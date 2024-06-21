@@ -4,6 +4,11 @@ use wasmparser::{
     BinaryReaderError, ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator,
     Parser, Payload, RefType, SubType, TableType, ValType,
 };
+
+
+use crate::convert::internal_to_encoder;
+use crate::convert::parser_to_internal;
+
 #[derive(Debug, Clone)]
 pub enum Error {
     BinaryReaderError(BinaryReaderError),
@@ -170,7 +175,7 @@ impl<'a> Module<'a> {
                             t.map_err(Error::from).and_then(|t| match t.init {
                                 wasmparser::TableInit::RefNull => Ok((t.ty, None)),
                                 wasmparser::TableInit::Expr(e) => {
-                                    convert::parser_to_internal::const_expr(e)
+                                    parser_to_internal::const_expr(e)
                                         .map(|init| (t.ty, Some(init)))
                                 }
                             })
@@ -418,10 +423,10 @@ impl<'a> Module<'a> {
             for (kind, items) in self.elements {
                 temp_const_exprs.clear();
                 let element_items = match &items {
-                    crate::ElementItems::Functions(funcs) => {
+                    ElementItems::Functions(funcs) => {
                         wasm_encoder::Elements::Functions(funcs)
                     }
-                    crate::ElementItems::ConstExprs { ty, exprs } => {
+                    ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
                         for e in exprs {
                             temp_const_exprs.push(internal_to_encoder::const_expr(e)?);
@@ -494,11 +499,11 @@ impl<'a> Module<'a> {
             for segment in self.data {
                 let segment_data = segment.data.iter().copied();
                 match segment.kind {
-                    crate::DataSegmentKind::Passive => data.segment(wasm_encoder::DataSegment {
+                    DataSegmentKind::Passive => data.segment(wasm_encoder::DataSegment {
                         mode: wasm_encoder::DataSegmentMode::Passive,
                         data: segment_data,
                     }),
-                    crate::DataSegmentKind::Active {
+                    DataSegmentKind::Active {
                         memory_index,
                         offset_expr,
                     } => {
