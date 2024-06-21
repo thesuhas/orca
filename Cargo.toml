@@ -1,0 +1,8 @@
+[package]
+name = "orca"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm-encoder = { version = "0.211.1", features = ["wasmparser"]}
+wasmparser = "0.211.1"
