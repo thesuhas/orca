@@ -1,7 +1,4 @@
-use wasmparser::{
-    BinaryReaderError, Export, GlobalType, Import, MemoryType, Operator, Parser, Payload, RefType,
-    SubType, TableType, ValType,
-};
+use wasmparser::{BinaryReaderError, Export, GlobalType, Import, MemoryType, Operator, Parser, Payload, RefType, SubType, TableType, ValType, ComponentType, Instance};
 
 pub struct Global<'a> {
     pub ty: GlobalType,
@@ -78,9 +75,14 @@ pub struct Module<'a> {
 pub struct Component<'a> {
     /// Needs to contain:
     /// 1. Modules
+    pub modules: Vec<Module<'a>>,
     /// 2. Alias
     /// 3. Types
+    pub types: Vec<ComponentType<'a>>, // TODO - Look into if a struct should replace this enum
     /// 4. Import
+    pub imports: Vec<Import<'a>>,
     /// 5. Export
-    /// TBD: Instances
+    pub exports: Vec<Export<'a>>,
+    /// 6. Instances
+    pub instances: Vec<Instance<'a>>
 }
