@@ -1,4 +1,40 @@
-use wasmparser::{BinaryReaderError, Export, GlobalType, Import, MemoryType, Operator, Parser, Payload, RefType, SubType, TableType, ValType, ComponentType, Instance};
+use std::ops::Range;
+
+use wasmparser::{
+    BinaryReaderError, ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator,
+    Parser, Payload, RefType, SubType, TableType, ValType,
+};
+#[derive(Debug, Clone)]
+pub enum Error {
+    BinaryReaderError(BinaryReaderError),
+    UnknownVersion(u32),
+    UnknownSection {
+        section_id: u8,
+    },
+    MissingFunctionEnd {
+        func_range: Range<usize>,
+    },
+    IncorrectDataCount {
+        declared_count: usize,
+        actual_count: usize,
+    },
+    ConversionError(String),
+    IncorrectCodeCounts {
+        function_section_count: usize,
+        code_section_declared_count: usize,
+        code_section_actual_count: usize,
+    },
+    MultipleStartSections,
+    /// `memory.grow` and `memory.size` operations must have a 0x00 byte
+    /// immediately after the instruction (it is not valid to have some other
+    /// variable length encoding representation of 0). This is because the
+    /// immediate byte will be used to reference other memories in the
+    /// multi-memory proposal.
+    InvalidMemoryReservedByte {
+        func_range: Range<usize>,
+    },
+}
+
 
 pub struct Global<'a> {
     pub ty: GlobalType,
@@ -84,5 +120,409 @@ pub struct Component<'a> {
     /// 5. Export
     pub exports: Vec<Export<'a>>,
     /// 6. Instances
-    pub instances: Vec<Instance<'a>>
+    pub instances: Vec<Instance<'a>>,
+}
+
+
+impl<'a> Module<'a> {
+    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+        let parser = Parser::new(0);
+        let mut imports = vec![];
+        let mut types = vec![];
+        let mut data = vec![];
+        let mut tables = vec![];
+        let mut memories = vec![];
+        let mut functions = vec![];
+        let mut elements = vec![];
+        let mut code_section_count = 0;
+        let mut code_sections = vec![];
+        let mut globals = vec![];
+        let mut exports = vec![];
+        let mut start = None;
+        let mut data_section_count = None;
+        let mut custom_sections = vec![];
+        for payload in parser.parse_all(wasm) {
+            let payload = payload?;
+            match payload {
+                Payload::ImportSection(import_section_reader) => {
+                    imports = import_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::TypeSection(type_section_reader) => {
+                    for rec_group in type_section_reader.into_iter() {
+                        types.extend(rec_group?.into_types());
+                    }
+                }
+                Payload::DataSection(data_section_reader) => {
+                    data = data_section_reader
+                        .into_iter()
+                        .map(|sec| {
+                            sec.map_err(Error::from)
+                                .and_then(parser_to_internal::data_segment)
+                        })
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::TableSection(table_section_reader) => {
+                    tables = table_section_reader
+                        .into_iter()
+                        .map(|t| {
+                            t.map_err(Error::from).and_then(|t| match t.init {
+                                wasmparser::TableInit::RefNull => Ok((t.ty, None)),
+                                wasmparser::TableInit::Expr(e) => {
+                                    convert::parser_to_internal::const_expr(e)
+                                        .map(|init| (t.ty, Some(init)))
+                                }
+                            })
+                        })
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::MemorySection(memory_section_reader) => {
+                    memories = memory_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::FunctionSection(function_section_reader) => {
+                    functions = function_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::GlobalSection(global_section_reader) => {
+                    globals = global_section_reader
+                        .into_iter()
+                        .map(|g| parser_to_internal::global(g?))
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::ExportSection(export_section_reader) => {
+                    exports = export_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
+                Payload::StartSection { func, range: _ } => {
+                    if start.is_some() {
+                        return Err(Error::MultipleStartSections);
+                    }
+                    start = Some(func);
+                }
+                Payload::ElementSection(element_section_reader) => {
+                    for element in element_section_reader.into_iter() {
+                        let element = element?;
+                        let items = parser_to_internal::element_items(element.items.clone())?;
+                        elements.push((parser_to_internal::element_kind(element.kind)?, items));
+                    }
+                }
+                Payload::DataCountSection { count, range: _ } => {
+                    data_section_count = Some(count);
+                }
+                Payload::CodeSectionStart {
+                    count,
+                    range: _,
+                    size: _,
+                } => {
+                    code_section_count = count as usize;
+                }
+                Payload::CodeSectionEntry(body) => {
+                    let locals_reader = body.get_locals_reader()?;
+                    let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
+                    let instructions = body
+                        .get_operators_reader()?
+                        .into_iter()
+                        .collect::<Result<Vec<_>, _>>()?;
+                    if let Some(last) = instructions.last() {
+                        if let Operator::End = last {
+                        } else {
+                            return Err(Error::MissingFunctionEnd {
+                                func_range: body.range(),
+                            });
+                        }
+                    }
+                    if !enable_multi_memory
+                        && instructions.iter().any(|i| match i {
+                        Operator::MemoryGrow { mem_byte, .. }
+                        | Operator::MemorySize { mem_byte, .. } => *mem_byte != 0x00,
+                        _ => false,
+                    })
+                    {
+                        return Err(Error::InvalidMemoryReservedByte {
+                            func_range: body.range(),
+                        });
+                    }
+                    code_sections.push(Body {
+                        locals,
+                        instructions,
+                    });
+                }
+                Payload::CustomSection(custom_section_reader) => {
+                    custom_sections
+                        .push((custom_section_reader.name(), custom_section_reader.data()));
+                }
+                Payload::Version {
+                    num,
+                    encoding: _,
+                    range: _,
+                } => {
+                    if num != 1 {
+                        return Err(Error::UnknownVersion(num as u32));
+                    }
+                }
+                Payload::UnknownSection {
+                    id,
+                    contents: _,
+                    range: _,
+                } => return Err(Error::UnknownSection { section_id: id }),
+                Payload::TagSection(_)
+                | Payload::ModuleSection {
+                    parser: _,
+                    range: _,
+                }
+                | Payload::InstanceSection(_)
+                | Payload::CoreTypeSection(_)
+                | Payload::ComponentSection {
+                    parser: _,
+                    range: _,
+                }
+                | Payload::ComponentInstanceSection(_)
+                | Payload::ComponentAliasSection(_)
+                | Payload::ComponentTypeSection(_)
+                | Payload::ComponentCanonicalSection(_)
+                | Payload::ComponentStartSection { start: _, range: _ }
+                | Payload::ComponentImportSection(_)
+                | Payload::ComponentExportSection(_)
+                | Payload::End(_) => {}
+            }
+        }
+        if code_section_count != code_sections.len() || code_section_count != functions.len() {
+            return Err(Error::IncorrectCodeCounts {
+                function_section_count: functions.len(),
+                code_section_declared_count: code_section_count,
+                code_section_actual_count: code_sections.len(),
+            });
+        }
+        if let Some(data_count) = data_section_count {
+            if data_count as usize != data.len() {
+                return Err(Error::IncorrectDataCount {
+                    declared_count: data_count as usize,
+                    actual_count: data.len(),
+                });
+            }
+        }
+        Ok(Module {
+            types,
+            imports,
+            functions,
+            tables,
+            memories,
+            globals,
+            exports,
+            start,
+            elements,
+            data_count_section_exists: data_section_count.is_some(),
+            code_sections,
+            data,
+            custom_sections,
+        })
+    }
+
+    pub fn encode(self) -> Result<Vec<u8>, Error> {
+        let mut module = wasm_encoder::Module::new();
+
+        if !self.types.is_empty() {
+            let mut types = wasm_encoder::TypeSection::new();
+            for subtype in self.types {
+                types.subtype(
+                    &wasm_encoder::SubType::try_from(subtype.clone()).map_err(|()| {
+                        Error::ConversionError(format!("Failed to convert type: {:?}", subtype))
+                    })?,
+                );
+            }
+            module.section(&types);
+        }
+
+        if !self.imports.is_empty() {
+            let mut imports = wasm_encoder::ImportSection::new();
+            for import in self.imports {
+                imports.import(
+                    import.module,
+                    import.name,
+                    wasm_encoder::EntityType::try_from(import.ty).map_err(|()| {
+                        Error::ConversionError(format!("Failed to convert type: {:?}", import.ty))
+                    })?,
+                );
+            }
+            module.section(&imports);
+        }
+
+        if !self.functions.is_empty() {
+            let mut functions = wasm_encoder::FunctionSection::new();
+            for type_index in self.functions {
+                functions.function(type_index);
+            }
+            module.section(&functions);
+        }
+
+        if !self.tables.is_empty() {
+            let mut tables = wasm_encoder::TableSection::new();
+            for (table_ty, init) in self.tables {
+                let table_ty = wasm_encoder::TableType::try_from(table_ty).map_err(|()| {
+                    Error::ConversionError(format!("Failed to convert type: {:?}", table_ty))
+                })?;
+                match init {
+                    None => tables.table(table_ty),
+                    Some(const_expr) => tables
+                        .table_with_init(table_ty, &internal_to_encoder::const_expr(&const_expr)?),
+                };
+            }
+            module.section(&tables);
+        }
+
+        if !self.memories.is_empty() {
+            let mut memories = wasm_encoder::MemorySection::new();
+            for memory in self.memories {
+                memories.memory(wasm_encoder::MemoryType::from(memory));
+            }
+            module.section(&memories);
+        }
+
+        if !self.globals.is_empty() {
+            let mut globals = wasm_encoder::GlobalSection::new();
+            for global in self.globals {
+                globals.global(
+                    wasm_encoder::GlobalType::try_from(global.ty).map_err(|()| {
+                        Error::ConversionError(format!("Failed to convert type: {:?}", global.ty))
+                    })?,
+                    &internal_to_encoder::const_expr(&global.init_expr)?,
+                );
+            }
+            module.section(&globals);
+        }
+
+        if !self.exports.is_empty() {
+            let mut exports = wasm_encoder::ExportSection::new();
+            for export in self.exports {
+                exports.export(
+                    export.name,
+                    wasm_encoder::ExportKind::from(export.kind),
+                    export.index,
+                );
+            }
+            module.section(&exports);
+        }
+
+        if let Some(function_index) = self.start {
+            module.section(&wasm_encoder::StartSection { function_index });
+        }
+
+        if !self.elements.is_empty() {
+            let mut elements = wasm_encoder::ElementSection::new();
+            let mut temp_const_exprs = vec![];
+            for (kind, items) in self.elements {
+                temp_const_exprs.clear();
+                let element_items = match &items {
+                    crate::ElementItems::Functions(funcs) => {
+                        wasm_encoder::Elements::Functions(funcs)
+                    }
+                    crate::ElementItems::ConstExprs { ty, exprs } => {
+                        temp_const_exprs.reserve(exprs.len());
+                        for e in exprs {
+                            temp_const_exprs.push(internal_to_encoder::const_expr(e)?);
+                        }
+                        wasm_encoder::Elements::Expressions(
+                            wasm_encoder::RefType::try_from(*ty).map_err(|()| {
+                                Error::ConversionError(format!("Failed to convert type: {:?}", ty))
+                            })?,
+                            &temp_const_exprs,
+                        )
+                    }
+                };
+
+                match kind {
+                    ElementKind::Passive => {
+                        elements.passive(element_items);
+                    }
+                    ElementKind::Active {
+                        table_index,
+                        offset_expr,
+                    } => {
+                        elements.active(
+                            table_index,
+                            &internal_to_encoder::const_expr(&offset_expr)?,
+                            element_items,
+                        );
+                    }
+                    ElementKind::Declared => {
+                        elements.declared(element_items);
+                    }
+                }
+            }
+            module.section(&elements);
+        }
+
+        if self.data_count_section_exists {
+            let data_count = wasm_encoder::DataCountSection {
+                count: self.data.len() as u32,
+            };
+            module.section(&data_count);
+        }
+
+        if !self.code_sections.is_empty() {
+            let mut code = wasm_encoder::CodeSection::new();
+            for Body {
+                locals,
+                instructions,
+            } in self.code_sections
+            {
+                let mut converted_locals = Vec::with_capacity(locals.len());
+                for (c, t) in locals {
+                    converted_locals.push((
+                        c,
+                        wasm_encoder::ValType::try_from(t).map_err(|()| {
+                            Error::ConversionError(format!("Falied to convert type: {:?}", t))
+                        })?,
+                    ));
+                }
+                let mut function = wasm_encoder::Function::new(converted_locals);
+                for op in instructions {
+                    function.instruction(&internal_to_encoder::op(op)?);
+                }
+                code.function(&function);
+            }
+            module.section(&code);
+        }
+
+        if !self.data.is_empty() {
+            let mut data = wasm_encoder::DataSection::new();
+            for segment in self.data {
+                let segment_data = segment.data.iter().copied();
+                match segment.kind {
+                    crate::DataSegmentKind::Passive => data.segment(wasm_encoder::DataSegment {
+                        mode: wasm_encoder::DataSegmentMode::Passive,
+                        data: segment_data,
+                    }),
+                    crate::DataSegmentKind::Active {
+                        memory_index,
+                        offset_expr,
+                    } => {
+                        let const_expr = internal_to_encoder::const_expr(&offset_expr)?;
+                        data.segment(wasm_encoder::DataSegment {
+                            mode: wasm_encoder::DataSegmentMode::Active {
+                                memory_index,
+                                offset: &const_expr,
+                            },
+                            data: segment_data,
+                        })
+                    }
+                };
+            }
+            module.section(&data);
+        }
+
+        for (name, data) in self.custom_sections {
+            module.section(&wasm_encoder::CustomSection {
+                name: std::borrow::Cow::Borrowed(name),
+                data: std::borrow::Cow::Borrowed(data),
+            });
+        }
+
+        Ok(module.finish())
+    }
 }
