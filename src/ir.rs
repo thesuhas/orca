@@ -74,3 +74,13 @@ pub struct Module<'a> {
     pub code_sections: Vec<Body<'a>>,
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
 }
+
+pub struct Component<'a> {
+    /// Needs to contain:
+    /// 1. Modules
+    /// 2. Alias
+    /// 3. Types
+    /// 4. Import
+    /// 5. Export
+    /// TBD: Instances
+}
