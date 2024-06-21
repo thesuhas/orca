@@ -8,7 +8,7 @@
 //! internal type should use [`wasmparser`].
 
 use crate::error::Error;
-use crate::ir::{DataSegmentKind, DataSegment, ElementKind, ElementItems, Global};
+use crate::ir::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global};
 type Result<T> = std::result::Result<T, Error>;
 
 /// Conversion from [`wasmparser`] to internal types.

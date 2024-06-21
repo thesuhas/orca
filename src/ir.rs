@@ -1,11 +1,11 @@
 use wasmparser::{
-    ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator,
-    Parser, Payload, RefType, SubType, TableType, ValType,
+    ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload,
+    RefType, SubType, TableType, ValType,
 };
 
-use crate::error::Error;
 use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
+use crate::error::Error;
 
 pub struct Global<'a> {
     pub ty: GlobalType,
@@ -94,7 +94,6 @@ pub struct Component<'a> {
     pub instances: Vec<Instance<'a>>,
 }
 
-
 impl<'a> Module<'a> {
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
@@ -141,8 +140,7 @@ impl<'a> Module<'a> {
                             t.map_err(Error::from).and_then(|t| match t.init {
                                 wasmparser::TableInit::RefNull => Ok((t.ty, None)),
                                 wasmparser::TableInit::Expr(e) => {
-                                    parser_to_internal::const_expr(e)
-                                        .map(|init| (t.ty, Some(init)))
+                                    parser_to_internal::const_expr(e).map(|init| (t.ty, Some(init)))
                                 }
                             })
                         })
@@ -209,10 +207,11 @@ impl<'a> Module<'a> {
                     }
                     if !enable_multi_memory
                         && instructions.iter().any(|i| match i {
-                        Operator::MemoryGrow { mem, .. }
-                        | Operator::MemorySize { mem, .. } => *mem != 0x00,
-                        _ => false,
-                    })
+                            Operator::MemoryGrow { mem, .. } | Operator::MemorySize { mem, .. } => {
+                                *mem != 0x00
+                            }
+                            _ => false,
+                        })
                     {
                         return Err(Error::InvalidMemoryReservedByte {
                             func_range: body.range(),
@@ -241,7 +240,8 @@ impl<'a> Module<'a> {
                     contents: _,
                     range: _,
                 } => return Err(Error::UnknownSection { section_id: id }),
-                Payload::TagSection(_) | Payload::ModuleSection {
+                Payload::TagSection(_)
+                | Payload::ModuleSection {
                     parser: _,
                     range: _,
                 }
@@ -388,9 +388,7 @@ impl<'a> Module<'a> {
             for (kind, items) in self.elements {
                 temp_const_exprs.clear();
                 let element_items = match &items {
-                    ElementItems::Functions(funcs) => {
-                        wasm_encoder::Elements::Functions(funcs)
-                    }
+                    ElementItems::Functions(funcs) => wasm_encoder::Elements::Functions(funcs),
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
                         for e in exprs {
