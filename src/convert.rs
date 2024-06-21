@@ -7,7 +7,8 @@
 //! the [`wasmparser`] and [`wasm_encoder`] types, but in most cases the
 //! internal type should use [`wasmparser`].
 
-use crate::ir::Error;
+use crate::error::Error;
+use crate::ir::{DataSegmentKind, DataSegment, ElementKind, ElementItems, Global};
 type Result<T> = std::result::Result<T, Error>;
 
 /// Conversion from [`wasmparser`] to internal types.
@@ -17,7 +18,7 @@ pub(super) mod parser_to_internal {
     pub(crate) fn const_expr(const_expr: wasmparser::ConstExpr) -> Result<wasmparser::Operator> {
         let mut ops = const_expr.get_operators_reader().into_iter();
         let first = ops.next();
-        let end: Option<std::result::Result<wasmparser::Operator, wasmparser::BinaryReaderError>> = ops.next();
+        let end = ops.next();
         let rest = ops.next();
         let (Some(first), Some(Ok(wasmparser::Operator::End)), None) = (first, end, rest) else {
             return Err(Error::ConversionError(format!(
@@ -49,54 +50,54 @@ pub(super) mod parser_to_internal {
         }
     }
 
-    fn data_kind(kind: wasmparser::DataKind) -> Result<crate::ir::DataSegmentKind> {
+    fn data_kind(kind: wasmparser::DataKind) -> Result<DataSegmentKind> {
         Ok(match kind {
-            wasmparser::DataKind::Passive => crate::ir::DataSegmentKind::Passive,
+            wasmparser::DataKind::Passive => DataSegmentKind::Passive,
             wasmparser::DataKind::Active {
                 memory_index,
                 offset_expr,
-            } => crate::ir::DataSegmentKind::Active {
+            } => DataSegmentKind::Active {
                 memory_index,
                 offset_expr: const_expr(offset_expr)?,
             },
         })
     }
 
-    pub(crate) fn data_segment(data: wasmparser::Data) -> Result<crate::ir::DataSegment> {
-        Ok(crate::ir::DataSegment {
+    pub(crate) fn data_segment(data: wasmparser::Data) -> Result<DataSegment> {
+        Ok(DataSegment {
             kind: data_kind(data.kind)?,
             data: data.data,
         })
     }
 
-    pub(crate) fn element_kind(kind: wasmparser::ElementKind) -> Result<crate::ir::ElementKind> {
+    pub(crate) fn element_kind(kind: wasmparser::ElementKind) -> Result<ElementKind> {
         match kind {
-            wasmparser::ElementKind::Passive => Ok(crate::ir::ElementKind::Passive),
-            wasmparser::ElementKind::Declared => Ok(crate::ir::ElementKind::Declared),
+            wasmparser::ElementKind::Passive => Ok(ElementKind::Passive),
+            wasmparser::ElementKind::Declared => Ok(ElementKind::Declared),
             wasmparser::ElementKind::Active {
                 table_index,
                 offset_expr,
-            } => Ok(crate::ir::ElementKind::Active {
+            } => Ok(ElementKind::Active {
                 table_index,
                 offset_expr: const_expr(offset_expr)?,
             }),
         }
     }
 
-    pub(crate) fn element_items(items: wasmparser::ElementItems) -> Result<crate::ir::ElementItems> {
+    pub(crate) fn element_items(items: wasmparser::ElementItems) -> Result<ElementItems> {
         match items {
             wasmparser::ElementItems::Functions(reader) => {
                 let functions = reader
                     .into_iter()
                     .collect::<std::result::Result<Vec<_>, _>>()?;
-                Ok(crate::ir::ElementItems::Functions(functions))
+                Ok(ElementItems::Functions(functions))
             }
             wasmparser::ElementItems::Expressions(ref_type, reader) => {
                 let exprs = reader
                     .into_iter()
                     .map(|expr| const_expr(expr?))
                     .collect::<std::result::Result<Vec<_>, _>>()?;
-                Ok(crate::ir::ElementItems::ConstExprs {
+                Ok(ElementItems::ConstExprs {
                     ty: ref_type,
                     exprs,
                 })
@@ -104,8 +105,8 @@ pub(super) mod parser_to_internal {
         }
     }
 
-    pub(crate) fn global(global: wasmparser::Global) -> Result<crate::ir::Global> {
-        Ok(crate::ir::Global {
+    pub(crate) fn global(global: wasmparser::Global) -> Result<Global> {
+        Ok(Global {
             ty: global.ty,
             init_expr: const_expr(global.init_expr)?,
         })

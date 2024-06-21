@@ -1,45 +1,11 @@
-use std::ops::Range;
-
 use wasmparser::{
-    BinaryReaderError, ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator,
+    ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator,
     Parser, Payload, RefType, SubType, TableType, ValType,
 };
 
-
+use crate::error::Error;
 use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
-
-#[derive(Debug, Clone)]
-pub enum Error {
-    BinaryReaderError(BinaryReaderError),
-    UnknownVersion(u32),
-    UnknownSection {
-        section_id: u8,
-    },
-    MissingFunctionEnd {
-        func_range: Range<usize>,
-    },
-    IncorrectDataCount {
-        declared_count: usize,
-        actual_count: usize,
-    },
-    ConversionError(String),
-    IncorrectCodeCounts {
-        function_section_count: usize,
-        code_section_declared_count: usize,
-        code_section_actual_count: usize,
-    },
-    MultipleStartSections,
-    /// `memory.grow` and `memory.size` operations must have a 0x00 byte
-    /// immediately after the instruction (it is not valid to have some other
-    /// variable length encoding representation of 0). This is because the
-    /// immediate byte will be used to reference other memories in the
-    /// multi-memory proposal.
-    InvalidMemoryReservedByte {
-        func_range: Range<usize>,
-    },
-}
-
 
 pub struct Global<'a> {
     pub ty: GlobalType,
@@ -243,8 +209,8 @@ impl<'a> Module<'a> {
                     }
                     if !enable_multi_memory
                         && instructions.iter().any(|i| match i {
-                        Operator::MemoryGrow { mem_byte, .. }
-                        | Operator::MemorySize { mem_byte, .. } => *mem_byte != 0x00,
+                        Operator::MemoryGrow { mem, .. }
+                        | Operator::MemorySize { mem, .. } => *mem != 0x00,
                         _ => false,
                     })
                     {
@@ -275,8 +241,7 @@ impl<'a> Module<'a> {
                     contents: _,
                     range: _,
                 } => return Err(Error::UnknownSection { section_id: id }),
-                Payload::TagSection(_)
-                | Payload::ModuleSection {
+                Payload::TagSection(_) | Payload::ModuleSection {
                     parser: _,
                     range: _,
                 }
