@@ -1,7 +1,4 @@
-use wasmparser::{
-    ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload,
-    RefType, SubType, TableType, ValType,
-};
+use wasmparser::{ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload, RefType, SubType, TableType, ValType, CanonicalFunction, ComponentAlias, ComponentImport, ComponentExport, CoreType, ComponentInstance};
 
 use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
@@ -84,19 +81,88 @@ pub struct Component<'a> {
     /// 1. Modules
     pub modules: Vec<Module<'a>>,
     /// 2. Alias
+    pub alias: Vec<ComponentAlias<'a>>,
     /// 3. Types
-    pub types: Vec<ComponentType<'a>>, // TODO - Look into if a struct should replace this enum
+    pub types: Vec<CoreType<'a>>, // TODO - Look into if a struct should replace this enum
     /// 4. Import
-    pub imports: Vec<Import<'a>>,
+    pub imports: Vec<ComponentImport<'a>>,
     /// 5. Export
-    pub exports: Vec<Export<'a>>,
+    pub exports: Vec<ComponentExport<'a>>,
     /// 6. Instances
     pub instances: Vec<Instance<'a>>,
+    pub component_instance: Vec<ComponentInstance<'a>>,
+    /// 7. Canons
+    pub canons: Vec<CanonicalFunction>,
+}
+
+impl<'a> Component<'a> {
+    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+        let mut modules = vec![];
+        let mut types = vec![];
+        let mut imports = vec![];
+        let mut exports = vec![];
+        let mut instances = vec![];
+        let mut canons = vec![];
+        let mut alias = vec![];
+        let mut component_instance = vec![];
+
+        let parser = Parser::new(0);
+        for payload in parser.parse_all(wasm) {
+            let payload = payload?;
+            // ComponentTypeSection(_) => { /* ... */ }
+            // ComponentStartSection { .. } => { /* ... */ }
+            match payload {
+                Payload::ComponentImportSection(import_section_reader) => {
+                    imports = import_section_reader.into_iter().collect::<Result<_, _>>()?
+                },
+                Payload::ComponentExportSection(export_section_reader) => {
+                    exports = export_section_reader.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::InstanceSection(instance_section_reader) => {
+                    instances = instance_section_reader.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::CoreTypeSection(core_type_reader) => {
+                    types = core_type_reader.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::ComponentInstanceSection(component_instances) => {
+                    component_instance = component_instances.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::ComponentAliasSection(alias_reader) => {
+                    alias = alias_reader.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::ComponentCanonicalSection(canon_reader) => {
+                    canons = canon_reader.into_iter().collect::<Result<_, _>>()?;
+                },
+                Payload::ModuleSection{parser, range} => {
+                    modules.push(Module::parse(&wasm[range], false, parser)?);
+                },
+                Payload::ComponentSection {
+                    parser: _,
+                    range: _,
+                } => {},
+                _ => {}
+            }
+        }
+        Ok(Component{
+            modules,
+            alias,
+            types,
+            imports,
+            exports,
+            instances,
+            component_instance,
+            canons
+        })
+    }
+
+    fn print(&self) {
+
+    }
 }
 
 impl<'a> Module<'a> {
-    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
-        let parser = Parser::new(0);
+    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
+        // let parser = Parser::new(0);
         let mut imports = vec![];
         let mut types = vec![];
         let mut data = vec![];
