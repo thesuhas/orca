@@ -1,8 +1,13 @@
-use wasmparser::{ComponentType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload, RefType, SubType, TableType, ValType, CanonicalFunction, ComponentAlias, ComponentImport, ComponentExport, CoreType, ComponentInstance};
-
 use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
 use crate::error::Error;
+use wasm_encoder::{ComponentAliasSection, ImportSection, ModuleSection};
+use wasmparser::Payload::{ComponentExportSection, ComponentImportSection};
+use wasmparser::{
+    CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
+    CoreType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload, RefType,
+    SubType, TableType, ValType,
+};
 
 pub struct Global<'a> {
     pub ty: GlobalType,
@@ -116,46 +121,53 @@ impl<'a> Component<'a> {
             // ComponentStartSection { .. } => { /* ... */ }
             match payload {
                 Payload::ComponentImportSection(import_section_reader) => {
-                    imports = import_section_reader.into_iter().collect::<Result<_, _>>()?
-                },
+                    imports = import_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?
+                }
                 Payload::ComponentExportSection(export_section_reader) => {
-                    exports = export_section_reader.into_iter().collect::<Result<_, _>>()?;
-                },
+                    exports = export_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
                 Payload::InstanceSection(instance_section_reader) => {
-                    instances = instance_section_reader.into_iter().collect::<Result<_, _>>()?;
-                },
+                    instances = instance_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                }
                 Payload::CoreTypeSection(core_type_reader) => {
                     types = core_type_reader.into_iter().collect::<Result<_, _>>()?;
-                },
+                }
                 Payload::ComponentInstanceSection(component_instances) => {
-                    component_instance = component_instances.into_iter().collect::<Result<_, _>>()?;
-                },
+                    component_instance =
+                        component_instances.into_iter().collect::<Result<_, _>>()?;
+                }
                 Payload::ComponentAliasSection(alias_reader) => {
                     alias = alias_reader.into_iter().collect::<Result<_, _>>()?;
-                },
+                }
                 Payload::ComponentCanonicalSection(canon_reader) => {
                     canons = canon_reader.into_iter().collect::<Result<_, _>>()?;
-                },
-                Payload::ModuleSection{parser, range} => {
+                }
+                Payload::ModuleSection { parser, range } => {
                     modules.push(Module::parse(&wasm[range], false, parser)?);
-                },
+                }
                 Payload::ComponentSection {
                     parser: _,
                     range: _,
-                } => {},
+                } => {}
                 Payload::CustomSection(custom_section_reader) => {
                     custom_sections
                         .push((custom_section_reader.name(), custom_section_reader.data()));
-                },
+                }
                 Payload::UnknownSection {
                     id,
                     contents: _,
                     range: _,
                 } => return Err(Error::UnknownSection { section_id: id }),
-                _ => {},
+                _ => {}
             }
         }
-        Ok(Component{
+        Ok(Component {
             modules,
             alias,
             types,
@@ -164,8 +176,121 @@ impl<'a> Component<'a> {
             instances,
             component_instance,
             canons,
-            custom_sections
+            custom_sections,
         })
+    }
+
+    pub fn encode(self) -> Result<Vec<u8>, Error> {
+        let mut component = wasm_encoder::Component::new();
+
+        // Module parsing
+        // if !self.modules.is_empty() {
+        //     // Parse each module
+        //     for m in self.modules {
+        //         component.section(&ModuleSection());
+        //     }
+        // }
+
+        // Alias parsing
+        if !self.alias.is_empty() {
+            let mut alias = ComponentAliasSection::new();
+            for a in self.alias {
+                alias.alias(wasm_encoder::Alias::try_from(a).expect("Unable to unpack alias"));
+            }
+            component.section(&alias);
+        }
+
+        // Types parsing
+        // if !self.types.is_empty() {
+        //     let mut core_type = wasm_encoder::CoreTypeSection::new();
+        //     for ty in self.types {
+        //         wasm_encoder::CoreTypeSection::try_from(ty).expect("Unable to unpack core type")
+        //     }
+        // }
+
+        // Import parsing
+        if !self.imports.is_empty() {
+            let mut imports = wasm_encoder::ComponentImportSection::new();
+            for imp in self.imports {
+                imports.import(
+                    imp.name.0,
+                    wasm_encoder::ComponentTypeRef::try_from(imp.ty)
+                        .expect("Unable to export component type in import"),
+                );
+            }
+            component.section(&imports);
+        }
+
+        // Export parsing
+        if !self.exports.is_empty() {
+            let mut exports = wasm_encoder::ComponentExportSection::new();
+            for exp in self.exports {
+                exports.export(
+                    exp.name.0,
+                    wasm_encoder::ComponentExportKind::try_from(exp.kind)
+                        .expect("Unable to unpack component export kind"),
+                    exp.index,
+                    Option::from(
+                        wasm_encoder::ComponentTypeRef::try_from(exp.ty)
+                            .expect("Unable to unpack component type ref in export"),
+                    ),
+                );
+            }
+            component.section(&exports);
+        }
+
+        // Component Instance parsing
+        if !self.component_instance.is_empty() {
+            let mut instances = wasm_encoder::ComponentInstanceSection::new();
+            for instance in self.component_instance {
+                match instance {
+                    ComponentInstance::Instantiate(idx, args) => {
+                        instances.instantiate(idx, args);
+                    },
+                    ComponentInstance::FromExports(export) => {
+                        let e = export.into_iter().collect();
+                        instances.export_items([(e.name, e.kind, e.index)]);
+                    }
+                }
+            }
+            component.section(&instances);
+        }
+
+        // TODO: Instance Parsing
+
+        // Canons parsing
+        if !self.canons.is_empty() {
+            let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
+            for canon in self.canons {
+                match canon {
+                    CanonicalFunction::Lift(core_func_idx, type_idx, opt) => {
+                        canon_sec.lift(core_func_idx, type_idx, opt);
+                    },
+                    CanonicalFunction::Lower(func_idx, opt) => {
+                        canon_sec.lower(func_idx, opt);
+                    },
+                    CanonicalFunction::ResourceNew(resource) => {
+                        canon_sec.resource_new(resource);
+                    },
+                    CanonicalFunction::ResourceDrop(resource) => {
+                        canon_sec.resource_rep(resource);
+                    },
+                    CanonicalFunction::ResourceRep(resource) => {
+                        canon_sec.resource_rep(resource);
+                    }
+                }
+            }
+            component.section(&canon_sec);
+        }
+
+        // Custom sections
+        for (name, data) in self.custom_sections {
+            component.section(&wasm_encoder::CustomSection {
+                name: std::borrow::Cow::Borrowed(name),
+                data: std::borrow::Cow::Borrowed(data),
+            });
+        }
+        Ok(component.finish())
     }
 }
 

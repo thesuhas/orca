@@ -4,8 +4,8 @@ pub mod ir;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use crate::ir::Component;
+    use std::fs;
     use std::path::Path;
 
     #[test]
