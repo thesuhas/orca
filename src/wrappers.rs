@@ -1,4 +1,4 @@
-use wasm_encoder::{ComponentExportKind, ExportKind};
+use wasm_encoder::{ComponentExportKind, ExportKind, ModuleArg};
 use wasmparser::{ComponentExternalKind, ComponentInstantiationArg, ExternalKind};
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
@@ -249,4 +249,18 @@ pub fn convert_component_export(
         EncoderComponentExportKind::from(value.kind).ret_original(),
         value.index,
     )
+}
+
+/// Extracts and Converts Exports
+pub fn convert_export(value: wasmparser::Export) -> (&str, ExportKind, u32) {
+    (
+        value.name,
+        wasm_encoder::ExportKind::from(value.kind),
+        value.index,
+    )
+}
+
+/// Extracts and Converts Instance args
+pub fn convert_instantiation_arg(value: wasmparser::InstantiationArg) -> (&str, ModuleArg) {
+    (value.name, ModuleArg::Instance(value.index))
 }

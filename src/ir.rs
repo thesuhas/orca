@@ -2,9 +2,9 @@ use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
-    convert_canon, convert_component_export, convert_component_instantiation_arg,
-    EncoderComponentExportKind, EncoderComponentOuterAlias, EncoderComponentTypeRef,
-    EncoderExportKind,
+    convert_canon, convert_component_export, convert_component_instantiation_arg, convert_export,
+    convert_instantiation_arg, EncoderComponentExportKind, EncoderComponentOuterAlias,
+    EncoderComponentTypeRef, EncoderExportKind,
 };
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
 use wasmparser::{
@@ -306,7 +306,24 @@ impl<'a> Component<'a> {
             component.section(&instances);
         }
 
-        // TODO: Instance Parsing
+        // Core Instance Parsing
+        if !self.instances.is_empty() {
+            let mut instances = wasm_encoder::InstanceSection::new();
+            for instance in self.instances {
+                match instance {
+                    Instance::Instantiate { module_index, args } => {
+                        instances.instantiate(
+                            module_index,
+                            args.into_vec().into_iter().map(convert_instantiation_arg),
+                        );
+                    }
+                    Instance::FromExports(exports) => {
+                        instances.export_items(exports.into_vec().into_iter().map(convert_export));
+                    }
+                }
+            }
+            component.section(&instances);
+        }
 
         // Canons parsing
         if !self.canons.is_empty() {
