@@ -2,3 +2,4 @@
 .idea/
 *.lock
 .vscode/
+.DS_Store/

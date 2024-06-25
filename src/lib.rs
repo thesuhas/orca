@@ -13,6 +13,6 @@ mod tests {
         let path = Path::new("test/hello_world.wasm");
         let data = fs::read(path).expect("File not found");
         let cmp = Component::parse(&data, false).expect("TODO: panic message");
-        println!("Component: {:?}", cmp);
+        println!("aha");
     }
 }

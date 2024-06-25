@@ -93,6 +93,8 @@ pub struct Component<'a> {
     pub component_instance: Vec<ComponentInstance<'a>>,
     /// 7. Canons
     pub canons: Vec<CanonicalFunction>,
+    /// 8. Custom sections
+    pub custom_sections: Vec<(&'a str, &'a [u8])>,
 }
 
 impl<'a> Component<'a> {
@@ -105,6 +107,7 @@ impl<'a> Component<'a> {
         let mut canons = vec![];
         let mut alias = vec![];
         let mut component_instance = vec![];
+        let mut custom_sections = vec![];
 
         let parser = Parser::new(0);
         for payload in parser.parse_all(wasm) {
@@ -140,7 +143,16 @@ impl<'a> Component<'a> {
                     parser: _,
                     range: _,
                 } => {},
-                _ => {}
+                Payload::CustomSection(custom_section_reader) => {
+                    custom_sections
+                        .push((custom_section_reader.name(), custom_section_reader.data()));
+                },
+                Payload::UnknownSection {
+                    id,
+                    contents: _,
+                    range: _,
+                } => return Err(Error::UnknownSection { section_id: id }),
+                _ => {},
             }
         }
         Ok(Component{
@@ -151,12 +163,9 @@ impl<'a> Component<'a> {
             exports,
             instances,
             component_instance,
-            canons
+            canons,
+            custom_sections
         })
-    }
-
-    fn print(&self) {
-
     }
 }
 
