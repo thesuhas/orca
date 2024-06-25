@@ -2,7 +2,8 @@ use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
-    convert_canon, EncoderComponentExportKind, EncoderComponentOuterAlias, EncoderComponentTypeRef,
+    convert_canon, convert_component_export, convert_component_instantiation_arg,
+    EncoderComponentExportKind, EncoderComponentOuterAlias, EncoderComponentTypeRef,
     EncoderExportKind,
 };
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
@@ -280,21 +281,30 @@ impl<'a> Component<'a> {
         }
 
         // Component Instance parsing
-        // if !self.component_instance.is_empty() {
-        //     let mut instances = wasm_encoder::ComponentInstanceSection::new();
-        //     for instance in self.component_instance {
-        //         match instance {
-        //             ComponentInstance::Instantiate(idx, args) => {
-        //                 instances.instantiate(idx, args);
-        //             }
-        //             ComponentInstance::FromExports(export) => {
-        //                 let e = export.into_iter().collect();
-        //                 instances.export_items([(e.name, e.kind, e.index)]);
-        //             }
-        //         }
-        //     }
-        //     component.section(&instances);
-        // }
+        if !self.component_instance.is_empty() {
+            let mut instances = wasm_encoder::ComponentInstanceSection::new();
+            for instance in self.component_instance {
+                match instance {
+                    ComponentInstance::Instantiate {
+                        component_index,
+                        args,
+                    } => {
+                        instances.instantiate(
+                            component_index,
+                            args.into_vec()
+                                .into_iter()
+                                .map(convert_component_instantiation_arg),
+                        );
+                    }
+                    ComponentInstance::FromExports(export) => {
+                        instances.export_items(
+                            export.into_vec().into_iter().map(convert_component_export),
+                        );
+                    }
+                }
+            }
+            component.section(&instances);
+        }
 
         // TODO: Instance Parsing
 

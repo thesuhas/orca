@@ -1,5 +1,5 @@
 use wasm_encoder::{ComponentExportKind, ExportKind};
-use wasmparser::{ComponentExternalKind, ExternalKind};
+use wasmparser::{ComponentExternalKind, ComponentInstantiationArg, ExternalKind};
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
 pub struct EncoderComponentExportKind(ComponentExportKind);
@@ -227,4 +227,26 @@ pub fn convert_canon(value: wasmparser::CanonicalOption) -> wasm_encoder::Canoni
         wasmparser::CanonicalOption::Realloc(u) => wasm_encoder::CanonicalOption::Realloc(u),
         wasmparser::CanonicalOption::PostReturn(u) => wasm_encoder::CanonicalOption::PostReturn(u),
     }
+}
+
+/// Extracts the args of ComponentInstantiation
+pub fn convert_component_instantiation_arg(
+    arg: ComponentInstantiationArg,
+) -> (&str, ComponentExportKind, u32) {
+    (
+        arg.name,
+        EncoderComponentExportKind::from(arg.kind).ret_original(),
+        arg.index,
+    )
+}
+
+/// Extracts and Converts Component Export
+pub fn convert_component_export(
+    value: wasmparser::ComponentExport,
+) -> (&str, ComponentExportKind, u32) {
+    (
+        value.name.0,
+        EncoderComponentExportKind::from(value.kind).ret_original(),
+        value.index,
+    )
 }
