@@ -1,8 +1,10 @@
-use wasm_encoder::{Alias, ComponentExportKind, EntityType, ExportKind, InstanceType, ModuleArg};
+use wasm_encoder::{
+    Alias, ComponentExportKind, CoreTypeEncoder, EntityType, ExportKind, InstanceType, ModuleArg,
+};
 use wasmparser::types::TypeIdentifier;
 use wasmparser::{
-    ComponentAlias, ComponentExternalKind, ComponentInstantiationArg, ExternalKind,
-    InstanceTypeDeclaration, TypeRef,
+    ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg,
+    ExternalKind, InstanceTypeDeclaration, SubType, TypeRef,
 };
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
@@ -221,6 +223,10 @@ impl EncoderComponentValType {
     }
 }
 
+pub fn convert_val_type(ty: &wasmparser::ValType) -> wasm_encoder::ValType {
+    EncoderValType::from(*ty).ret_original()
+}
+
 /// Function that converts Canonical Option
 pub fn convert_canon(value: wasmparser::CanonicalOption) -> wasm_encoder::CanonicalOption {
     match value {
@@ -310,11 +316,18 @@ pub fn convert_module_type_declaration(
 ) -> wasm_encoder::ModuleType {
     let mut mty = wasm_encoder::ModuleType::new();
     match ty {
-        wasmparser::ModuleTypeDeclaration::Type(sub) => {}
+        wasmparser::ModuleTypeDeclaration::Type(sub) => {
+            let enc = mty.ty();
+            encode_core_type_subtype(enc, sub);
+        }
         wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
             mty.export(name, EncoderEntityType::from(ty).ret_original());
         }
-        wasmparser::ModuleTypeDeclaration::OuterAlias { kind, count, index } => {
+        wasmparser::ModuleTypeDeclaration::OuterAlias {
+            kind: _kind,
+            count,
+            index,
+        } => {
             mty.alias_outer_core_type(count, index);
         }
         wasmparser::ModuleTypeDeclaration::Import(import) => {
@@ -352,28 +365,19 @@ pub fn convert_module_type_declaration(
 pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
     let mut ity = InstanceType::new();
     match value {
-        InstanceTypeDeclaration::CoreType(core_type) => {
-            match core_type {
-                wasmparser::CoreType::Sub(sub) => {
-                    // TODO: Struct and Arrays once added to wasm_encoder
-                    let mut enc = ity.core_type();
-                    match sub {
-                        wasmparser::CompositeType::Func(func) => {
-                            enc.function(func.params(), func.results());
-                        }
-                        wasmparser::CompositeType::Array(array) => {}
-                        wasmparser::CompositeType::Struct(str) => {}
-                    }
-                }
-                wasmparser::CoreType::Module(module) => {
-                    for m in &*module {
-                        let mut enc = ity.core_type();
-                        enc.module(&convert_module_type_declaration((*m).clone()));
-                    }
+        InstanceTypeDeclaration::CoreType(core_type) => match core_type {
+            wasmparser::CoreType::Sub(sub) => {
+                let enc = ity.core_type();
+                encode_core_type_subtype(enc, sub);
+            }
+            wasmparser::CoreType::Module(module) => {
+                for m in &*module {
+                    let enc = ity.core_type();
+                    enc.module(&convert_module_type_declaration((*m).clone()));
                 }
             }
-        }
-        InstanceTypeDeclaration::Type(ty) => {
+        },
+        InstanceTypeDeclaration::Type(_ty) => {
             // TODO - Recursive Data Structure
         }
         InstanceTypeDeclaration::Alias(alias) => match alias {
@@ -483,15 +487,98 @@ pub fn convert_component_val_type(
     EncoderComponentValType::from(val).ret_original()
 }
 
+/// Convert Record Type
+pub fn convert_record_type(
+    val: (&str, wasmparser::ComponentValType),
+) -> (&str, wasm_encoder::ComponentValType) {
+    (val.0, EncoderComponentValType::from(val.1).ret_original())
+}
+
+/// Convert Func Params
+pub fn convert_params(
+    p: (&str, wasmparser::ComponentValType),
+) -> (&str, wasm_encoder::ComponentValType) {
+    (p.0, convert_component_val_type(p.1))
+}
+
+/// Convert Func Results
+pub fn convert_results(result: ComponentFuncResult) -> Vec<(&str, wasm_encoder::ComponentValType)> {
+    let mut results = vec![];
+    match result {
+        // TODO - Look if empty string is enough
+        ComponentFuncResult::Unnamed(ty) => results.push(("", convert_component_val_type(ty))),
+        ComponentFuncResult::Named(b) => {
+            for named in b.into_vec() {
+                results.push((named.0, convert_component_val_type(named.1)));
+            }
+        }
+    }
+    results
+}
+
 /// Convert variant case
 pub fn convert_variant_case(
     variant: wasmparser::VariantCase,
-) -> (&str, Option<wasm_encoder::ComponentValType>) {
+) -> (&str, Option<wasm_encoder::ComponentValType>, Option<u32>) {
     (
         variant.name,
         match variant.ty {
             None => None,
             Some(ty) => Some(EncoderComponentValType::from(ty).ret_original()),
         },
+        match variant.refines {
+            None => None,
+            Some(u) => Some(u),
+        },
     )
+}
+
+/// CoreTypeEncoding
+pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
+    // TODO: Struct and Arrays once added to wasm_encoder
+    match subtype.composite_type {
+        wasmparser::CompositeType::Func(func) => {
+            enc.function(
+                func.params()
+                    .iter()
+                    .map(convert_val_type)
+                    .collect::<Vec<_>>(),
+                func.results()
+                    .iter()
+                    .map(convert_val_type)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        wasmparser::CompositeType::Array(_array) => {}
+        wasmparser::CompositeType::Struct(_str) => {}
+    }
+}
+
+/// Process Alias
+pub fn process_alias(a: ComponentAlias) -> Alias {
+    match a {
+        ComponentAlias::InstanceExport {
+            kind,
+            instance_index,
+            name,
+        } => Alias::InstanceExport {
+            instance: instance_index,
+            kind: EncoderComponentExportKind::from(kind).ret_original(),
+            name,
+        },
+        ComponentAlias::CoreInstanceExport {
+            kind,
+            instance_index,
+            name,
+        } => Alias::CoreInstanceExport {
+            instance: instance_index,
+            kind: EncoderExportKind::from(kind).ret_original(),
+            name,
+        },
+        ComponentAlias::Outer { kind, count, index } => Alias::Outer {
+            kind: EncoderComponentOuterAlias::from(kind).ret_original(),
+            count,
+            index,
+        },
+    }
 }
