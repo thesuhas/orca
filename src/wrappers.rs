@@ -1,4 +1,5 @@
 use wasm_encoder::{Alias, ComponentExportKind, EntityType, ExportKind, InstanceType, ModuleArg};
+use wasmparser::types::TypeIdentifier;
 use wasmparser::{
     ComponentAlias, ComponentExternalKind, ComponentInstantiationArg, ExternalKind,
     InstanceTypeDeclaration, TypeRef,
@@ -327,13 +328,53 @@ pub fn convert_module_type_declaration(
     return mty;
 }
 
+/// Convert Component Types
+// pub fn convert_component_type(value: ComponentType) -> Vec<wasm_encoder::ComponentType> {
+//     let mut types = vec![];
+//     match value {
+//         ComponentType::Defined(comp_ty) => {}
+//         ComponentType::Func(func_ty) => {}
+//         ComponentType::Component(comp) => {}
+//         ComponentType::Instance(inst) => {
+//             for i in inst.into_vec().into_iter() {
+//                 types.push(&convert_instance_type(i));
+//                 wasm_encoder::ComponentType::
+//             }
+//         }
+//         ComponentType::Resource { rep, dtor } => {
+//
+//         }
+//     }
+//     return types;
+// }
+
 /// Convert Instance Types
 pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
     let mut ity = InstanceType::new();
     match value {
-        InstanceTypeDeclaration::CoreType(core_type) => {}
+        InstanceTypeDeclaration::CoreType(core_type) => {
+            match core_type {
+                wasmparser::CoreType::Sub(sub) => {
+                    // TODO: Struct and Arrays once added to wasm_encoder
+                    let mut enc = ity.core_type();
+                    match sub {
+                        wasmparser::CompositeType::Func(func) => {
+                            enc.function(func.params(), func.results());
+                        }
+                        wasmparser::CompositeType::Array(array) => {}
+                        wasmparser::CompositeType::Struct(str) => {}
+                    }
+                }
+                wasmparser::CoreType::Module(module) => {
+                    for m in &*module {
+                        let mut enc = ity.core_type();
+                        enc.module(&convert_module_type_declaration((*m).clone()));
+                    }
+                }
+            }
+        }
         InstanceTypeDeclaration::Type(ty) => {
-
+            // TODO
         }
         InstanceTypeDeclaration::Alias(alias) => match alias {
             ComponentAlias::InstanceExport {
@@ -371,4 +412,86 @@ pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
         }
     }
     return ity;
+}
+
+/// Wrapper for HeapType Conversion
+
+pub fn convert_heap_type(value: wasmparser::HeapType) -> wasm_encoder::HeapType {
+    match value {
+        wasmparser::HeapType::Concrete(u) => {
+            // TODO - Check the conversion of indices
+            match u {
+                wasmparser::UnpackedIndex::Module(u) => wasm_encoder::HeapType::Concrete(u),
+                wasmparser::UnpackedIndex::RecGroup(u) => wasm_encoder::HeapType::Concrete(u),
+                wasmparser::UnpackedIndex::Id(id) => {
+                    wasm_encoder::HeapType::Concrete(id.index() as u32)
+                }
+            }
+        }
+        wasmparser::HeapType::Func => wasm_encoder::HeapType::Func,
+        wasmparser::HeapType::Extern => wasm_encoder::HeapType::Extern,
+        wasmparser::HeapType::Any => wasm_encoder::HeapType::Any,
+        wasmparser::HeapType::None => wasm_encoder::HeapType::None,
+        wasmparser::HeapType::NoExtern => wasm_encoder::HeapType::None,
+        wasmparser::HeapType::NoFunc => wasm_encoder::HeapType::NoFunc,
+        wasmparser::HeapType::Eq => wasm_encoder::HeapType::Eq,
+        wasmparser::HeapType::Struct => wasm_encoder::HeapType::Struct,
+        wasmparser::HeapType::Array => wasm_encoder::HeapType::Array,
+        wasmparser::HeapType::I31 => wasm_encoder::HeapType::I31,
+        wasmparser::HeapType::Exn => wasm_encoder::HeapType::Exn,
+    }
+}
+
+/// Wrapper for ValType Conversion
+pub struct EncoderValType(wasm_encoder::ValType);
+
+impl From<wasmparser::ValType> for EncoderValType {
+    fn from(value: wasmparser::ValType) -> Self {
+        match value {
+            wasmparser::ValType::I32 => EncoderValType(wasm_encoder::ValType::I32),
+            wasmparser::ValType::I64 => EncoderValType(wasm_encoder::ValType::I64),
+            wasmparser::ValType::F32 => EncoderValType(wasm_encoder::ValType::F32),
+            wasmparser::ValType::F64 => EncoderValType(wasm_encoder::ValType::F64),
+            wasmparser::ValType::V128 => EncoderValType(wasm_encoder::ValType::V128),
+            wasmparser::ValType::Ref(ty) => {
+                EncoderValType(wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                    nullable: ty.is_nullable(),
+                    heap_type: convert_heap_type(ty.heap_type()),
+                }))
+            }
+        }
+    }
+}
+
+impl EncoderValType {
+    pub fn ret_original(&self) -> wasm_encoder::ValType {
+        match self {
+            EncoderValType(wasm_encoder::ValType::I32) => wasm_encoder::ValType::I32,
+            EncoderValType(wasm_encoder::ValType::I64) => wasm_encoder::ValType::I64,
+            EncoderValType(wasm_encoder::ValType::F32) => wasm_encoder::ValType::F32,
+            EncoderValType(wasm_encoder::ValType::F64) => wasm_encoder::ValType::F64,
+            EncoderValType(wasm_encoder::ValType::V128) => wasm_encoder::ValType::V128,
+            EncoderValType(wasm_encoder::ValType::Ref(ty)) => wasm_encoder::ValType::Ref(*ty),
+        }
+    }
+}
+
+/// Convert Component Val Type
+pub fn convert_component_val_type(
+    val: wasmparser::ComponentValType,
+) -> wasm_encoder::ComponentValType {
+    EncoderComponentValType::from(val).ret_original()
+}
+
+/// Convert variant case
+pub fn convert_variant_case(
+    variant: wasmparser::VariantCase,
+) -> (&str, Option<wasm_encoder::ComponentValType>) {
+    (
+        variant.name,
+        match variant.ty {
+            None => None,
+            Some(ty) => Some(EncoderComponentValType::from(ty).ret_original()),
+        },
+    )
 }
