@@ -3,3 +3,4 @@
 *.lock
 .vscode/
 .DS_Store/
+**/out.**

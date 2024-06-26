@@ -3,14 +3,15 @@ use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
     convert_canon, convert_component_export, convert_component_instantiation_arg, convert_export,
-    convert_instantiation_arg, EncoderComponentExportKind, EncoderComponentOuterAlias,
-    EncoderComponentTypeRef, EncoderExportKind,
+    convert_instance_type, convert_instantiation_arg, convert_module_type_declaration,
+    EncoderComponentExportKind, EncoderComponentOuterAlias, EncoderComponentTypeRef,
+    EncoderExportKind,
 };
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    CoreType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser, Payload, RefType,
-    SubType, TableType, ValType,
+    ComponentType, CoreType, Export, GlobalType, Import, Instance, MemoryType, Operator, Parser,
+    Payload, RefType, SubType, TableType, ValType,
 };
 
 pub struct Global<'a> {
@@ -92,7 +93,8 @@ pub struct Component<'a> {
     /// 2. Alias
     pub alias: Vec<ComponentAlias<'a>>,
     /// 3. Types
-    pub types: Vec<CoreType<'a>>, // TODO - Look into if a struct should replace this enum
+    pub core_types: Vec<CoreType<'a>>, // TODO - Look into if a struct should replace this enum
+    pub component_types: Vec<ComponentType<'a>>,
     /// 4. Import
     pub imports: Vec<ComponentImport<'a>>,
     /// 5. Export
@@ -109,7 +111,8 @@ pub struct Component<'a> {
 impl<'a> Component<'a> {
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let mut modules = vec![];
-        let mut types = vec![];
+        let mut core_types = vec![];
+        let mut component_types = vec![];
         let mut imports = vec![];
         let mut exports = vec![];
         let mut instances = vec![];
@@ -140,7 +143,12 @@ impl<'a> Component<'a> {
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::CoreTypeSection(core_type_reader) => {
-                    types = core_type_reader.into_iter().collect::<Result<_, _>>()?;
+                    core_types = core_type_reader.into_iter().collect::<Result<_, _>>()?;
+                }
+                Payload::ComponentTypeSection(component_type_reader) => {
+                    component_types = component_type_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
                 }
                 Payload::ComponentInstanceSection(component_instances) => {
                     component_instance =
@@ -174,7 +182,8 @@ impl<'a> Component<'a> {
         Ok(Component {
             modules,
             alias,
-            types,
+            core_types,
+            component_types,
             imports,
             exports,
             instances,
@@ -234,22 +243,46 @@ impl<'a> Component<'a> {
             component.section(&alias);
         }
 
-        // Types parsing ASK-MEETING
-        // if !self.types.is_empty() {
-        //     let mut type_section = wasm_encoder::ComponentTypeSection::new();
-        //     for ty in self.types {
-        //         match ty {
-        //             CoreType::Sub(subtype) => {
-        //                 type_section.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).map_err(|()| {
-        //                     Error::ConversionError(format!("Failed to convert type: {:?}", subtype))
-        //                 }?));
-        //             },
-        //             CoreType::Module(module) => {
-        //                 type_section
-        //             }
-        //         }
-        //     }
-        // }
+        // Core Types
+        if !self.core_types.is_empty() {
+            let mut type_section = wasm_encoder::CoreTypeSection::new();
+            for ty in self.core_types {
+                match ty {
+                    CoreType::Sub(subtype) => {
+                        // type_section.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).map_err(|()| {
+                        //     Error::ConversionError(format!("Failed to convert type: {:?}", subtype))
+                        // }?));
+                        // TODO: Look into SubType
+                    }
+                    CoreType::Module(module) => {
+                        for m in &*module {
+                            type_section.module(&convert_module_type_declaration((*m).clone()));
+                        }
+                    }
+                }
+            }
+            component.section(&type_section);
+        }
+
+        // Component Types
+        if !self.component_types.is_empty() {
+            let mut component_ty_section = wasm_encoder::ComponentTypeSection::new();
+            for ty in self.component_types {
+                match ty {
+                    ComponentType::Defined(comp_ty) => {}
+                    ComponentType::Func(func_ty) => {}
+                    ComponentType::Component(comp) => {}
+                    ComponentType::Instance(inst) => {
+                        for i in inst.into_vec().into_iter() {
+                            component_ty_section.instance(&convert_instance_type(i));
+                        }
+                    }
+                    ComponentType::Resource { rep, dtor } => {
+                        component_ty_section.resource(rep, dtor);
+                    }
+                }
+            }
+        }
 
         // Import parsing
         if !self.imports.is_empty() {

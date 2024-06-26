@@ -1,5 +1,8 @@
-use wasm_encoder::{ComponentExportKind, ExportKind, ModuleArg};
-use wasmparser::{ComponentExternalKind, ComponentInstantiationArg, ExternalKind};
+use wasm_encoder::{Alias, ComponentExportKind, EntityType, ExportKind, InstanceType, ModuleArg};
+use wasmparser::{
+    ComponentAlias, ComponentExternalKind, ComponentInstantiationArg, ExternalKind,
+    InstanceTypeDeclaration, TypeRef,
+};
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
 pub struct EncoderComponentExportKind(ComponentExportKind);
@@ -263,4 +266,109 @@ pub fn convert_export(value: wasmparser::Export) -> (&str, ExportKind, u32) {
 /// Extracts and Converts Instance args
 pub fn convert_instantiation_arg(value: wasmparser::InstantiationArg) -> (&str, ModuleArg) {
     (value.name, ModuleArg::Instance(value.index))
+}
+
+/// Convert wasmparser TypeRef to Entity Type
+pub struct EncoderEntityType(EntityType);
+
+impl From<TypeRef> for EncoderEntityType {
+    fn from(value: TypeRef) -> Self {
+        match value {
+            TypeRef::Func(u) => EncoderEntityType(EntityType::Function(u)),
+            TypeRef::Table(ty) => EncoderEntityType(EntityType::Table(
+                wasm_encoder::TableType::try_from(ty).unwrap(),
+            )),
+            TypeRef::Memory(ty) => {
+                EncoderEntityType(EntityType::Memory(wasm_encoder::MemoryType::from(ty)))
+            }
+            TypeRef::Global(ty) => EncoderEntityType(EntityType::Global(
+                wasm_encoder::GlobalType::try_from(ty).unwrap(),
+            )),
+            TypeRef::Tag(ty) => EncoderEntityType(EntityType::Tag(
+                wasm_encoder::TagType::try_from(ty).unwrap(),
+            )),
+        }
+    }
+}
+
+impl EncoderEntityType {
+    pub fn ret_original(&self) -> EntityType {
+        match self {
+            EncoderEntityType(EntityType::Function(u)) => EntityType::Function(*u),
+            EncoderEntityType(EntityType::Table(ty)) => EntityType::Table(*ty),
+            EncoderEntityType(EntityType::Global(ty)) => EntityType::Global(*ty),
+            EncoderEntityType(EntityType::Memory(ty)) => EntityType::Memory(*ty),
+            EncoderEntityType(EntityType::Tag(ty)) => EntityType::Tag(*ty),
+        }
+    }
+}
+
+/// Convert ModuleTypeDeclaration to ModuleType
+pub fn convert_module_type_declaration(
+    ty: wasmparser::ModuleTypeDeclaration,
+) -> wasm_encoder::ModuleType {
+    let mut mty = wasm_encoder::ModuleType::new();
+    match ty {
+        wasmparser::ModuleTypeDeclaration::Type(sub) => {}
+        wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
+            mty.export(name, EncoderEntityType::from(ty).ret_original());
+        }
+        wasmparser::ModuleTypeDeclaration::OuterAlias { kind, count, index } => {
+            mty.alias_outer_core_type(count, index);
+        }
+        wasmparser::ModuleTypeDeclaration::Import(import) => {
+            mty.import(
+                import.module,
+                import.name,
+                EncoderEntityType::from(import.ty).ret_original(),
+            );
+        }
+    }
+    return mty;
+}
+
+/// Convert Instance Types
+pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
+    let mut ity = InstanceType::new();
+    match value {
+        InstanceTypeDeclaration::CoreType(core_type) => {}
+        InstanceTypeDeclaration::Type(ty) => {
+
+        }
+        InstanceTypeDeclaration::Alias(alias) => match alias {
+            ComponentAlias::InstanceExport {
+                kind,
+                instance_index,
+                name,
+            } => {
+                ity.alias(Alias::InstanceExport {
+                    instance: instance_index,
+                    kind: EncoderComponentExportKind::from(kind).ret_original(),
+                    name,
+                });
+            }
+            ComponentAlias::CoreInstanceExport {
+                kind,
+                instance_index,
+                name,
+            } => {
+                ity.alias(Alias::CoreInstanceExport {
+                    instance: instance_index,
+                    kind: EncoderExportKind::from(kind).ret_original(),
+                    name,
+                });
+            }
+            ComponentAlias::Outer { kind, count, index } => {
+                ity.alias(Alias::Outer {
+                    kind: EncoderComponentOuterAlias::from(kind).ret_original(),
+                    count,
+                    index,
+                });
+            }
+        },
+        InstanceTypeDeclaration::Export { name, ty } => {
+            ity.export(name.0, EncoderComponentTypeRef::from(ty).ret_original());
+        }
+    }
+    return ity;
 }
