@@ -374,7 +374,7 @@ pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
             }
         }
         InstanceTypeDeclaration::Type(ty) => {
-            // TODO
+            // TODO - Recursive Data Structure
         }
         InstanceTypeDeclaration::Alias(alias) => match alias {
             ComponentAlias::InstanceExport {
