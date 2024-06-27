@@ -1,7 +1,7 @@
 use wasm_encoder::{
-    Alias, ComponentExportKind, CoreTypeEncoder, EntityType, ExportKind, InstanceType, ModuleArg,
+    Alias, ComponentExportKind, ComponentFuncTypeEncoder, CoreTypeEncoder, EntityType, ExportKind,
+    InstanceType, ModuleArg,
 };
-use wasmparser::types::TypeIdentifier;
 use wasmparser::{
     ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg,
     ExternalKind, InstanceTypeDeclaration, SubType, TypeRef,
@@ -341,26 +341,6 @@ pub fn convert_module_type_declaration(
     return mty;
 }
 
-/// Convert Component Types
-// pub fn convert_component_type(value: ComponentType) -> Vec<wasm_encoder::ComponentType> {
-//     let mut types = vec![];
-//     match value {
-//         ComponentType::Defined(comp_ty) => {}
-//         ComponentType::Func(func_ty) => {}
-//         ComponentType::Component(comp) => {}
-//         ComponentType::Instance(inst) => {
-//             for i in inst.into_vec().into_iter() {
-//                 types.push(&convert_instance_type(i));
-//                 wasm_encoder::ComponentType::
-//             }
-//         }
-//         ComponentType::Resource { rep, dtor } => {
-//
-//         }
-//     }
-//     return types;
-// }
-
 /// Convert Instance Types
 pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
     let mut ity = InstanceType::new();
@@ -423,13 +403,11 @@ pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
 pub fn convert_heap_type(value: wasmparser::HeapType) -> wasm_encoder::HeapType {
     match value {
         wasmparser::HeapType::Concrete(u) => {
-            // TODO - Check the conversion of indices
+            // Panic is caused because of - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
             match u {
                 wasmparser::UnpackedIndex::Module(u) => wasm_encoder::HeapType::Concrete(u),
-                wasmparser::UnpackedIndex::RecGroup(u) => wasm_encoder::HeapType::Concrete(u),
-                wasmparser::UnpackedIndex::Id(id) => {
-                    wasm_encoder::HeapType::Concrete(id.index() as u32)
-                }
+                wasmparser::UnpackedIndex::RecGroup(_u) => panic!("Only for validation"),
+                wasmparser::UnpackedIndex::Id(_id) => panic!("Only for validation"),
             }
         }
         wasmparser::HeapType::Func => wasm_encoder::HeapType::Func,
@@ -502,18 +480,20 @@ pub fn convert_params(
 }
 
 /// Convert Func Results
-pub fn convert_results(result: ComponentFuncResult) -> Vec<(&str, wasm_encoder::ComponentValType)> {
+pub fn convert_results(result: ComponentFuncResult, mut enc: ComponentFuncTypeEncoder) {
     let mut results = vec![];
     match result {
-        // TODO - Look if empty string is enough
-        ComponentFuncResult::Unnamed(ty) => results.push(("", convert_component_val_type(ty))),
+        // Modified to pass encoder into this function, need to use results for unnamed - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
+        ComponentFuncResult::Unnamed(ty) => {
+            enc.result(convert_component_val_type(ty));
+        }
         ComponentFuncResult::Named(b) => {
             for named in b.into_vec() {
                 results.push((named.0, convert_component_val_type(named.1)));
             }
         }
     }
-    results
+    enc.results(results);
 }
 
 /// Convert variant case
@@ -535,7 +515,7 @@ pub fn convert_variant_case(
 
 /// CoreTypeEncoding
 pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
-    // TODO: Struct and Arrays once added to wasm_encoder
+    // TODO: Struct and Arrays once added to wasm_encoder - still in GC Proposal
     match subtype.composite_type {
         wasmparser::CompositeType::Func(func) => {
             enc.function(
@@ -549,8 +529,9 @@ pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
                     .collect::<Vec<_>>(),
             );
         }
-        wasmparser::CompositeType::Array(_array) => {}
-        wasmparser::CompositeType::Struct(_str) => {}
+        wasmparser::CompositeType::Array(_array) | wasmparser::CompositeType::Struct(_str) => {
+            panic!("Still in GC Proposal")
+        }
     }
 }
 

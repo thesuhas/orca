@@ -220,7 +220,6 @@ impl<'a> Component<'a> {
             for ty in self.core_types {
                 match ty {
                     CoreType::Sub(subtype) => {
-                        // TODO: Struct and Arrays once added to wasm_encoder
                         let enc = type_section.ty();
                         encode_core_type_subtype(enc, subtype);
                     }
@@ -281,7 +280,7 @@ impl<'a> Component<'a> {
                     ComponentType::Func(func_ty) => {
                         let mut enc = component_ty_section.function();
                         enc.params(func_ty.params.into_vec().into_iter().map(convert_params));
-                        enc.results(convert_results(func_ty.results));
+                        convert_results(func_ty.results, enc);
                     }
                     ComponentType::Component(comp) => {
                         let mut new_comp = wasm_encoder::ComponentType::new();
