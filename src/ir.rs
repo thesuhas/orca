@@ -6,7 +6,7 @@ use crate::wrappers::{
     convert_instantiation_arg, convert_module_type_declaration, convert_params,
     convert_record_type, convert_results, convert_val_type, convert_variant_case,
     encode_core_type_subtype, process_alias, EncoderComponentExportKind, EncoderComponentTypeRef,
-    EncoderComponentValType, EncoderEntityType, EncoderValType,
+    EncoderComponentValType, EncoderEntityType, EncoderValType, convert_component_type
 };
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
@@ -308,8 +308,9 @@ impl<'a> Component<'a> {
                                         }
                                     }
                                 },
-                                ComponentTypeDeclaration::Type(_typ) => {
-                                    // TODO - Deal with this recursive structure
+                                ComponentTypeDeclaration::Type(typ) => {
+                                    let enc = new_comp.ty();
+                                    convert_component_type(typ, enc);
                                 }
                                 ComponentTypeDeclaration::Alias(a) => {
                                     new_comp.alias(process_alias(a));
@@ -328,7 +329,6 @@ impl<'a> Component<'a> {
                                 }
                             }
                         }
-
                         component_ty_section.component(&new_comp);
                     }
                     ComponentType::Instance(inst) => {
