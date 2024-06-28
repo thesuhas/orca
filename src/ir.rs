@@ -1,13 +1,14 @@
-use crate::convert::internal_to_encoder;
 use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
     convert_canon, convert_component_export, convert_component_instantiation_arg,
-    convert_component_val_type, convert_export, convert_instance_type, convert_instantiation_arg,
-    convert_module_type_declaration, convert_params, convert_record_type, convert_results,
-    convert_variant_case, encode_core_type_subtype, process_alias, EncoderComponentExportKind,
-    EncoderComponentTypeRef, EncoderComponentValType, EncoderValType,
+    convert_component_val_type, convert_export, convert_heap_type, convert_instance_type,
+    convert_instantiation_arg, convert_module_type_declaration, convert_params,
+    convert_record_type, convert_results, convert_val_type, convert_variant_case,
+    encode_core_type_subtype, process_alias, EncoderComponentExportKind, EncoderComponentTypeRef,
+    EncoderComponentValType, EncoderEntityType, EncoderValType,
 };
+use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
@@ -17,7 +18,7 @@ use wasmparser::{
 
 pub struct Global<'a> {
     pub ty: GlobalType,
-    pub init_expr: Operator<'a>,
+    pub init_expr: wasmparser::ConstExpr<'a>,
 }
 
 pub struct DataSegment<'a> {
@@ -37,7 +38,7 @@ pub enum DataSegmentKind<'a> {
         /// The memory index for the data segment.
         memory_index: u32,
         /// The initialization operator for the data segment.
-        offset_expr: Operator<'a>,
+        offset_expr: wasmparser::ConstExpr<'a>,
     },
 }
 
@@ -45,7 +46,7 @@ pub enum ElementKind<'a> {
     Passive,
     Active {
         table_index: Option<u32>,
-        offset_expr: Operator<'a>,
+        offset_expr: wasmparser::ConstExpr<'a>,
     },
     Declared,
 }
@@ -54,7 +55,7 @@ pub enum ElementItems<'a> {
     Functions(Vec<u32>),
     ConstExprs {
         ty: RefType,
-        exprs: Vec<Operator<'a>>,
+        exprs: Vec<wasmparser::ConstExpr<'a>>,
     },
 }
 
@@ -74,7 +75,7 @@ pub struct Module<'a> {
     /// Mapping from function index to type index.
     pub functions: Vec<u32>,
     /// Each table has a type and optional initialization expression.
-    pub tables: Vec<(TableType, Option<Operator<'a>>)>,
+    pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
     pub memories: Vec<MemoryType>,
     pub globals: Vec<Global<'a>>,
     pub data: Vec<DataSegment<'a>>,
@@ -94,7 +95,7 @@ pub struct Component<'a> {
     /// 2. Alias
     pub alias: Vec<ComponentAlias<'a>>,
     /// 3. Types
-    pub core_types: Vec<CoreType<'a>>, // TODO - Look into if a struct should replace this enum
+    pub core_types: Vec<CoreType<'a>>,
     pub component_types: Vec<ComponentType<'a>>,
     /// 4. Import
     pub imports: Vec<ComponentImport<'a>>,
@@ -161,12 +162,19 @@ impl<'a> Component<'a> {
                 Payload::ComponentCanonicalSection(canon_reader) => {
                     canons = canon_reader.into_iter().collect::<Result<_, _>>()?;
                 }
-                Payload::ModuleSection { parser, range } => {
-                    modules.push(Module::parse(&wasm[range], enable_multi_memory, parser)?);
+                Payload::ModuleSection {
+                    parser,
+                    unchecked_range,
+                } => {
+                    modules.push(Module::parse(
+                        &wasm[unchecked_range],
+                        enable_multi_memory,
+                        parser,
+                    )?);
                 }
                 Payload::ComponentSection {
                     parser: _,
-                    range: _,
+                    unchecked_range: _,
                 } => {}
                 Payload::CustomSection(custom_section_reader) => {
                     custom_sections
@@ -462,6 +470,11 @@ impl<'a> Component<'a> {
 }
 
 impl<'a> Module<'a> {
+    pub fn parse_only_module(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+        let parser = Parser::new(0);
+        Module::parse(wasm, enable_multi_memory, parser)
+    }
+
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
         // let parser = Parser::new(0);
         let mut imports = vec![];
@@ -506,9 +519,7 @@ impl<'a> Module<'a> {
                         .map(|t| {
                             t.map_err(Error::from).and_then(|t| match t.init {
                                 wasmparser::TableInit::RefNull => Ok((t.ty, None)),
-                                wasmparser::TableInit::Expr(e) => {
-                                    parser_to_internal::const_expr(e).map(|init| (t.ty, Some(init)))
-                                }
+                                wasmparser::TableInit::Expr(e) => Ok((t.ty, Some(e))),
                             })
                         })
                         .collect::<Result<_, _>>()?;
@@ -610,13 +621,13 @@ impl<'a> Module<'a> {
                 Payload::TagSection(_)
                 | Payload::ModuleSection {
                     parser: _,
-                    range: _,
+                    unchecked_range: _,
                 }
                 | Payload::InstanceSection(_)
                 | Payload::CoreTypeSection(_)
                 | Payload::ComponentSection {
                     parser: _,
-                    range: _,
+                    unchecked_range: _,
                 }
                 | Payload::ComponentInstanceSection(_)
                 | Payload::ComponentAliasSection(_)
@@ -660,17 +671,18 @@ impl<'a> Module<'a> {
         })
     }
 
+    pub fn encode_only_module(self) -> Result<Vec<u8>, Error> {
+        Ok(self.encode().unwrap().finish())
+    }
+
     pub fn encode(self) -> Result<wasm_encoder::Module, Error> {
         let mut module = wasm_encoder::Module::new();
+        let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
             for subtype in self.types {
-                types.subtype(
-                    &wasm_encoder::SubType::try_from(subtype.clone()).map_err(|()| {
-                        Error::ConversionError(format!("Failed to convert type: {:?}", subtype))
-                    })?,
-                );
+                types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
             }
             module.section(&types);
         }
@@ -681,9 +693,7 @@ impl<'a> Module<'a> {
                 imports.import(
                     import.module,
                     import.name,
-                    wasm_encoder::EntityType::try_from(import.ty).map_err(|()| {
-                        Error::ConversionError(format!("Failed to convert type: {:?}", import.ty))
-                    })?,
+                    EncoderEntityType::from(import.ty).ret_original(),
                 );
             }
             module.section(&imports);
@@ -700,13 +710,23 @@ impl<'a> Module<'a> {
         if !self.tables.is_empty() {
             let mut tables = wasm_encoder::TableSection::new();
             for (table_ty, init) in self.tables {
-                let table_ty = wasm_encoder::TableType::try_from(table_ty).map_err(|()| {
-                    Error::ConversionError(format!("Failed to convert type: {:?}", table_ty))
-                })?;
+                let table_ty = wasm_encoder::TableType {
+                    element_type: wasm_encoder::RefType {
+                        nullable: table_ty.element_type.is_nullable(),
+                        heap_type: convert_heap_type(table_ty.element_type.heap_type()),
+                    },
+                    table64: table_ty.table64,
+                    minimum: table_ty.initial, // TODO - Check if this maps
+                    maximum: table_ty.maximum,
+                };
                 match init {
                     None => tables.table(table_ty),
-                    Some(const_expr) => tables
-                        .table_with_init(table_ty, &internal_to_encoder::const_expr(&const_expr)?),
+                    Some(const_expr) => tables.table_with_init(
+                        table_ty,
+                        &reencode
+                            .const_expr(const_expr)
+                            .expect("Error in Converting Const Expr"),
+                    ),
                 };
             }
             module.section(&tables);
@@ -724,10 +744,14 @@ impl<'a> Module<'a> {
             let mut globals = wasm_encoder::GlobalSection::new();
             for global in self.globals {
                 globals.global(
-                    wasm_encoder::GlobalType::try_from(global.ty).map_err(|()| {
-                        Error::ConversionError(format!("Failed to convert type: {:?}", global.ty))
-                    })?,
-                    &internal_to_encoder::const_expr(&global.init_expr)?,
+                    wasm_encoder::GlobalType {
+                        val_type: convert_val_type(&global.ty.content_type),
+                        mutable: global.ty.mutable,
+                        shared: global.ty.shared,
+                    },
+                    &reencode
+                        .const_expr(global.init_expr)
+                        .expect("Error unpacking globals"),
                 );
             }
             module.section(&globals);
@@ -759,12 +783,17 @@ impl<'a> Module<'a> {
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
                         for e in exprs {
-                            temp_const_exprs.push(internal_to_encoder::const_expr(e)?);
+                            temp_const_exprs.push(
+                                reencode
+                                    .const_expr((*e).clone())
+                                    .expect("Unable to convert element constant expr"),
+                            );
                         }
                         wasm_encoder::Elements::Expressions(
-                            wasm_encoder::RefType::try_from(*ty).map_err(|()| {
-                                Error::ConversionError(format!("Failed to convert type: {:?}", ty))
-                            })?,
+                            wasm_encoder::RefType {
+                                nullable: ty.is_nullable(),
+                                heap_type: convert_heap_type(ty.heap_type()),
+                            },
                             &temp_const_exprs,
                         )
                     }
@@ -780,7 +809,9 @@ impl<'a> Module<'a> {
                     } => {
                         elements.active(
                             table_index,
-                            &internal_to_encoder::const_expr(&offset_expr)?,
+                            &reencode
+                                .const_expr(offset_expr)
+                                .expect("Unable to convert offset expr"),
                             element_items,
                         );
                     }
@@ -808,16 +839,15 @@ impl<'a> Module<'a> {
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, t) in locals {
-                    converted_locals.push((
-                        c,
-                        wasm_encoder::ValType::try_from(t).map_err(|()| {
-                            Error::ConversionError(format!("Falied to convert type: {:?}", t))
-                        })?,
-                    ));
+                    converted_locals.push((c, EncoderValType::from(t).ret_original()));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 for op in instructions {
-                    function.instruction(&internal_to_encoder::op(op)?);
+                    function.instruction(
+                        &reencode
+                            .instruction(op)
+                            .expect("Unable to convert Instruction"),
+                    );
                 }
                 code.function(&function);
             }
@@ -829,23 +859,17 @@ impl<'a> Module<'a> {
             for segment in self.data {
                 let segment_data = segment.data.iter().copied();
                 match segment.kind {
-                    DataSegmentKind::Passive => data.segment(wasm_encoder::DataSegment {
-                        mode: wasm_encoder::DataSegmentMode::Passive,
-                        data: segment_data,
-                    }),
+                    DataSegmentKind::Passive => data.passive(segment_data),
                     DataSegmentKind::Active {
                         memory_index,
                         offset_expr,
-                    } => {
-                        let const_expr = internal_to_encoder::const_expr(&offset_expr)?;
-                        data.segment(wasm_encoder::DataSegment {
-                            mode: wasm_encoder::DataSegmentMode::Active {
-                                memory_index,
-                                offset: &const_expr,
-                            },
-                            data: segment_data,
-                        })
-                    }
+                    } => data.active(
+                        memory_index,
+                        &reencode
+                            .const_expr(offset_expr)
+                            .expect("Data segment offset expr"),
+                        segment_data,
+                    ),
                 };
             }
             module.section(&data);

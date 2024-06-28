@@ -406,21 +406,28 @@ pub fn convert_heap_type(value: wasmparser::HeapType) -> wasm_encoder::HeapType 
             // Panic is caused because of - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
             match u {
                 wasmparser::UnpackedIndex::Module(u) => wasm_encoder::HeapType::Concrete(u),
-                wasmparser::UnpackedIndex::RecGroup(_u) => panic!("Only for validation"),
-                wasmparser::UnpackedIndex::Id(_id) => panic!("Only for validation"),
+                wasmparser::UnpackedIndex::RecGroup(_) | wasmparser::UnpackedIndex::Id(_) => {
+                    panic!("Only for validation")
+                }
             }
         }
-        wasmparser::HeapType::Func => wasm_encoder::HeapType::Func,
-        wasmparser::HeapType::Extern => wasm_encoder::HeapType::Extern,
-        wasmparser::HeapType::Any => wasm_encoder::HeapType::Any,
-        wasmparser::HeapType::None => wasm_encoder::HeapType::None,
-        wasmparser::HeapType::NoExtern => wasm_encoder::HeapType::None,
-        wasmparser::HeapType::NoFunc => wasm_encoder::HeapType::NoFunc,
-        wasmparser::HeapType::Eq => wasm_encoder::HeapType::Eq,
-        wasmparser::HeapType::Struct => wasm_encoder::HeapType::Struct,
-        wasmparser::HeapType::Array => wasm_encoder::HeapType::Array,
-        wasmparser::HeapType::I31 => wasm_encoder::HeapType::I31,
-        wasmparser::HeapType::Exn => wasm_encoder::HeapType::Exn,
+        wasmparser::HeapType::Abstract { shared, ty } => wasm_encoder::HeapType::Abstract {
+            shared,
+            ty: match ty {
+                wasmparser::AbstractHeapType::Func => wasm_encoder::AbstractHeapType::Func,
+                wasmparser::AbstractHeapType::Extern => wasm_encoder::AbstractHeapType::Extern,
+                wasmparser::AbstractHeapType::Any => wasm_encoder::AbstractHeapType::Any,
+                wasmparser::AbstractHeapType::None => wasm_encoder::AbstractHeapType::None,
+                wasmparser::AbstractHeapType::NoExtern => wasm_encoder::AbstractHeapType::None,
+                wasmparser::AbstractHeapType::NoFunc => wasm_encoder::AbstractHeapType::NoFunc,
+                wasmparser::AbstractHeapType::Eq => wasm_encoder::AbstractHeapType::Eq,
+                wasmparser::AbstractHeapType::Struct => wasm_encoder::AbstractHeapType::Struct,
+                wasmparser::AbstractHeapType::Array => wasm_encoder::AbstractHeapType::Array,
+                wasmparser::AbstractHeapType::I31 => wasm_encoder::AbstractHeapType::I31,
+                wasmparser::AbstractHeapType::Exn => wasm_encoder::AbstractHeapType::Exn,
+                wasmparser::AbstractHeapType::NoExn => wasm_encoder::AbstractHeapType::NoExn,
+            },
+        },
     }
 }
 
@@ -483,7 +490,7 @@ pub fn convert_params(
 pub fn convert_results(result: ComponentFuncResult, mut enc: ComponentFuncTypeEncoder) {
     let mut results = vec![];
     match result {
-        // Modified to pass encoder into this function, need to use results for unnamed - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
+        // Modified to pass encoder into this function, need to use result for unnamed - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
         ComponentFuncResult::Unnamed(ty) => {
             enc.result(convert_component_val_type(ty));
         }
@@ -529,7 +536,7 @@ pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
                     .collect::<Vec<_>>(),
             );
         }
-        wasmparser::CompositeType::Array(_array) | wasmparser::CompositeType::Struct(_str) => {
+        wasmparser::CompositeType::Array(_) | wasmparser::CompositeType::Struct(_) => {
             panic!("Still in GC Proposal")
         }
     }
