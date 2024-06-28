@@ -1,0 +1,17 @@
+(component
+  (core module (;0;)
+    (type (;0;) (func))
+    (func (;0;) (type 0))
+    (table (;0;) 1 funcref)
+    (memory (;0;) 1)
+    (global (;0;) i32 i32.const 5)
+    (export "mem" (memory 0))
+    (export "table" (table 0))
+    (export "global" (global 0))
+    (export "func" (func 0))
+  )
+  (core instance (;0;) (instantiate 0))
+  (@producers
+    (processed-by "wit-component" "0.207.0")
+  )
+)
