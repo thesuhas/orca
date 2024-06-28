@@ -653,10 +653,10 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                 }
             }
         }
-        ComponentType::Instance(inst) => {
-            inst.iter().for_each( |i| {
-                enc.instance(&convert_instance_type((*i).clone()));
-            });
+        ComponentType::Instance(_inst) => {
+            // for i in inst.into_vec() {
+            //     enc.instance(&convert_instance_type(i));
+            // }
         }
         ComponentType::Resource { rep, dtor } => {
             enc.resource(EncoderValType::from(rep).ret_original(), dtor);

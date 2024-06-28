@@ -113,155 +113,155 @@ pub(super) mod parser_to_internal {
     }
 }
 
-/// Conversion from internal to [`wasm_encoder`] types.
-pub(super) mod internal_to_encoder {
-    use super::*;
-    use crate::wrappers::EncoderValType;
-
-    pub(crate) fn block_type(ty: wasmparser::BlockType) -> Result<wasm_encoder::BlockType> {
-        Ok(match ty {
-            wasmparser::BlockType::Empty => wasm_encoder::BlockType::Empty,
-            wasmparser::BlockType::Type(ty) => {
-                wasm_encoder::BlockType::Result(EncoderValType::from(ty).ret_original())
-            }
-            wasmparser::BlockType::FuncType(f) => wasm_encoder::BlockType::FunctionType(f),
-        })
-    }
-
-    // fn memarg(memarg: &wasmparser::MemArg) -> wasm_encoder::MemArg {
-    //     wasm_encoder::MemArg {
-    //         offset: memarg.offset,
-    //         align: memarg.align as u32,
-    //         memory_index: memarg.memory,
-    //     }
-    // }
-
-    // pub(crate) fn const_expr(expr: &wasmparser::Operator) -> Result<wasm_encoder::ConstExpr> {
-    //     use wasm_encoder::Encode;
-    //     let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
-    //     let mut bytes = vec![];
-    //     op(expr.clone())?.encode(&mut bytes);
-    //     Ok(wasm_encoder::ConstExpr::raw(bytes))
-    // }
-
-    // pub(crate) fn catch(catch: &wasmparser::Catch) -> wasm_encoder::Catch {
-    //     match catch {
-    //         wasmparser::Catch::One { tag, label } => wasm_encoder::Catch::One {
-    //             tag: *tag,
-    //             label: *label,
-    //         },
-    //         wasmparser::Catch::OneRef { tag, label } => wasm_encoder::Catch::OneRef {
-    //             tag: *tag,
-    //             label: *label,
-    //         },
-    //         wasmparser::Catch::All { label } => wasm_encoder::Catch::All { label: *label },
-    //         wasmparser::Catch::AllRef { label } => wasm_encoder::Catch::AllRef { label: *label },
-    //     }
-    // }
-
-    //Convert [`wasmparser::Operator`] to [`wasm_encoder::Instruction`]. A
-    //simplified example of the conversion done in wasm-mutate
-    //[here](https://github.com/bytecodealliance/wasm-tools/blob/a8c4fddd239b0cb8978c76e6dfd856d5bd29b860/crates/wasm-mutate/src/mutators/translate.rs#L279).
-    // #[allow(unused_variables)]
-    // pub(crate) fn op(op: wasmparser::Operator<'_>) -> Result<wasm_encoder::Instruction<'static>> {
-    //     use wasm_encoder::Instruction as I;
-    //
-    //     macro_rules! convert {
-    //         ($( @$proposal:ident $op:ident $({ $($arg:ident: $argty:ty),* })? => $visit:ident)*) => {
-    //             match op {
-    //                 $(
-    //                     wasmparser::Operator::$op $({ $($arg),* })? => {
-    //                         $(
-    //                             $(let $arg = convert!(map $arg $arg);)*
-    //                         )?
-    //                         convert!(build $op $($($arg)*)?)
-    //                     }
-    //                 )*
-    //             }
-    //         };
-    //
-    //         // Mapping the arguments from wasmparser to wasm-encoder types.
-    //
-    //         // Arguments which need to be explicitly converted or ignored.
-    //         (map $arg:ident blockty) => (block_type($arg)?);
-    //         (map $arg:ident try_table) => ((
-    //             block_type($arg.ty)?,
-    //             std::borrow::Cow::from(
-    //                 $arg
-    //                     .catches
-    //                     .iter()
-    //                     .map(|c| catch(c))
-    //                     .collect::<std::vec::Vec<_>>()
-    //             )
-    //         ));
-    //         (map $arg:ident targets) => ((
-    //             $arg
-    //                 .targets()
-    //                 .collect::<std::result::Result<Vec<_>, wasmparser::BinaryReaderError>>()?
-    //                 .into(),
-    //             $arg.default(),
-    //         ));
-    //         (map $arg:ident ty) => (
-    //             EncoderValType::from($arg).ret_original()
-    //         );
-    //         (map $arg:ident hty) => (
-    //             convert_heap_type($arg)
-    //         );
-    //         (map $arg:ident from_ref_type) => (
-    //             wasm_encoder::RefType {
-    //                 nullable: $arg.is_nullable(),
-    //                 heap_type: convert_heap_type($arg.heap_type()),
-    //             }
-    //         );
-    //         (map $arg:ident to_ref_type) => (
-    //             wasm_encoder::RefType {
-    //                 nullable: $arg.is_nullable(),
-    //                 heap_type: convert_heap_type($arg.heap_type()),
-    //             }
-    //         );
-    //
-    //         (map $arg:ident memarg) => (memarg(&$arg));
-    //         (map $arg:ident table_byte) => (());
-    //         (map $arg:ident mem_byte) => (());
-    //         (map $arg:ident flags) => (());
-    //
-    //         // All other arguments are kept the same.
-    //         (map $arg:ident $_:ident) => ($arg);
-    //
-    //         // Construct the wasm-encoder Instruction from the arguments of a
-    //         // wasmparser instruction.  There are a few special cases for where the
-    //         // structure of a wasmparser instruction differs from that of
-    //         // wasm-encoder.
-    //
-    //         // Single operators are directly converted.
-    //         (build $op:ident) => (Ok(I::$op));
-    //
-    //         // Special cases with a single argument.
-    //         (build BrTable $arg:ident) => (Ok(I::BrTable($arg.0, $arg.1)));
-    //         (build TryTable $arg:ident) => (Ok(I::TryTable($arg.0, $arg.1)));
-    //         (build F32Const $arg:ident) => (Ok(I::F32Const(f32::from_bits($arg.bits()))));
-    //         (build F64Const $arg:ident) => (Ok(I::F64Const(f64::from_bits($arg.bits()))));
-    //         (build V128Const $arg:ident) => (Ok(I::V128Const($arg.i128())));
-    //
-    //         // Standard case with a single argument.
-    //         (build $op:ident $arg:ident) => (Ok(I::$op($arg)));
-    //
-    //         // Special case of multiple arguments.
-    //         (build CallIndirect $ty:ident $table:ident $_:ident) => (Ok(I::CallIndirect {
-    //             ty: $ty,
-    //             table: $table,
-    //         }));
-    //         (build ReturnCallIndirect $ty:ident $table:ident) => (Ok(I::ReturnCallIndirect {
-    //             type_index: $ty,
-    //             table_index: $table,
-    //         }));
-    //         (build MemoryGrow $mem:ident $_:ident) => (Ok(I::MemoryGrow($mem)));
-    //         (build MemorySize $mem:ident $_:ident) => (Ok(I::MemorySize($mem)));
-    //
-    //         // Standard case of multiple arguments.
-    //         (build $op:ident $($arg:ident)*) => (Ok(I::$op { $($arg),* }));
-    //     }
-    //
-    //     wasmparser::for_each_operator!(convert)
-    // }
-}
+// Conversion from internal to [`wasm_encoder`] types.
+// pub(super) mod internal_to_encoder {
+//     use super::*;
+//     use crate::wrappers::EncoderValType;
+//
+//     pub(crate) fn block_type(ty: wasmparser::BlockType) -> Result<wasm_encoder::BlockType> {
+//         Ok(match ty {
+//             wasmparser::BlockType::Empty => wasm_encoder::BlockType::Empty,
+//             wasmparser::BlockType::Type(ty) => {
+//                 wasm_encoder::BlockType::Result(EncoderValType::from(ty).ret_original())
+//             }
+//             wasmparser::BlockType::FuncType(f) => wasm_encoder::BlockType::FunctionType(f),
+//         })
+//     }
+//
+//     // fn memarg(memarg: &wasmparser::MemArg) -> wasm_encoder::MemArg {
+//     //     wasm_encoder::MemArg {
+//     //         offset: memarg.offset,
+//     //         align: memarg.align as u32,
+//     //         memory_index: memarg.memory,
+//     //     }
+//     // }
+//
+//     // pub(crate) fn const_expr(expr: &wasmparser::Operator) -> Result<wasm_encoder::ConstExpr> {
+//     //     use wasm_encoder::Encode;
+//     //     let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
+//     //     let mut bytes = vec![];
+//     //     op(expr.clone())?.encode(&mut bytes);
+//     //     Ok(wasm_encoder::ConstExpr::raw(bytes))
+//     // }
+//
+//     // pub(crate) fn catch(catch: &wasmparser::Catch) -> wasm_encoder::Catch {
+//     //     match catch {
+//     //         wasmparser::Catch::One { tag, label } => wasm_encoder::Catch::One {
+//     //             tag: *tag,
+//     //             label: *label,
+//     //         },
+//     //         wasmparser::Catch::OneRef { tag, label } => wasm_encoder::Catch::OneRef {
+//     //             tag: *tag,
+//     //             label: *label,
+//     //         },
+//     //         wasmparser::Catch::All { label } => wasm_encoder::Catch::All { label: *label },
+//     //         wasmparser::Catch::AllRef { label } => wasm_encoder::Catch::AllRef { label: *label },
+//     //     }
+//     // }
+//
+//     //Convert [`wasmparser::Operator`] to [`wasm_encoder::Instruction`]. A
+//     //simplified example of the conversion done in wasm-mutate
+//     //[here](https://github.com/bytecodealliance/wasm-tools/blob/a8c4fddd239b0cb8978c76e6dfd856d5bd29b860/crates/wasm-mutate/src/mutators/translate.rs#L279).
+//     // #[allow(unused_variables)]
+//     // pub(crate) fn op(op: wasmparser::Operator<'_>) -> Result<wasm_encoder::Instruction<'static>> {
+//     //     use wasm_encoder::Instruction as I;
+//     //
+//     //     macro_rules! convert {
+//     //         ($( @$proposal:ident $op:ident $({ $($arg:ident: $argty:ty),* })? => $visit:ident)*) => {
+//     //             match op {
+//     //                 $(
+//     //                     wasmparser::Operator::$op $({ $($arg),* })? => {
+//     //                         $(
+//     //                             $(let $arg = convert!(map $arg $arg);)*
+//     //                         )?
+//     //                         convert!(build $op $($($arg)*)?)
+//     //                     }
+//     //                 )*
+//     //             }
+//     //         };
+//     //
+//     //         // Mapping the arguments from wasmparser to wasm-encoder types.
+//     //
+//     //         // Arguments which need to be explicitly converted or ignored.
+//     //         (map $arg:ident blockty) => (block_type($arg)?);
+//     //         (map $arg:ident try_table) => ((
+//     //             block_type($arg.ty)?,
+//     //             std::borrow::Cow::from(
+//     //                 $arg
+//     //                     .catches
+//     //                     .iter()
+//     //                     .map(|c| catch(c))
+//     //                     .collect::<std::vec::Vec<_>>()
+//     //             )
+//     //         ));
+//     //         (map $arg:ident targets) => ((
+//     //             $arg
+//     //                 .targets()
+//     //                 .collect::<std::result::Result<Vec<_>, wasmparser::BinaryReaderError>>()?
+//     //                 .into(),
+//     //             $arg.default(),
+//     //         ));
+//     //         (map $arg:ident ty) => (
+//     //             EncoderValType::from($arg).ret_original()
+//     //         );
+//     //         (map $arg:ident hty) => (
+//     //             convert_heap_type($arg)
+//     //         );
+//     //         (map $arg:ident from_ref_type) => (
+//     //             wasm_encoder::RefType {
+//     //                 nullable: $arg.is_nullable(),
+//     //                 heap_type: convert_heap_type($arg.heap_type()),
+//     //             }
+//     //         );
+//     //         (map $arg:ident to_ref_type) => (
+//     //             wasm_encoder::RefType {
+//     //                 nullable: $arg.is_nullable(),
+//     //                 heap_type: convert_heap_type($arg.heap_type()),
+//     //             }
+//     //         );
+//     //
+//     //         (map $arg:ident memarg) => (memarg(&$arg));
+//     //         (map $arg:ident table_byte) => (());
+//     //         (map $arg:ident mem_byte) => (());
+//     //         (map $arg:ident flags) => (());
+//     //
+//     //         // All other arguments are kept the same.
+//     //         (map $arg:ident $_:ident) => ($arg);
+//     //
+//     //         // Construct the wasm-encoder Instruction from the arguments of a
+//     //         // wasmparser instruction.  There are a few special cases for where the
+//     //         // structure of a wasmparser instruction differs from that of
+//     //         // wasm-encoder.
+//     //
+//     //         // Single operators are directly converted.
+//     //         (build $op:ident) => (Ok(I::$op));
+//     //
+//     //         // Special cases with a single argument.
+//     //         (build BrTable $arg:ident) => (Ok(I::BrTable($arg.0, $arg.1)));
+//     //         (build TryTable $arg:ident) => (Ok(I::TryTable($arg.0, $arg.1)));
+//     //         (build F32Const $arg:ident) => (Ok(I::F32Const(f32::from_bits($arg.bits()))));
+//     //         (build F64Const $arg:ident) => (Ok(I::F64Const(f64::from_bits($arg.bits()))));
+//     //         (build V128Const $arg:ident) => (Ok(I::V128Const($arg.i128())));
+//     //
+//     //         // Standard case with a single argument.
+//     //         (build $op:ident $arg:ident) => (Ok(I::$op($arg)));
+//     //
+//     //         // Special case of multiple arguments.
+//     //         (build CallIndirect $ty:ident $table:ident $_:ident) => (Ok(I::CallIndirect {
+//     //             ty: $ty,
+//     //             table: $table,
+//     //         }));
+//     //         (build ReturnCallIndirect $ty:ident $table:ident) => (Ok(I::ReturnCallIndirect {
+//     //             type_index: $ty,
+//     //             table_index: $table,
+//     //         }));
+//     //         (build MemoryGrow $mem:ident $_:ident) => (Ok(I::MemoryGrow($mem)));
+//     //         (build MemorySize $mem:ident $_:ident) => (Ok(I::MemorySize($mem)));
+//     //
+//     //         // Standard case of multiple arguments.
+//     //         (build $op:ident $($arg:ident)*) => (Ok(I::$op { $($arg),* }));
+//     //     }
+//     //
+//     //     wasmparser::for_each_operator!(convert)
+//     // }
+// }/**/
