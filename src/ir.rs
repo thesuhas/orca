@@ -2,11 +2,11 @@ use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
     convert_canon, convert_component_export, convert_component_instantiation_arg,
-    convert_component_val_type, convert_export, convert_heap_type, convert_instance_type,
-    convert_instantiation_arg, convert_module_type_declaration, convert_params,
-    convert_record_type, convert_results, convert_val_type, convert_variant_case,
+    convert_component_type, convert_component_val_type, convert_export, convert_heap_type,
+    convert_instance_type, convert_instantiation_arg, convert_module_type_declaration,
+    convert_params, convert_record_type, convert_results, convert_val_type, convert_variant_case,
     encode_core_type_subtype, process_alias, EncoderComponentExportKind, EncoderComponentTypeRef,
-    EncoderComponentValType, EncoderEntityType, EncoderValType, convert_component_type
+    EncoderComponentValType, EncoderEntityType, EncoderValType,
 };
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
