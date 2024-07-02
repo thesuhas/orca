@@ -46,17 +46,17 @@ macro_rules! make_round_trip_tests_component {
 }
 
 mod round_trip {
-    // make_round_trip_tests_component!(
-    //     "dfinity/components",
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-    //     exports,
-    //     start,
-    //     const_expr
-    // );
+    make_round_trip_tests_component!(
+        "dfinity/components",
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        exports,
+        start,
+        const_expr
+    );
 
     make_round_trip_tests_component!(
         "handwritten/components",
