@@ -16,11 +16,13 @@ use wasmparser::{
     MemoryType, Operator, Parser, Payload, RefType, SubType, TableType, ValType,
 };
 
+#[derive(Debug, Clone)]
 pub struct Global<'a> {
     pub ty: GlobalType,
     pub init_expr: wasmparser::ConstExpr<'a>,
 }
 
+#[derive(Debug, Clone)]
 pub struct DataSegment<'a> {
     /// The kind of data segment.
     pub kind: DataSegmentKind<'a>,
@@ -42,6 +44,7 @@ pub enum DataSegmentKind<'a> {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum ElementKind<'a> {
     Passive,
     Active {
@@ -51,6 +54,7 @@ pub enum ElementKind<'a> {
     Declared,
 }
 
+#[derive(Debug, Clone)]
 pub enum ElementItems<'a> {
     Functions(Vec<u32>),
     ConstExprs {
@@ -59,6 +63,7 @@ pub enum ElementItems<'a> {
     },
 }
 
+#[derive(Debug, Clone)]
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
     /// Note that these do not include the function parameters which are given
@@ -69,6 +74,7 @@ pub struct Body<'a> {
     pub instructions: Vec<Operator<'a>>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Module<'a> {
     pub types: Vec<SubType>,
     pub imports: Vec<Import<'a>>,
