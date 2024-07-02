@@ -6,7 +6,7 @@ use crate::wrappers::{
     convert_instance_type, convert_instantiation_arg, convert_module_type_declaration,
     convert_params, convert_record_type, convert_results, convert_val_type, convert_variant_case,
     encode_core_type_subtype, process_alias, EncoderComponentExportKind, EncoderComponentTypeRef,
-    EncoderComponentValType, EncoderEntityType, EncoderValType,
+    EncoderComponentValType, EncoderEntityType, EncoderValType
 };
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
@@ -71,7 +71,7 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
-    pub instructions: Vec<Operator<'a>>,
+    pub instructions: Vec<(Operator<'a>, bool)>,
 }
 
 #[derive(Clone, Debug)]
@@ -473,6 +473,24 @@ impl<'a> Component<'a> {
         }
         Ok(component.finish())
     }
+
+    pub fn visitor(self) {
+        // This function is responsible for visiting every instruction
+        for (index, module) in self.modules.into_iter().enumerate() {
+            println!("Entered Module: {}", index);
+            for function in module.functions {
+                println!("Entered Function: {}", function);
+                // Each function index should match to a code section
+                let body: Body = module.code_sections[function as usize].clone();
+                for (local_idx, local_ty) in body.locals {
+                    println!("Local {}: {}", local_idx, local_ty);
+                }
+                for (idx, (_instr, instrumented)) in body.instructions.into_iter().enumerate() {
+                    println!("Instruction: {} Instrumented: {}", idx, instrumented);
+                }
+            }
+        }
+    }
 }
 
 impl<'a> Module<'a> {
@@ -601,9 +619,10 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
+                    let instructions_bool = instructions.into_iter().map(|op| (op, false)).collect();
                     code_sections.push(Body {
                         locals,
-                        instructions,
+                        instructions: instructions_bool,
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -851,7 +870,7 @@ impl<'a> Module<'a> {
                 for op in instructions {
                     function.instruction(
                         &reencode
-                            .instruction(op)
+                            .instruction(op.0)
                             .expect("Unable to convert Instruction"),
                     );
                 }
