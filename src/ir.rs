@@ -71,7 +71,7 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
-    pub instructions: Vec<Operator<'a>>,
+    pub instructions: Vec<(Operator<'a>, bool)>,
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +94,7 @@ pub struct Module<'a> {
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Component<'a> {
     /// Needs to contain:
     /// 1. Modules
@@ -473,6 +474,23 @@ impl<'a> Component<'a> {
         }
         Ok(component.finish())
     }
+
+    pub fn visitor(self) {
+        // This function is responsible for visiting every instruction
+        for (index, module) in self.modules.into_iter().enumerate() {
+            println!("Entered Module: {}", index);
+            for (idx, body) in module.code_sections.into_iter().enumerate() {
+                println!("Entered Function: {}", idx);
+                // Each function index should match to a code section
+                for (local_idx, local_ty) in body.locals {
+                    println!("Local {}: {}", local_idx, local_ty);
+                }
+                for (idx, (_instr, instrumented)) in body.instructions.into_iter().enumerate() {
+                    println!("Instruction: {} Instrumented: {}", idx, instrumented);
+                }
+            }
+        }
+    }
 }
 
 impl<'a> Module<'a> {
@@ -601,9 +619,11 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
+                    let instructions_bool =
+                        instructions.into_iter().map(|op| (op, false)).collect();
                     code_sections.push(Body {
                         locals,
-                        instructions,
+                        instructions: instructions_bool,
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -851,7 +871,7 @@ impl<'a> Module<'a> {
                 for op in instructions {
                     function.instruction(
                         &reencode
-                            .instruction(op)
+                            .instruction(op.0)
                             .expect("Unable to convert Instruction"),
                     );
                 }
