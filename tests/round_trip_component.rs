@@ -1,6 +1,6 @@
 use orca::ir::Component;
-use std::io::Write; // bring trait into scope
 use std::fs::File;
+use std::io::Write; // bring trait into scope
 
 fn round_trip_component(testname: &str, folder: &str) {
     let filename = format!(
@@ -12,6 +12,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
 
     let component = Component::parse(&buff, false).expect("Unable to parse");
+    component.clone().visitor();
     let result = component.encode().expect("Unable to encode");
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
@@ -23,7 +24,7 @@ fn round_trip_component(testname: &str, folder: &str) {
             Err(e) => {
                 eprintln!("Failed to create the file: {}", e);
                 return;
-            },
+            }
         };
 
         // Write the string to the file
@@ -58,8 +59,5 @@ mod round_trip {
         const_expr
     );
 
-    make_round_trip_tests_component!(
-        "handwritten/components",
-        add
-    );
+    make_round_trip_tests_component!("handwritten/components", add);
 }

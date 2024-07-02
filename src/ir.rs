@@ -6,7 +6,7 @@ use crate::wrappers::{
     convert_instance_type, convert_instantiation_arg, convert_module_type_declaration,
     convert_params, convert_record_type, convert_results, convert_val_type, convert_variant_case,
     encode_core_type_subtype, process_alias, EncoderComponentExportKind, EncoderComponentTypeRef,
-    EncoderComponentValType, EncoderEntityType, EncoderValType
+    EncoderComponentValType, EncoderEntityType, EncoderValType,
 };
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
@@ -94,6 +94,7 @@ pub struct Module<'a> {
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Component<'a> {
     /// Needs to contain:
     /// 1. Modules
@@ -478,10 +479,9 @@ impl<'a> Component<'a> {
         // This function is responsible for visiting every instruction
         for (index, module) in self.modules.into_iter().enumerate() {
             println!("Entered Module: {}", index);
-            for function in module.functions {
-                println!("Entered Function: {}", function);
+            for (idx, body) in module.code_sections.into_iter().enumerate() {
+                println!("Entered Function: {}", idx);
                 // Each function index should match to a code section
-                let body: Body = module.code_sections[function as usize].clone();
                 for (local_idx, local_ty) in body.locals {
                     println!("Local {}: {}", local_idx, local_ty);
                 }
@@ -619,7 +619,8 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool = instructions.into_iter().map(|op| (op, false)).collect();
+                    let instructions_bool =
+                        instructions.into_iter().map(|op| (op, false)).collect();
                     code_sections.push(Body {
                         locals,
                         instructions: instructions_bool,
