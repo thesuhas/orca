@@ -2,11 +2,8 @@ use wasm_encoder::{
     Alias, ComponentExportKind, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder,
     EntityType, ExportKind, InstanceType, ModuleArg,
 };
-use wasmparser::{
-    ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg,
-    ComponentType, ComponentTypeDeclaration, CoreType, ExternalKind, InstanceTypeDeclaration,
-    SubType, TypeRef,
-};
+use wasmparser::{ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg, ComponentType, ComponentTypeDeclaration, CoreType, ExternalKind, InstanceTypeDeclaration, Operator, SubType, TypeRef};
+use crate::ir::InstrumentType;
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
 pub struct EncoderComponentExportKind(ComponentExportKind);
@@ -229,21 +226,21 @@ pub fn convert_val_type(ty: &wasmparser::ValType) -> wasm_encoder::ValType {
 }
 
 /// Function that converts Canonical Option
-pub fn convert_canon(value: wasmparser::CanonicalOption) -> wasm_encoder::CanonicalOption {
+pub fn convert_canon(value: &wasmparser::CanonicalOption) -> wasm_encoder::CanonicalOption {
     match value {
         wasmparser::CanonicalOption::UTF8 => wasm_encoder::CanonicalOption::UTF8,
         wasmparser::CanonicalOption::UTF16 => wasm_encoder::CanonicalOption::UTF16,
         wasmparser::CanonicalOption::CompactUTF16 => wasm_encoder::CanonicalOption::CompactUTF16,
-        wasmparser::CanonicalOption::Memory(u) => wasm_encoder::CanonicalOption::Memory(u),
-        wasmparser::CanonicalOption::Realloc(u) => wasm_encoder::CanonicalOption::Realloc(u),
-        wasmparser::CanonicalOption::PostReturn(u) => wasm_encoder::CanonicalOption::PostReturn(u),
+        wasmparser::CanonicalOption::Memory(u) => wasm_encoder::CanonicalOption::Memory(*u),
+        wasmparser::CanonicalOption::Realloc(u) => wasm_encoder::CanonicalOption::Realloc(*u),
+        wasmparser::CanonicalOption::PostReturn(u) => wasm_encoder::CanonicalOption::PostReturn(*u),
     }
 }
 
 /// Extracts the args of ComponentInstantiation
-pub fn convert_component_instantiation_arg(
-    arg: ComponentInstantiationArg,
-) -> (&str, ComponentExportKind, u32) {
+pub fn convert_component_instantiation_arg<'a>(
+    arg: &'a ComponentInstantiationArg<'a>,
+) -> (&'a str, ComponentExportKind, u32) {
     (
         arg.name,
         EncoderComponentExportKind::from(arg.kind).ret_original(),
@@ -252,9 +249,9 @@ pub fn convert_component_instantiation_arg(
 }
 
 /// Extracts and Converts Component Export
-pub fn convert_component_export(
-    value: wasmparser::ComponentExport,
-) -> (&str, ComponentExportKind, u32) {
+pub fn convert_component_export<'a>(
+    value: &'a wasmparser::ComponentExport<'a>,
+) -> (&'a str, ComponentExportKind, u32) {
     (
         value.name.0,
         EncoderComponentExportKind::from(value.kind).ret_original(),
@@ -263,7 +260,7 @@ pub fn convert_component_export(
 }
 
 /// Extracts and Converts Exports
-pub fn convert_export(value: wasmparser::Export) -> (&str, ExportKind, u32) {
+pub fn convert_export<'a>(value: &'a wasmparser::Export<'a>) -> (&'a str, ExportKind, u32) {
     (
         value.name,
         wasm_encoder::ExportKind::from(value.kind),
@@ -272,7 +269,7 @@ pub fn convert_export(value: wasmparser::Export) -> (&str, ExportKind, u32) {
 }
 
 /// Extracts and Converts Instance args
-pub fn convert_instantiation_arg(value: wasmparser::InstantiationArg) -> (&str, ModuleArg) {
+pub fn convert_instantiation_arg<'a>(value: &'a wasmparser::InstantiationArg<'a>) -> (&'a str, ModuleArg) {
     (value.name, ModuleArg::Instance(value.index))
 }
 
@@ -319,7 +316,7 @@ pub fn convert_module_type_declaration(
     match ty {
         wasmparser::ModuleTypeDeclaration::Type(sub) => {
             let enc = mty.ty();
-            encode_core_type_subtype(enc, sub);
+            encode_core_type_subtype(enc, &sub);
         }
         wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
             mty.export(name, EncoderEntityType::from(ty).ret_original());
@@ -349,7 +346,7 @@ pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
         InstanceTypeDeclaration::CoreType(core_type) => match core_type {
             wasmparser::CoreType::Sub(sub) => {
                 let enc = ity.core_type();
-                encode_core_type_subtype(enc, sub);
+                encode_core_type_subtype(enc, &sub);
             }
             wasmparser::CoreType::Module(module) => {
                 for m in &*module {
@@ -475,9 +472,9 @@ pub fn convert_component_val_type(
 }
 
 /// Convert Record Type
-pub fn convert_record_type(
-    val: (&str, wasmparser::ComponentValType),
-) -> (&str, wasm_encoder::ComponentValType) {
+pub fn convert_record_type<'a>(
+    val: &'a (&'a str, wasmparser::ComponentValType),
+) -> (&'a str, wasm_encoder::ComponentValType) {
     (val.0, EncoderComponentValType::from(val.1).ret_original())
 }
 
@@ -506,9 +503,9 @@ pub fn convert_results(result: ComponentFuncResult, mut enc: ComponentFuncTypeEn
 }
 
 /// Convert variant case
-pub fn convert_variant_case(
-    variant: wasmparser::VariantCase,
-) -> (&str, Option<wasm_encoder::ComponentValType>, Option<u32>) {
+pub fn convert_variant_case<'a>(
+    variant: &'a wasmparser::VariantCase<'a>,
+) -> (&'a str, Option<wasm_encoder::ComponentValType>, Option<u32>) {
     (
         variant.name,
         match variant.ty {
@@ -523,9 +520,9 @@ pub fn convert_variant_case(
 }
 
 /// CoreTypeEncoding
-pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
+pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: &SubType) {
     // TODO: Struct and Arrays once added to wasm_encoder - still in GC Proposal
-    match subtype.composite_type {
+    match &subtype.composite_type {
         wasmparser::CompositeType::Func(func) => {
             enc.function(
                 func.params()
@@ -545,15 +542,15 @@ pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: SubType) {
 }
 
 /// Process Alias
-pub fn process_alias(a: ComponentAlias) -> Alias {
+pub fn process_alias<'a>(a: &'a ComponentAlias<'a>) -> Alias<'a> {
     match a {
         ComponentAlias::InstanceExport {
             kind,
             instance_index,
             name,
         } => Alias::InstanceExport {
-            instance: instance_index,
-            kind: EncoderComponentExportKind::from(kind).ret_original(),
+            instance: *instance_index,
+            kind: EncoderComponentExportKind::from(*kind).ret_original(),
             name,
         },
         ComponentAlias::CoreInstanceExport {
@@ -561,14 +558,14 @@ pub fn process_alias(a: ComponentAlias) -> Alias {
             instance_index,
             name,
         } => Alias::CoreInstanceExport {
-            instance: instance_index,
-            kind: EncoderExportKind::from(kind).ret_original(),
+            instance: *instance_index,
+            kind: EncoderExportKind::from(*kind).ret_original(),
             name,
         },
         ComponentAlias::Outer { kind, count, index } => Alias::Outer {
-            kind: EncoderComponentOuterAlias::from(kind).ret_original(),
-            count,
-            index,
+            kind: EncoderComponentOuterAlias::from(*kind).ret_original(),
+            count: *count,
+            index: *index,
         },
     }
 }
@@ -583,10 +580,10 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                     def_enc.primitive(wasm_encoder::PrimitiveValType::from(p))
                 }
                 wasmparser::ComponentDefinedType::Record(record) => {
-                    def_enc.record(record.into_vec().into_iter().map(convert_record_type));
+                    def_enc.record(record.iter().map(convert_record_type));
                 }
                 wasmparser::ComponentDefinedType::Variant(variant) => {
-                    def_enc.variant(variant.into_vec().into_iter().map(convert_variant_case))
+                    def_enc.variant(variant.iter().map(convert_variant_case))
                 }
                 wasmparser::ComponentDefinedType::List(l) => {
                     def_enc.list(EncoderComponentValType::from(l).ret_original())
@@ -629,7 +626,7 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                     ComponentTypeDeclaration::CoreType(core) => match core {
                         CoreType::Sub(sub) => {
                             let enc = new_comp.core_type();
-                            encode_core_type_subtype(enc, sub);
+                            encode_core_type_subtype(enc, &sub);
                         }
                         CoreType::Module(module) => {
                             for m in &*module {
@@ -643,7 +640,7 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                         convert_component_type(typ, enc);
                     }
                     ComponentTypeDeclaration::Alias(a) => {
-                        new_comp.alias(process_alias(a));
+                        new_comp.alias(process_alias(&a));
                     }
                     ComponentTypeDeclaration::Export { name, ty } => {
                         new_comp.export(name.0, EncoderComponentTypeRef::from(ty).ret_original());
@@ -664,7 +661,7 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                     InstanceTypeDeclaration::CoreType(core_type) => match core_type {
                         wasmparser::CoreType::Sub(sub) => {
                             let enc = ity.core_type();
-                            encode_core_type_subtype(enc, sub);
+                            encode_core_type_subtype(enc, &sub);
                         }
                         wasmparser::CoreType::Module(module) => {
                             for m in &*module {
@@ -719,4 +716,13 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
             enc.resource(EncoderValType::from(rep).ret_original(), dtor);
         }
     }
+}
+
+pub fn compare_operator(ops: Vec<(Operator, InstrumentType)>, _target: &mut Operator) -> InstrumentType {
+    for (op, instr_ty) in ops.iter() {
+        if std::mem::discriminant(op) == std::mem::discriminant(_target) {
+            return (*instr_ty).clone();
+        }
+    }
+    InstrumentType::NotInstrumented
 }
