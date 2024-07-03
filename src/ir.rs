@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Formatter;
 use crate::convert::parser_to_internal;
 use crate::error::Error;
 use crate::wrappers::{
@@ -64,6 +66,21 @@ pub enum ElementItems<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub enum InstructionType {
+    Instrumented,
+    NotInstrumented
+}
+
+impl fmt::Display for InstructionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            InstructionType::Instrumented => write!(f, "Instrumented"),
+            InstructionType::NotInstrumented => write!(f, "Not Instrumented")
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
     /// Note that these do not include the function parameters which are given
@@ -71,7 +88,7 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
-    pub instructions: Vec<(Operator<'a>, bool)>,
+    pub instructions: Vec<(Operator<'a>, InstructionType)>,
 }
 
 #[derive(Clone, Debug)]
@@ -620,7 +637,7 @@ impl<'a> Module<'a> {
                         });
                     }
                     let instructions_bool =
-                        instructions.into_iter().map(|op| (op, false)).collect();
+                        instructions.into_iter().map(|op| (op, InstructionType::NotInstrumented)).collect();
                     code_sections.push(Body {
                         locals,
                         instructions: instructions_bool,
