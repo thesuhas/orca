@@ -1,9 +1,13 @@
+use crate::ir::InstrumentType;
 use wasm_encoder::{
     Alias, ComponentExportKind, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder,
     EntityType, ExportKind, InstanceType, ModuleArg,
 };
-use wasmparser::{ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg, ComponentType, ComponentTypeDeclaration, CoreType, ExternalKind, InstanceTypeDeclaration, Operator, SubType, TypeRef};
-use crate::ir::InstrumentType;
+use wasmparser::{
+    ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg,
+    ComponentType, ComponentTypeDeclaration, CoreType, ExternalKind, InstanceTypeDeclaration,
+    Operator, SubType, TypeRef,
+};
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
 pub struct EncoderComponentExportKind(ComponentExportKind);
@@ -269,7 +273,9 @@ pub fn convert_export<'a>(value: &'a wasmparser::Export<'a>) -> (&'a str, Export
 }
 
 /// Extracts and Converts Instance args
-pub fn convert_instantiation_arg<'a>(value: &'a wasmparser::InstantiationArg<'a>) -> (&'a str, ModuleArg) {
+pub fn convert_instantiation_arg<'a>(
+    value: &'a wasmparser::InstantiationArg<'a>,
+) -> (&'a str, ModuleArg) {
     (value.name, ModuleArg::Instance(value.index))
 }
 
@@ -718,11 +724,28 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
     }
 }
 
-pub fn compare_operator(ops: Vec<(Operator, InstrumentType)>, _target: &mut Operator) -> InstrumentType {
+pub fn compare_operator_instr_ty(
+    ops: Vec<(Operator, InstrumentType)>,
+    _target: &mut Operator,
+) -> InstrumentType {
     for (op, instr_ty) in ops.iter() {
         if std::mem::discriminant(op) == std::mem::discriminant(_target) {
             return (*instr_ty).clone();
         }
     }
     InstrumentType::NotInstrumented
+}
+
+
+
+pub fn compare_operator_for_inject<'a>(
+    ops: Vec<(Operator<'a>, Operator<'a>)>,
+    target: Operator,
+) -> Option<Operator<'a>> {
+    for (op, op2) in ops.iter() {
+        if std::mem::discriminant(op) == std::mem::discriminant(&target) {
+            return Some((*op2).clone());
+        }
+    }
+    None
 }
