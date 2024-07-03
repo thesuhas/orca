@@ -2,14 +2,13 @@ use orca::ir::{Component, InstrumentType};
 use wasmparser::Operator;
 
 pub fn compare_operator(
-    op: Operator,
-    target: Operator,
+    op: &Operator,
+    target: &Operator,
 ) -> bool {
-        if std::mem::discriminant(&op) == std::mem::discriminant(&target) {
-            return true;
+        match (op, target) {
+            (Operator::Call {function_index: idx1}, Operator::Call {function_index:idx2}) => idx1 == idx2,
+            _ => false
         }
-
-    false
 }
 
 #[test]
@@ -58,5 +57,17 @@ fn test_inject_code() {
 
     component.add_instrumentation(injections.clone());
 
-    // TODO - Finish this test
+    for module in component.modules.iter() {
+        for body in module.code_sections.iter() {
+            for (idx, (instr, ty)) in body.instructions.iter().enumerate() {
+                // Now for each instruction, see if it matches to the injected stuff
+                for (orig, inject) in injections.iter() {
+                    if compare_operator(instr, orig) {
+                        // That means, previous instruction must be injected
+                        assert_eq!(compare_operator(inject, &body.instructions[idx - 1].0), true);
+                    }
+                }
+            }
+        }
+    }
 }

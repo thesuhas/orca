@@ -729,6 +729,7 @@ pub fn compare_operator_instr_ty(
     _target: &mut Operator,
 ) -> InstrumentType {
     for (op, instr_ty) in ops.iter() {
+        // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
         if std::mem::discriminant(op) == std::mem::discriminant(_target) {
             return (*instr_ty).clone();
         }
@@ -743,6 +744,7 @@ pub fn compare_operator_for_inject<'a>(
     target: Operator,
 ) -> Option<Operator<'a>> {
     for (op, op2) in ops.iter() {
+        // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
         if std::mem::discriminant(op) == std::mem::discriminant(&target) {
             return Some((*op2).clone());
         }
