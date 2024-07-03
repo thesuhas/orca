@@ -65,7 +65,7 @@ pub enum ElementItems<'a> {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InstrumentType {
     InstrumentBefore,
     InstrumentAfter,
