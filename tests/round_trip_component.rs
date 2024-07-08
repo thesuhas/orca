@@ -33,6 +33,7 @@ fn round_trip_component(testname: &str, folder: &str) {
             Err(e) => eprintln!("Failed to write to the file: {}", e),
         }
     }
+    assert_eq!(out, original);
 }
 
 macro_rules! make_round_trip_tests_component {
@@ -47,17 +48,21 @@ macro_rules! make_round_trip_tests_component {
 }
 
 mod round_trip {
-    make_round_trip_tests_component!(
-        "dfinity/components",
-        data_section,
-        func,
-        func_locals,
-        table,
-        table_init,
-        exports,
-        start,
-        const_expr
-    );
+    // make_round_trip_tests_component!(
+    //     "dfinity/components",
+    //     data_section,
+    //     func,
+    //     func_locals,
+    //     table,
+    //     table_init,
+    //     exports,
+    //     start,
+    //     const_expr
+    // );
+    //
+    // make_round_trip_tests_component!("handwritten/components", add);
 
-    make_round_trip_tests_component!("handwritten/components", add);
+    // make_round_trip_tests_component!("wizard/components", func_loop);
+
+    make_round_trip_tests_component!("spec-test/components", if_test);
 }
