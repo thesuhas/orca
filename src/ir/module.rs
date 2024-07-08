@@ -1,9 +1,11 @@
+use crate::ir::convert::parser_to_internal;
+use crate::error::Error;
+use crate::ir::types::{
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
+};
+use crate::ir::wrappers::{convert_heap_type, convert_val_type, EncoderEntityType, EncoderValType};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
-use crate::convert::parser_to_internal;
-use crate::error::Error;
-use crate::ir::types::{Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType};
-use crate::wrappers::{convert_heap_type, convert_val_type, EncoderEntityType, EncoderValType};
 
 #[derive(Clone, Debug)]
 pub struct Module<'a> {
@@ -14,7 +16,7 @@ pub struct Module<'a> {
     /// Each table has a type and optional initialization expression.
     pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
     pub memories: Vec<MemoryType>,
-    pub globals: Vec<Global<'a>>,
+    pub globals: Vec<Global>,
     pub data: Vec<DataSegment<'a>>,
     pub data_count_section_exists: bool,
     pub exports: Vec<Export<'a>>,
@@ -141,11 +143,11 @@ impl<'a> Module<'a> {
                     }
                     if !enable_multi_memory
                         && instructions.iter().any(|i| match i {
-                        Operator::MemoryGrow { mem, .. } | Operator::MemorySize { mem, .. } => {
-                            *mem != 0x00
-                        }
-                        _ => false,
-                    })
+                            Operator::MemoryGrow { mem, .. } | Operator::MemorySize { mem, .. } => {
+                                *mem != 0x00
+                            }
+                            _ => false,
+                        })
                     {
                         return Err(Error::InvalidMemoryReservedByte {
                             func_range: body.range(),
@@ -309,9 +311,7 @@ impl<'a> Module<'a> {
                         mutable: global.ty.mutable,
                         shared: global.ty.shared,
                     },
-                    &reencode
-                        .const_expr((*global).clone().init_expr)
-                        .expect("Error unpacking globals"),
+                    &(*global).clone().init_expr.to_wasmencoder_type(),
                 );
             }
             module.section(&globals);

@@ -1,9 +1,19 @@
-use wasm_encoder::{ComponentAliasSection, ModuleSection};
-use wasmparser::{CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance, ComponentType, ComponentTypeDeclaration, CoreType, Instance, Operator, Parser, Payload};
 use crate::error::Error;
-use crate::ir::types::InstrumentType;
 use crate::ir::module::Module;
-use crate::wrappers::{compare_operator_for_inject, compare_operator_instr_ty, convert_canon, convert_component_export, convert_component_instantiation_arg, convert_component_type, convert_component_val_type, convert_export, convert_instance_type, convert_instantiation_arg, convert_module_type_declaration, convert_params, convert_record_type, convert_results, convert_variant_case, encode_core_type_subtype, EncoderComponentExportKind, EncoderComponentTypeRef, EncoderComponentValType, EncoderValType, process_alias};
+use crate::ir::types::InstrumentType;
+use crate::ir::wrappers::{
+    compare_operator_for_inject, compare_operator_instr_ty, convert_canon,
+    convert_component_export, convert_component_instantiation_arg, convert_component_type,
+    convert_component_val_type, convert_export, convert_instance_type, convert_instantiation_arg,
+    convert_module_type_declaration, convert_params, convert_record_type, convert_results,
+    convert_variant_case, encode_core_type_subtype, process_alias, EncoderComponentExportKind,
+    EncoderComponentTypeRef, EncoderComponentValType, EncoderValType,
+};
+use wasm_encoder::{ComponentAliasSection, ModuleSection};
+use wasmparser::{
+    CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
+    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Operator, Parser, Payload,
+};
 
 #[derive(Debug, Clone)]
 pub struct Component<'a> {

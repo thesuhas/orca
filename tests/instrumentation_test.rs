@@ -1,14 +1,18 @@
 use orca::ir::{Component, InstrumentType};
 use wasmparser::Operator;
 
-pub fn compare_operator(
-    op: &Operator,
-    target: &Operator,
-) -> bool {
-        match (op, target) {
-            (Operator::Call {function_index: idx1}, Operator::Call {function_index:idx2}) => idx1 == idx2,
-            _ => false
-        }
+pub fn compare_operator(op: &Operator, target: &Operator) -> bool {
+    match (op, target) {
+        (
+            Operator::Call {
+                function_index: idx1,
+            },
+            Operator::Call {
+                function_index: idx2,
+            },
+        ) => idx1 == idx2,
+        _ => false,
+    }
 }
 
 #[test]
@@ -64,7 +68,10 @@ fn test_inject_code() {
                 for (orig, inject) in injections.iter() {
                     if compare_operator(instr, orig) {
                         // That means, previous instruction must be injected
-                        assert_eq!(compare_operator(inject, &body.instructions[idx - 1].0), true);
+                        assert_eq!(
+                            compare_operator(inject, &body.instructions[idx - 1].0),
+                            true
+                        );
                     }
                 }
             }
