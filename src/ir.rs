@@ -23,6 +23,8 @@ use wasmparser::{
 #[derive(Debug, Clone)]
 pub struct Global<'a> {
     pub ty: GlobalType,
+    // TODO: We might want to build our own representation of econstant expression
+    // seee https://docs.rs/walrus/latest/src/walrus/const_expr.rs.html#13-22
     pub init_expr: wasmparser::ConstExpr<'a>,
 }
 
@@ -503,16 +505,7 @@ impl<'a> Component<'a> {
         // This function is responsible for visiting every instruction
         for (index, module) in self.modules.iter().enumerate() {
             println!("Entered Module: {}", index);
-            for (idx, body) in module.code_sections.iter().enumerate() {
-                println!("Entered Function: {}", idx);
-                // Each function index should match to a code section
-                for (local_idx, local_ty) in body.locals.iter() {
-                    println!("Local {}: {}", local_idx, local_ty);
-                }
-                for (idx, (_instr, instrumented)) in body.instructions.iter().enumerate() {
-                    println!("Instruction: {} Instrumented: {}", idx, instrumented);
-                }
-            }
+            (*module).clone().visitor();
         }
     }
 
@@ -1008,5 +1001,18 @@ impl<'a> Module<'a> {
         }
 
         Ok(module)
+    }
+
+    pub fn visitor(self) {
+        for (idx, body) in self.code_sections.into_iter().enumerate() {
+            println!("Entered Function: {}", idx);
+            // Each function index should match to a code section
+            for (local_idx, local_ty) in body.locals {
+                println!("Local {}: {}", local_idx, local_ty);
+            }
+            for (idx, (_instr, instrumented)) in body.instructions.into_iter().enumerate() {
+                println!("Instruction: {} Instrumented: {}", idx, instrumented);
+            }
+        }
     }
 }
