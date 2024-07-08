@@ -314,6 +314,7 @@ impl EncoderEntityType {
     }
 }
 
+// Not added to wasm-tools
 /// Convert ModuleTypeDeclaration to ModuleType
 pub fn convert_module_type_declaration(
     ty: wasmparser::ModuleTypeDeclaration,
@@ -345,6 +346,7 @@ pub fn convert_module_type_declaration(
     return mty;
 }
 
+// Not added to wasm-tools
 /// Convert Instance Types
 pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
     let mut ity = InstanceType::new();
@@ -477,6 +479,7 @@ pub fn convert_component_val_type(
     EncoderComponentValType::from(val).ret_original()
 }
 
+// Not added to wasm-tools
 /// Convert Record Type
 pub fn convert_record_type<'a>(
     val: &'a (&'a str, wasmparser::ComponentValType),
@@ -484,6 +487,7 @@ pub fn convert_record_type<'a>(
     (val.0, EncoderComponentValType::from(val.1).ret_original())
 }
 
+// Not added to wasm-tools
 /// Convert Func Params
 pub fn convert_params(
     p: (&str, wasmparser::ComponentValType),
@@ -491,6 +495,7 @@ pub fn convert_params(
     (p.0, convert_component_val_type(p.1))
 }
 
+// Not added to wasm-tools
 /// Convert Func Results
 pub fn convert_results(result: ComponentFuncResult, mut enc: ComponentFuncTypeEncoder) {
     let mut results = vec![];
@@ -508,6 +513,7 @@ pub fn convert_results(result: ComponentFuncResult, mut enc: ComponentFuncTypeEn
     enc.results(results);
 }
 
+// Not added to wasm-tools
 /// Convert variant case
 pub fn convert_variant_case<'a>(
     variant: &'a wasmparser::VariantCase<'a>,
@@ -525,6 +531,7 @@ pub fn convert_variant_case<'a>(
     )
 }
 
+// Not added to wasm-tools
 /// CoreTypeEncoding
 pub fn encode_core_type_subtype(enc: CoreTypeEncoder, subtype: &SubType) {
     // TODO: Struct and Arrays once added to wasm_encoder - still in GC Proposal
