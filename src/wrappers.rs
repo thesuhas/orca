@@ -1,4 +1,4 @@
-use crate::ir::InstrumentType;
+use crate::ir::types::InstrumentType;
 use wasm_encoder::{
     Alias, ComponentExportKind, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder,
     EntityType, ExportKind, InstanceType, ModuleArg,
