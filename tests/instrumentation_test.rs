@@ -73,10 +73,7 @@ fn test_inject_before() {
                 for (orig, inject) in injections.iter() {
                     if is_same_call(instr, orig) {
                         // That means, previous instruction must be injected
-                        assert_eq!(
-                            is_same_call(inject, &body.instructions[idx - 1].0),
-                            true
-                        );
+                        assert_eq!(is_same_call(inject, &body.instructions[idx - 1].0), true);
                     }
                 }
             }
@@ -121,10 +118,7 @@ fn test_inject_after() {
                 for (orig, inject) in injections.iter() {
                     if is_same_call(instr, orig) {
                         // That means, previous instruction must be injected
-                        assert_eq!(
-                            is_same_call(inject, &body.instructions[idx + 1].0),
-                            true
-                        );
+                        assert_eq!(is_same_call(inject, &body.instructions[idx + 1].0), true);
                     }
                 }
             }
@@ -132,7 +126,6 @@ fn test_inject_after() {
     }
     component.visitor();
 }
-
 
 #[test]
 fn test_inject_alt() {
