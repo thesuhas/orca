@@ -8,12 +8,14 @@
 //! internal type should use [`wasmparser`].
 
 use crate::error::Error;
-use crate::ir::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global};
+
+use crate::ir::types::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global};
 type Result<T> = std::result::Result<T, Error>;
 
 /// Conversion from [`wasmparser`] to internal types.
-pub(super) mod parser_to_internal {
+pub(crate) mod parser_to_internal {
     use super::*;
+    use crate::ir::types::InitExpr;
 
     // pub(crate) fn const_expr(const_expr: wasmparser::ConstExpr) -> Result<wasmparser::Operator> {
     //     let mut ops = const_expr.get_operators_reader().into_iter();
@@ -95,7 +97,6 @@ pub(super) mod parser_to_internal {
             wasmparser::ElementItems::Expressions(ref_type, reader) => {
                 let exprs = reader
                     .into_iter()
-                    .map(|expr| expr)
                     .collect::<std::result::Result<Vec<_>, _>>()?;
                 Ok(ElementItems::ConstExprs {
                     ty: ref_type,
@@ -108,7 +109,7 @@ pub(super) mod parser_to_internal {
     pub(crate) fn global(global: wasmparser::Global) -> Result<Global> {
         Ok(Global {
             ty: global.ty,
-            init_expr: global.init_expr,
+            init_expr: InitExpr::eval(&global.init_expr),
         })
     }
 }

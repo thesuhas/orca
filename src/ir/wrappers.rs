@@ -1,4 +1,4 @@
-use crate::ir::InstrumentType;
+use crate::ir::types::InstrumentType;
 use wasm_encoder::{
     Alias, ComponentExportKind, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder,
     EntityType, ExportKind, InstanceType, ModuleArg,
@@ -295,9 +295,7 @@ impl From<TypeRef> for EncoderEntityType {
             TypeRef::Global(ty) => EncoderEntityType(EntityType::Global(
                 wasm_encoder::GlobalType::try_from(ty).unwrap(),
             )),
-            TypeRef::Tag(ty) => EncoderEntityType(EntityType::Tag(
-                wasm_encoder::TagType::try_from(ty).unwrap(),
-            )),
+            TypeRef::Tag(ty) => EncoderEntityType(EntityType::Tag(wasm_encoder::TagType::from(ty))),
         }
     }
 }
@@ -343,7 +341,7 @@ pub fn convert_module_type_declaration(
             );
         }
     }
-    return mty;
+    mty
 }
 
 // Not added to wasm-tools
@@ -402,7 +400,7 @@ pub fn convert_instance_type(value: InstanceTypeDeclaration) -> InstanceType {
             ity.export(name.0, EncoderComponentTypeRef::from(ty).ret_original());
         }
     }
-    return ity;
+    ity
 }
 
 /// Wrapper for HeapType Conversion
@@ -520,14 +518,8 @@ pub fn convert_variant_case<'a>(
 ) -> (&'a str, Option<wasm_encoder::ComponentValType>, Option<u32>) {
     (
         variant.name,
-        match variant.ty {
-            None => None,
-            Some(ty) => Some(EncoderComponentValType::from(ty).ret_original()),
-        },
-        match variant.refines {
-            None => None,
-            Some(u) => Some(u),
-        },
+        variant.ty.map(convert_component_val_type),
+        variant.refines,
     )
 }
 
@@ -604,24 +596,14 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
                 wasmparser::ComponentDefinedType::Tuple(tup) => {
                     def_enc.tuple(tup.into_vec().into_iter().map(convert_component_val_type))
                 }
-                wasmparser::ComponentDefinedType::Flags(flags) => {
-                    def_enc.flags(flags.into_vec().into_iter())
-                }
-                wasmparser::ComponentDefinedType::Enum(en) => {
-                    def_enc.enum_type(en.into_vec().into_iter())
-                }
+                wasmparser::ComponentDefinedType::Flags(flags) => def_enc.flags(flags.into_vec()),
+                wasmparser::ComponentDefinedType::Enum(en) => def_enc.enum_type(en.into_vec()),
                 wasmparser::ComponentDefinedType::Option(opt) => {
                     def_enc.option(convert_component_val_type(opt))
                 }
                 wasmparser::ComponentDefinedType::Result { ok, err } => def_enc.result(
-                    match ok {
-                        None => None,
-                        Some(val) => Some(convert_component_val_type(val)),
-                    },
-                    match err {
-                        None => None,
-                        Some(e) => Some(convert_component_val_type(e)),
-                    },
+                    ok.map(convert_component_val_type),
+                    err.map(convert_component_val_type),
                 ),
                 wasmparser::ComponentDefinedType::Own(u) => def_enc.own(u),
                 wasmparser::ComponentDefinedType::Borrow(u) => def_enc.borrow(u),
@@ -731,27 +713,29 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
     }
 }
 
+/// return the InstrumentType of the former if the two operators are the same
 pub fn compare_operator_instr_ty(
     ops: Vec<(Operator, InstrumentType)>,
-    _target: &mut Operator,
+    target: &mut Operator,
 ) -> InstrumentType {
     for (op, instr_ty) in ops.iter() {
         // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
-        if std::mem::discriminant(op) == std::mem::discriminant(_target) {
+        if std::mem::discriminant(op) == std::mem::discriminant(target) {
             return (*instr_ty).clone();
         }
     }
     InstrumentType::NotInstrumented
 }
 
+/// return code to inject if orig matches target
 pub fn compare_operator_for_inject<'a>(
     ops: Vec<(Operator<'a>, Operator<'a>)>,
     target: Operator,
 ) -> Option<Operator<'a>> {
-    for (op, op2) in ops.iter() {
+    for (orig, inject) in ops.iter() {
         // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
-        if std::mem::discriminant(op) == std::mem::discriminant(&target) {
-            return Some((*op2).clone());
+        if std::mem::discriminant(orig) == std::mem::discriminant(&target) {
+            return Some((*inject).clone());
         }
     }
     None

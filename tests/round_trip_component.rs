@@ -1,4 +1,4 @@
-use orca::ir::Component;
+use orca::ir::component::Component;
 use std::fs::File;
 use std::io::Write; // bring trait into scope
 
@@ -34,6 +34,7 @@ fn round_trip_component(testname: &str, folder: &str) {
         }
     }
     assert_eq!(out, original);
+    println!("{}", out);
 }
 
 macro_rules! make_round_trip_tests_component {
