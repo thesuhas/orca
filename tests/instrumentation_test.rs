@@ -1,4 +1,5 @@
-use orca::ir::{Component, InstrumentType};
+use orca::ir::component::Component;
+use orca::ir::types::InstrumentType;
 use wasmparser::Operator;
 
 pub fn compare_operator(op: &Operator, target: &Operator) -> bool {
@@ -38,8 +39,10 @@ fn test_mark_as_instrumented() {
             }
         }
     }
+    component.visitor();
 }
 
+// note that the instrumented code does not type check
 #[test]
 fn test_inject_code() {
     let file = "tests/handwritten/components/add.wat";
@@ -63,7 +66,7 @@ fn test_inject_code() {
 
     for module in component.modules.iter() {
         for body in module.code_sections.iter() {
-            for (idx, (instr, ty)) in body.instructions.iter().enumerate() {
+            for (idx, (instr, ..)) in body.instructions.iter().enumerate() {
                 // Now for each instruction, see if it matches to the injected stuff
                 for (orig, inject) in injections.iter() {
                     if compare_operator(instr, orig) {
@@ -77,4 +80,11 @@ fn test_inject_code() {
             }
         }
     }
+    component.visitor();
+    let data = component.encode().expect("Unable to encode");
+    let out = wasmprinter::print_bytes(data).expect("couldn't translated Wasm to wat");
+    // write to file for debugging
+    // TODO: the alias should come afte the core instance
+    std::fs::write("output.wat", out.clone()).expect("Unable to write to file");
+    println!("{}", out);
 }

@@ -97,7 +97,6 @@ pub(crate) mod parser_to_internal {
             wasmparser::ElementItems::Expressions(ref_type, reader) => {
                 let exprs = reader
                     .into_iter()
-                    .map(|expr| expr)
                     .collect::<std::result::Result<Vec<_>, _>>()?;
                 Ok(ElementItems::ConstExprs {
                     ty: ref_type,

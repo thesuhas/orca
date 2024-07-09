@@ -205,14 +205,8 @@ impl<'a> Component<'a> {
                                 enc.option(convert_component_val_type(*opt))
                             }
                             wasmparser::ComponentDefinedType::Result { ok, err } => enc.result(
-                                match ok {
-                                    None => None,
-                                    Some(val) => Some(convert_component_val_type(*val)),
-                                },
-                                match err {
-                                    None => None,
-                                    Some(e) => Some(convert_component_val_type(*e)),
-                                },
+                                ok.map(convert_component_val_type),
+                                err.map(convert_component_val_type),
                             ),
                             wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
                             wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
@@ -303,10 +297,8 @@ impl<'a> Component<'a> {
                     exp.name.0,
                     EncoderComponentExportKind::from(exp.kind).ret_original(),
                     exp.index,
-                    match exp.ty {
-                        None => None,
-                        Some(ty) => Some(EncoderComponentTypeRef::from(ty).ret_original()),
-                    },
+                    exp.ty
+                        .map(|ty| EncoderComponentTypeRef::from(ty).ret_original()),
                 );
             }
             component.section(&exports);
@@ -397,6 +389,7 @@ impl<'a> Component<'a> {
         Ok(component.finish())
     }
 
+    /// Print every instruction
     pub fn visitor(&self) {
         // This function is responsible for visiting every instruction
         for (index, module) in self.modules.iter().enumerate() {
@@ -405,19 +398,21 @@ impl<'a> Component<'a> {
         }
     }
 
+    /// flip the instrument type according to the instruction of interest
     pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
         // This function is responsible for visiting every instruction
-        for (index, module) in self.modules.iter_mut().enumerate() {
-            println!("Entered Module: {}", index);
-            for (idx, body) in module.code_sections.iter_mut().enumerate() {
-                println!("Entered Function: {}", idx);
+        for (mod_idx, module) in self.modules.iter_mut().enumerate() {
+            println!("Entered Module: {}", mod_idx);
+            for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
+                println!("Entered Function: {}", func_idx);
                 // Each function index should match to a code section
                 // for (local_idx, local_ty) in body.locals.iter() {
                 //     println!("Local {}: {}", local_idx, local_ty);
                 // }
-                for (idx, (instr, ref mut instrumented)) in body.instructions.iter_mut().enumerate()
+                for (instr_idx, (instr, ref mut instrumented)) in
+                    body.instructions.iter_mut().enumerate()
                 {
-                    println!("Instruction: {} Instrumented: {}", idx, instrumented);
+                    println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
                     *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
                 }
             }
@@ -426,9 +421,7 @@ impl<'a> Component<'a> {
 
     pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
         for (index, module) in self.modules.iter_mut().enumerate() {
-            println!("Entered Module: {}", index);
             for (idx, body) in module.code_sections.iter_mut().enumerate() {
-                println!("Entered Function: {}", idx);
                 // Each function index should match to a code section
                 for (local_idx, local_ty) in body.locals.iter() {
                     println!("Local {}: {}", local_idx, local_ty);

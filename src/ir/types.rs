@@ -53,6 +53,7 @@ pub enum ElementItems<'a> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+/// The type of instrumentation to be applied to an instruction.
 pub enum InstrumentType {
     InstrumentBefore,
     InstrumentAfter,
@@ -120,16 +121,16 @@ impl InitExpr {
         val
     }
 
-    pub(crate) fn to_wasmencoder_type(&self) -> wasm_encoder::ConstExpr {
+    pub(crate) fn to_wasmencoder_type(self) -> wasm_encoder::ConstExpr {
         match self {
             InitExpr::Value(v) => match v {
-                Value::I32(v) => wasm_encoder::ConstExpr::i32_const(*v),
-                Value::I64(v) => wasm_encoder::ConstExpr::i64_const(*v),
-                Value::F32(v) => wasm_encoder::ConstExpr::f32_const(*v),
-                Value::F64(v) => wasm_encoder::ConstExpr::f64_const(*v),
-                Value::V128(v) => wasm_encoder::ConstExpr::v128_const(*v as i128),
+                Value::I32(v) => wasm_encoder::ConstExpr::i32_const(v),
+                Value::I64(v) => wasm_encoder::ConstExpr::i64_const(v),
+                Value::F32(v) => wasm_encoder::ConstExpr::f32_const(v),
+                Value::F64(v) => wasm_encoder::ConstExpr::f64_const(v),
+                Value::V128(v) => wasm_encoder::ConstExpr::v128_const(v as i128),
             },
-            InitExpr::Global(g) => wasm_encoder::ConstExpr::global_get(*g),
+            InitExpr::Global(g) => wasm_encoder::ConstExpr::global_get(g),
             InitExpr::RefNull(ty) => wasm_encoder::ConstExpr::ref_null(if ty.is_func_ref() {
                 wasm_encoder::HeapType::Abstract {
                     shared: false,
@@ -143,7 +144,7 @@ impl InitExpr {
             } else {
                 unreachable!()
             }),
-            InitExpr::RefFunc(f) => wasm_encoder::ConstExpr::ref_func(*f),
+            InitExpr::RefFunc(f) => wasm_encoder::ConstExpr::ref_func(f),
         }
     }
 }
@@ -175,6 +176,7 @@ impl fmt::Display for Value {
     }
 }
 
+#[allow(clippy::identity_op)]
 pub(crate) fn v128_to_u128(value: &wasmparser::V128) -> u128 {
     let n = value.bytes();
     ((n[0] as u128) << 0)

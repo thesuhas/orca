@@ -1,5 +1,5 @@
-use crate::ir::convert::parser_to_internal;
 use crate::error::Error;
+use crate::ir::convert::parser_to_internal;
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
 };
@@ -75,9 +75,9 @@ impl<'a> Module<'a> {
                     tables = table_section_reader
                         .into_iter()
                         .map(|t| {
-                            t.map_err(Error::from).and_then(|t| match t.init {
-                                wasmparser::TableInit::RefNull => Ok((t.ty, None)),
-                                wasmparser::TableInit::Expr(e) => Ok((t.ty, Some(e))),
+                            t.map_err(Error::from).map(|t| match t.init {
+                                wasmparser::TableInit::RefNull => (t.ty, None),
+                                wasmparser::TableInit::Expr(e) => (t.ty, Some(e)),
                             })
                         })
                         .collect::<Result<_, _>>()?;
@@ -452,8 +452,8 @@ impl<'a> Module<'a> {
             for (local_idx, local_ty) in body.locals {
                 println!("Local {}: {}", local_idx, local_ty);
             }
-            for (idx, (_instr, instrumented)) in body.instructions.into_iter().enumerate() {
-                println!("Instruction: {} Instrumented: {}", idx, instrumented);
+            for (instr_idx, (instr, instrumented)) in body.instructions.into_iter().enumerate() {
+                println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
             }
         }
     }
