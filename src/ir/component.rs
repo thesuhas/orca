@@ -420,8 +420,8 @@ impl<'a> Component<'a> {
     }
 
     pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
-        for (index, module) in self.modules.iter_mut().enumerate() {
-            for (idx, body) in module.code_sections.iter_mut().enumerate() {
+        for (_module_idx, module) in self.modules.iter_mut().enumerate() {
+            for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
                 // Each function index should match to a code section
                 for (local_idx, local_ty) in body.locals.iter() {
                     println!("Local {}: {}", local_idx, local_ty);
