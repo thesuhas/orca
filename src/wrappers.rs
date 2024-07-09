@@ -744,8 +744,6 @@ pub fn compare_operator_instr_ty(
     InstrumentType::NotInstrumented
 }
 
-
-
 pub fn compare_operator_for_inject<'a>(
     ops: Vec<(Operator<'a>, Operator<'a>)>,
     target: Operator,
