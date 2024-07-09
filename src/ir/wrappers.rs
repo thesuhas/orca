@@ -727,15 +727,15 @@ pub fn compare_operator_instr_ty(
     InstrumentType::NotInstrumented
 }
 
-///
+/// return code to inject if orig matches target
 pub fn compare_operator_for_inject<'a>(
     ops: Vec<(Operator<'a>, Operator<'a>)>,
     target: Operator,
 ) -> Option<Operator<'a>> {
-    for (op, op2) in ops.iter() {
+    for (orig, inject) in ops.iter() {
         // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
-        if std::mem::discriminant(op) == std::mem::discriminant(&target) {
-            return Some((*op2).clone());
+        if std::mem::discriminant(orig) == std::mem::discriminant(&target) {
+            return Some((*inject).clone());
         }
     }
     None
