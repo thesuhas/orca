@@ -155,13 +155,13 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool = instructions
+                    let instructions_bool: Vec<_> = instructions
                         .into_iter()
                         .map(|op| (op, InstrumentType::NotInstrumented))
                         .collect();
                     code_sections.push(Body {
                         locals,
-                        instructions: instructions_bool,
+                        instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
                     });
                 }
@@ -230,7 +230,7 @@ impl<'a> Module<'a> {
             start,
             elements,
             data_count_section_exists: data_section_count.is_some(),
-            code_sections,
+            code_sections: code_sections.clone(),
             data,
             custom_sections,
             num_functions: code_sections.len(),
@@ -399,7 +399,7 @@ impl<'a> Module<'a> {
             for Body {
                 locals,
                 instructions,
-                num_instructions,
+                num_instructions: _,
             } in self.code_sections.iter()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());

@@ -119,7 +119,7 @@ impl<'a> Component<'a> {
             }
         }
         Ok(Component {
-            modules,
+            modules: modules.clone(),
             alias,
             core_types,
             component_types,
