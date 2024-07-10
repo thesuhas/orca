@@ -1,18 +1,17 @@
 use crate::error::Error;
 use crate::ir::module::Module;
-use crate::ir::types::InstrumentType;
 use crate::ir::wrappers::{
-    compare_operator_for_inject, compare_operator_instr_ty, convert_canon,
-    convert_component_export, convert_component_instantiation_arg, convert_component_type,
-    convert_component_val_type, convert_export, convert_instance_type, convert_instantiation_arg,
-    convert_module_type_declaration, convert_params, convert_record_type, convert_results,
-    convert_variant_case, encode_core_type_subtype, process_alias, EncoderComponentExportKind,
-    EncoderComponentTypeRef, EncoderComponentValType, EncoderValType,
+    convert_canon, convert_component_export, convert_component_instantiation_arg,
+    convert_component_type, convert_component_val_type, convert_export, convert_instance_type,
+    convert_instantiation_arg, convert_module_type_declaration, convert_params,
+    convert_record_type, convert_results, convert_variant_case, encode_core_type_subtype,
+    process_alias, EncoderComponentExportKind, EncoderComponentTypeRef, EncoderComponentValType,
+    EncoderValType,
 };
 use wasm_encoder::{ComponentAliasSection, ModuleSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Operator, Parser, Payload,
+    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
 };
 
 #[derive(Debug, Clone)]
@@ -401,76 +400,76 @@ impl<'a> Component<'a> {
         }
     }
 
-    /// flip the instrument type according to the instruction of interest
-    pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
-        // This function is responsible for visiting every instruction
-        for (mod_idx, module) in self.modules.iter_mut().enumerate() {
-            println!("Entered Module: {}", mod_idx);
-            for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
-                println!("Entered Function: {}", func_idx);
-                // Each function index should match to a code section
-                // for (local_idx, local_ty) in body.locals.iter() {
-                //     println!("Local {}: {}", local_idx, local_ty);
-                // }
-                for (instr_idx, (instr, ref mut instrumented)) in
-                    body.instructions.iter_mut().enumerate()
-                {
-                    println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
-                    *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
-                }
-            }
-        }
-    }
+    // flip the instrument type according to the instruction of interest
+    // pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
+    //     // This function is responsible for visiting every instruction
+    //     for (mod_idx, module) in self.modules.iter_mut().enumerate() {
+    //         println!("Entered Module: {}", mod_idx);
+    //         for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
+    //             println!("Entered Function: {}", func_idx);
+    //             // Each function index should match to a code section
+    //             // for (local_idx, local_ty) in body.locals.iter() {
+    //             //     println!("Local {}: {}", local_idx, local_ty);
+    //             // }
+    //             for (instr_idx, (instr, ref mut instrumented)) in
+    //                 body.instructions.iter_mut().enumerate()
+    //             {
+    //                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
+    //                 *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
+    //             }
+    //         }
+    //     }
+    // }
 
-    pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
-        for (_module_idx, module) in self.modules.iter_mut().enumerate() {
-            for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
-                // Each function index should match to a code section
-                for (local_idx, local_ty) in body.locals.iter() {
-                    println!("Local {}: {}", local_idx, local_ty);
-                }
-
-                let mut changes = Vec::new();
-
-                for (idx, (instr, instrumented)) in body.instructions.iter_mut().enumerate() {
-                    if *instrumented != InstrumentType::NotInstrumented {
-                        match compare_operator_for_inject(code_injections.clone(), instr.clone()) {
-                            Some(inject) => {
-                                if *instrumented == InstrumentType::InstrumentAlternate {
-                                    // Replace the value
-                                    changes.push((idx, inject, InstrumentType::NotInstrumented));
-                                } else if *instrumented == InstrumentType::InstrumentBefore {
-                                    *instrumented = InstrumentType::NotInstrumented;
-                                    changes.push((idx, inject, InstrumentType::NotInstrumented));
-                                } else {
-                                    *instrumented = InstrumentType::NotInstrumented;
-                                    changes.push((
-                                        idx + 1,
-                                        inject,
-                                        InstrumentType::NotInstrumented,
-                                    ));
-                                }
-                            }
-                            None => {
-                                // If nothing matches, reset instrumentation
-                                *instrumented = InstrumentType::NotInstrumented;
-                            }
-                        }
-                    }
-                }
-
-                // Apply changes
-                let mut offset = 0;
-                for (idx, op, instr) in changes {
-                    if instr == InstrumentType::InstrumentAlternate {
-                        body.instructions[idx + offset] = (op, instr);
-                    } else {
-                        body.instructions
-                            .insert(idx + offset, (op, InstrumentType::NotInstrumented));
-                        offset += 1;
-                    }
-                }
-            }
-        }
-    }
+    // pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
+    //     for (_module_idx, module) in self.modules.iter_mut().enumerate() {
+    //         for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
+    //             // Each function index should match to a code section
+    //             for (local_idx, local_ty) in body.locals.iter() {
+    //                 println!("Local {}: {}", local_idx, local_ty);
+    //             }
+    //
+    //             let mut changes = Vec::new();
+    //
+    //             for (idx, (instr, instrumented)) in body.instructions.iter_mut().enumerate() {
+    //                 if *instrumented != InstrumentType::NotInstrumented {
+    //                     match compare_operator_for_inject(code_injections.clone(), instr.clone()) {
+    //                         Some(inject) => {
+    //                             if *instrumented == InstrumentType::InstrumentAlternate {
+    //                                 // Replace the value
+    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
+    //                             } else if *instrumented == InstrumentType::InstrumentBefore {
+    //                                 *instrumented = InstrumentType::NotInstrumented;
+    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
+    //                             } else {
+    //                                 *instrumented = InstrumentType::NotInstrumented;
+    //                                 changes.push((
+    //                                     idx + 1,
+    //                                     inject,
+    //                                     InstrumentType::NotInstrumented,
+    //                                 ));
+    //                             }
+    //                         }
+    //                         None => {
+    //                             // If nothing matches, reset instrumentation
+    //                             *instrumented = InstrumentType::NotInstrumented;
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //
+    //             // Apply changes
+    //             let mut offset = 0;
+    //             for (idx, op, instr) in changes {
+    //                 if instr == InstrumentType::InstrumentAlternate {
+    //                     body.instructions[idx + offset] = (op, instr);
+    //                 } else {
+    //                     body.instructions
+    //                         .insert(idx + offset, (op, InstrumentType::NotInstrumented));
+    //                     offset += 1;
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }

@@ -7,8 +7,8 @@ fn iterator_test() {
     let file = "tests/handwritten/components/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&component);
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     loop {
         match comp_it.next() {
@@ -16,5 +16,5 @@ fn iterator_test() {
             None => break,
         }
     }
-    assert_eq!(count, 8);
+    assert_eq!(count, 10);
 }
