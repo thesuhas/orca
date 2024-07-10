@@ -1,19 +1,8 @@
 use crate::ir::component::Component;
 use crate::ir::module::Module;
-use crate::ir::types::Body;
+use crate::ir::types::{Body, InstrumentType};
 use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
 use wasmparser::Operator;
-
-// pub trait Iterator {
-//     fn next(&mut self) -> Option<&Operator>;
-//
-//     // These methods enable instrumentation
-//     fn before(&mut self);
-//
-//     fn after(&mut self);
-//
-//     fn alternate(&mut self);
-// }
 
 pub struct FuncIterator {
     curr_instr: usize,
@@ -40,6 +29,10 @@ impl FuncIterator {
         }
     }
 
+    fn reset(&mut self) {
+        self.curr_instr = 0;
+    }
+
     fn has_next(&self) -> bool {
         self.curr_instr < self.num_instr
     }
@@ -56,6 +49,10 @@ impl FuncIterator {
             self.curr_instr += 1;
             Some(&instr.0)
         }
+    }
+
+    fn get_instrument_type<'a>(&'a self, body: &'a Body) -> &InstrumentType {
+        &body.instructions[self.curr_instr].1
     }
 
     fn before(&self, body: &mut Body) {
@@ -80,6 +77,10 @@ impl ModuleIterator {
         }
     }
 
+    fn reset(&mut self) {
+        self.curr_func = 0;
+    }
+
     pub fn has_next_function(&self) -> bool {
         self.curr_func + 1 < self.num_funcs
     }
@@ -93,6 +94,10 @@ impl ModuleIterator {
         } else {
             false
         }
+    }
+
+    fn get_instrument_type<'a>(&'a self, module: &'a Module) -> &InstrumentType {
+        self.func_iterator.get_instrument_type(&module.code_sections[self.curr_func])
     }
 
     fn has_next(&self) -> bool {
@@ -140,6 +145,10 @@ impl<'a> ComponentIterator<'a> {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.curr_mod = 0;
+    }
+
     fn next_module(&mut self) -> bool {
         self.curr_mod += 1;
         if self.curr_mod < self.component.num_modules {
@@ -168,17 +177,21 @@ impl<'a> ComponentIterator<'a> {
         }
     }
 
-    fn before(&mut self) {
+    pub fn get_instrument_type(&self) -> &InstrumentType {
+        self.mod_iterator.get_instrument_type(&self.component.modules[self.curr_mod])
+    }
+
+    pub fn before(&mut self) {
         self.mod_iterator
             .before(&mut self.component.modules[self.curr_mod])
     }
 
-    fn after(&mut self) {
+    pub fn after(&mut self) {
         self.mod_iterator
             .after(&mut self.component.modules[self.curr_mod])
     }
 
-    fn alternate(&mut self) {
+    pub fn alternate(&mut self) {
         self.mod_iterator
             .alternate(&mut self.component.modules[self.curr_mod])
     }
