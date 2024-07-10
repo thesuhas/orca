@@ -81,6 +81,7 @@ pub struct Body<'a> {
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
     pub instructions: Vec<(Operator<'a>, InstrumentType)>,
+    pub num_instructions: usize,
 }
 
 /// A constant which is produced in WebAssembly, typically used in global

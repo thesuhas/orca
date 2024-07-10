@@ -36,6 +36,8 @@ pub struct Component<'a> {
     pub canons: Vec<CanonicalFunction>,
     /// 8. Custom sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    /// Number of modules
+    pub num_modules: usize,
 }
 
 impl<'a> Component<'a> {
@@ -127,6 +129,7 @@ impl<'a> Component<'a> {
             component_instance,
             canons,
             custom_sections,
+            num_modules: modules.len(),
         })
     }
 

@@ -25,6 +25,8 @@ pub struct Module<'a> {
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
     pub code_sections: Vec<Body<'a>>,
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    // Number of functions
+    pub num_functions: usize,
 }
 
 impl<'a> Module<'a> {
@@ -160,6 +162,7 @@ impl<'a> Module<'a> {
                     code_sections.push(Body {
                         locals,
                         instructions: instructions_bool,
+                        num_instructions: instructions_bool.len(),
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -230,6 +233,7 @@ impl<'a> Module<'a> {
             code_sections,
             data,
             custom_sections,
+            num_functions: code_sections.len(),
         })
     }
 
@@ -395,6 +399,7 @@ impl<'a> Module<'a> {
             for Body {
                 locals,
                 instructions,
+                num_instructions,
             } in self.code_sections.iter()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
