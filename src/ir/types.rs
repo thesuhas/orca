@@ -82,6 +82,19 @@ impl PartialEq for InstrumentType<'_> {
 
 impl Eq for InstrumentType<'_> {}
 
+impl<'a> InstrumentType<'a> {
+    pub fn add_instr(&mut self, val: Operator<'a>) {
+        match self {
+            InstrumentType::InstrumentBefore(ref mut instrs)
+            | InstrumentType::InstrumentAlternate(ref mut instrs)
+            | InstrumentType::InstrumentAfter(ref mut instrs) => instrs.push(val),
+            InstrumentType::NotInstrumented => {
+                panic!("Cannot inject code into locations that are not instrumented!")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).

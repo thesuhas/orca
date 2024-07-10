@@ -1,7 +1,9 @@
 use crate::ir::component::Component;
 use crate::ir::module::Module;
+use crate::ir::types::InstrumentType::{
+    InstrumentAfter, InstrumentAlternate, InstrumentBefore,
+};
 use crate::ir::types::{Body, InstrumentType};
-use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
 use wasmparser::Operator;
 
 pub struct FuncIterator {
@@ -29,8 +31,9 @@ impl FuncIterator {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, num_instr: usize) {
         self.curr_instr = 0;
+        self.num_instr = num_instr;
     }
 
     fn has_next(&self) -> bool {
@@ -66,6 +69,10 @@ impl FuncIterator {
     fn alternate(&self, body: &mut Body) {
         body.instructions[self.curr_instr].1 = InstrumentAlternate(vec![])
     }
+
+    pub fn inject<'a>(&mut self, body: &mut Body<'a>, instr: Operator<'a>) {
+        body.instructions[self.curr_instr].1.add_instr(instr);
+    }
 }
 
 impl ModuleIterator {
@@ -77,8 +84,10 @@ impl ModuleIterator {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, num_funcs: usize, num_instr: usize) {
         self.curr_func = 0;
+        self.num_funcs = num_funcs;
+        self.func_iterator.reset(num_instr);
     }
 
     pub fn has_next_function(&self) -> bool {
@@ -97,7 +106,8 @@ impl ModuleIterator {
     }
 
     fn get_instrument_type<'a>(&'a self, module: &'a Module) -> &InstrumentType {
-        self.func_iterator.get_instrument_type(&module.code_sections[self.curr_func])
+        self.func_iterator
+            .get_instrument_type(&module.code_sections[self.curr_func])
     }
 
     fn has_next(&self) -> bool {
@@ -132,6 +142,11 @@ impl ModuleIterator {
         self.func_iterator
             .alternate(&mut module.code_sections[self.curr_func])
     }
+
+    pub fn inject<'a>(&mut self, module: &mut Module<'a>, instr: Operator<'a>) {
+        self.func_iterator
+            .inject(&mut module.code_sections[self.curr_func], instr);
+    }
 }
 
 impl<'a> ComponentIterator<'a> {
@@ -147,6 +162,7 @@ impl<'a> ComponentIterator<'a> {
 
     pub fn reset(&mut self) {
         self.curr_mod = 0;
+        self.mod_iterator.reset(self.component.modules[self.curr_mod].num_functions, self.component.modules[self.curr_mod].code_sections[0].num_instructions);
     }
 
     fn next_module(&mut self) -> bool {
@@ -178,7 +194,8 @@ impl<'a> ComponentIterator<'a> {
     }
 
     pub fn get_instrument_type(&self) -> &InstrumentType {
-        self.mod_iterator.get_instrument_type(&self.component.modules[self.curr_mod])
+        self.mod_iterator
+            .get_instrument_type(&self.component.modules[self.curr_mod])
     }
 
     pub fn before(&mut self) {
@@ -194,5 +211,10 @@ impl<'a> ComponentIterator<'a> {
     pub fn alternate(&mut self) {
         self.mod_iterator
             .alternate(&mut self.component.modules[self.curr_mod])
+    }
+
+    pub fn inject(&mut self, instr: Operator<'a>) {
+        self.mod_iterator
+            .inject(&mut self.component.modules[self.curr_mod], instr);
     }
 }

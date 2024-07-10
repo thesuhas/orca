@@ -1,7 +1,7 @@
-use wasmparser::Operator;
 use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::types::InstrumentType;
+use wasmparser::Operator;
 
 pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
     match (op, target) {
@@ -51,7 +51,7 @@ fn iterator_mark_as_before_test() {
                 if is_same_call(op, &interested) {
                     comp_it.before();
                 }
-            },
+            }
             None => break,
         }
     }
@@ -62,9 +62,12 @@ fn iterator_mark_as_before_test() {
         match comp_it.next() {
             Some(op) => {
                 if is_same_call(op, &interested) {
-                    assert_eq!(*comp_it.get_instrument_type(), InstrumentType::InstrumentBefore(vec![]));
+                    assert_eq!(
+                        *comp_it.get_instrument_type(),
+                        InstrumentType::InstrumentBefore(vec![])
+                    );
                 }
-            },
+            }
             None => break,
         }
     }
