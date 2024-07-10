@@ -141,15 +141,6 @@ impl<'a> Component<'a> {
             }
         }
 
-        // Alias parsing
-        if !self.alias.is_empty() {
-            let mut alias = ComponentAliasSection::new();
-            for a in self.alias.iter() {
-                alias.alias(process_alias(a));
-            }
-            component.section(&alias);
-        }
-
         // Core Types
         if !self.core_types.is_empty() {
             let mut type_section = wasm_encoder::CoreTypeSection::new();
@@ -341,6 +332,15 @@ impl<'a> Component<'a> {
                 }
             }
             component.section(&instances);
+        }
+
+        // Alias parsing
+        if !self.alias.is_empty() {
+            let mut alias = ComponentAliasSection::new();
+            for a in self.alias.iter() {
+                alias.alias(process_alias(a));
+            }
+            component.section(&alias);
         }
 
         // Canons parsing
