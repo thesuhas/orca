@@ -10,9 +10,7 @@ fn round_trip_component(testname: &str, folder: &str) {
         testname
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-
     let component = Component::parse(&buff, false).expect("Unable to parse");
-    component.clone().visitor();
     let result = component.encode().expect("Unable to encode");
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
@@ -32,9 +30,12 @@ fn round_trip_component(testname: &str, folder: &str) {
             Ok(_) => println!("Data successfully written to the file."),
             Err(e) => eprintln!("Failed to write to the file: {}", e),
         }
+
+        // write original to file
+        let mut file = File::create(format!("{}_original.wat", testname)).expect("Unable to create file");
+        file.write_all(original.as_bytes()).expect("Unable to write to file");
     }
     assert_eq!(out, original);
-    println!("{}", out);
 }
 
 macro_rules! make_round_trip_tests_component {
@@ -49,21 +50,23 @@ macro_rules! make_round_trip_tests_component {
 }
 
 mod round_trip {
-    // make_round_trip_tests_component!(
-    //     "dfinity/components",
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-    //     exports,
-    //     start,
-    //     const_expr
-    // );
-    //
-    // make_round_trip_tests_component!("handwritten/components", add);
+    make_round_trip_tests_component!(
+        "dfinity/components",
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        exports,
+        start,
+        const_expr
+    );
 
-    // make_round_trip_tests_component!("wizard/components", func_loop);
+    make_round_trip_tests_component!("handwritten/components", add);
+
+    make_round_trip_tests_component!("wizard/components", func_loop);
 
     make_round_trip_tests_component!("spec-test/components", if_test);
+
+    make_round_trip_tests_component!("spin", hello_world);
 }
