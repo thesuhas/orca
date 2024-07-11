@@ -2,7 +2,7 @@ use crate::ir::component::Component;
 use crate::ir::module::Module;
 use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
 use crate::ir::types::{Body, InstrumentType};
-use wasmparser::Operator;
+use wasmparser::{Operator};
 
 pub struct FuncIterator {
     curr_instr: usize,
@@ -288,8 +288,74 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             .inject(&mut self.component.modules[self.curr_mod], instr);
     }
 
+    // Control Flow
+    pub fn call(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::Call {
+            function_index: idx,
+        });
+        self
+    }
+
+    pub fn if_stmt(&mut self, block_type: wasmparser::ValType) -> &mut Self {
+        self.inject(Operator::If {blockty: wasmparser::BlockType::Type(block_type)});
+        self
+    }
+
+    pub fn else_stmt(&mut self) -> &mut Self {
+        self.inject(Operator::Else);
+        self
+    }
+
+    pub fn end(&mut self) -> &mut Self {
+        self.inject(Operator::End);
+        self
+    }
+
+    pub fn block(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
+        self.inject(Operator::Block {blockty: block_type});
+        self
+    }
+
+    pub fn br(&mut self, relative_depth: u32) -> &mut Self {
+        self.inject(Operator::Br {relative_depth});
+        self
+    }
+
+    pub fn br_if(&mut self, relative_depth: u32) -> &mut Self {
+        self.inject(Operator::BrIf {relative_depth});
+        self
+    }
+
+
+    // Numerics
     pub fn i32(&mut self, value: i32) -> &mut Self {
         self.inject(Operator::I32Const { value });
+        self
+    }
+
+    pub fn i64(&mut self, value: i64) -> &mut Self {
+        self.inject(Operator::I64Const {value});
+        self
+    }
+
+    pub fn local_get(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::LocalGet {local_index: idx});
+        self
+    }
+
+    pub fn local_set(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::LocalSet {local_index: idx});
+        self
+    }
+
+    pub fn i32_add(&mut self) -> &mut Self {
+        self.inject(Operator::I32Add);
+        self
+    }
+
+    // Parametric Instructions
+    pub fn drop(&mut self) -> &mut Self {
+        self.inject(Operator::Drop);
         self
     }
 
