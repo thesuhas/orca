@@ -1,4 +1,4 @@
-use orca::ir::component::{self, Component};
+use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
 use orca::ir::types::InstrumentType;
@@ -220,7 +220,7 @@ fn iterator_inject_i32_before() {
 }
 
 // you can also inline this
-fn iterate<'a>(component: &'a mut Component) {
+fn iterate(component: &mut Component) {
     let mut comp_it = ComponentIterator::new(component);
 
     let after = Operator::Call { function_index: 1 };
