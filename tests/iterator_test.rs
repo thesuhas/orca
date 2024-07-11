@@ -104,7 +104,6 @@ fn test_blocks() {
     }
 }
 
-// TODO: add asserts, I currently test this with eyeballing
 #[test]
 fn iterator_mark_as_before_test() {
     let file = "tests/handwritten/components/add.wat";
@@ -141,6 +140,10 @@ fn iterator_mark_as_before_test() {
         let fun_idx = comp_it.curr_func_idx();
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
+        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+            assert_ne!(*instr_type, InstrumentType::NotInstrumented);
+        }
+
         println!(
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
