@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Write;
 use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
@@ -213,5 +215,52 @@ fn iterator_inject_i32_before() {
         if comp_it.next().is_none() {
             break;
         };
+    }
+}
+
+#[test]
+fn iterator_verify_injection() {
+    let file = "tests/handwritten/components/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
+    {
+        let mut comp_it = ComponentIterator::new(&mut component);
+
+        let interested = Operator::Call { function_index: 1 };
+
+        loop {
+            let op = comp_it.curr_op();
+            let mod_idx = comp_it.curr_mod_idx();
+            let fun_idx = comp_it.curr_func_idx();
+            let instr_idx = comp_it.curr_instr_idx();
+            let instr_type = comp_it.get_instrument_type();
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, fun_idx, instr_idx, op, instr_type
+            );
+            if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+                comp_it.before().i32(0);
+            }
+            if comp_it.next().is_none() {
+                break;
+            };
+        }
+    }
+    
+    let result = component.encode().expect("Error in Encoding");
+    let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
+    let mut file = match File::create(format!("{}_test.wat", "add_test")) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to create the file: {}", e);
+            return;
+        }
+    };
+
+    // Write the string to the file
+    match file.write_all(out.as_bytes()) {
+        Ok(_) => println!("Data successfully written to the file."),
+        Err(e) => eprintln!("Failed to write to the file: {}", e),
     }
 }
