@@ -78,6 +78,10 @@ impl FuncIterator {
     pub fn inject<'a>(&mut self, body: &mut Body<'a>, instr: Operator<'a>) {
         body.instructions[self.curr_instr].1.add_instr(instr);
     }
+
+    pub fn get_injected_val<'a>(&'a self, idx: usize, body: &'a Body) -> &Operator {
+        body.instructions[self.curr_instr].1.get_instr(idx)
+    }
 }
 
 impl ModuleIterator {
@@ -152,6 +156,11 @@ impl ModuleIterator {
     pub fn inject<'a>(&mut self, module: &mut Module<'a>, instr: Operator<'a>) {
         self.func_iterator
             .inject(&mut module.code_sections[self.curr_func], instr);
+    }
+
+    pub fn get_injected_val<'a>(&'a self, idx: usize, module: &'a Module) -> &Operator {
+        self.func_iterator
+            .get_injected_val(idx, &module.code_sections[self.curr_func])
     }
 }
 
@@ -262,23 +271,36 @@ impl<'a> ComponentIterator<'a> {
             .get_instrument_type(&self.component.modules[self.curr_mod])
     }
 
-    pub fn before(&mut self) {
+    pub fn before(&mut self) -> &mut Self {
         self.mod_iterator
-            .before(&mut self.component.modules[self.curr_mod])
+            .before(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
-    pub fn after(&mut self) {
+    pub fn after(&mut self) -> &mut Self {
         self.mod_iterator
-            .after(&mut self.component.modules[self.curr_mod])
+            .after(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
-    pub fn alternate(&mut self) {
+    pub fn alternate(&mut self) -> &mut Self {
         self.mod_iterator
-            .alternate(&mut self.component.modules[self.curr_mod])
+            .alternate(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
     pub fn inject(&mut self, instr: Operator<'a>) {
         self.mod_iterator
             .inject(&mut self.component.modules[self.curr_mod], instr);
+    }
+
+    pub fn i32(&mut self, value: i32) -> &mut Self {
+        self.inject(Operator::I32Const { value });
+        self
+    }
+
+    pub fn get_injected_val(&mut self, idx: usize) -> &Operator {
+        self.mod_iterator
+            .get_injected_val(idx, &self.component.modules[self.curr_mod])
     }
 }

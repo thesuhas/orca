@@ -93,6 +93,17 @@ impl<'a> InstrumentType<'a> {
             }
         }
     }
+
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        match self {
+            InstrumentType::InstrumentBefore(ref instrs)
+            | InstrumentType::InstrumentAlternate(ref instrs)
+            | InstrumentType::InstrumentAfter(ref instrs) => instrs.get(idx).unwrap(),
+            InstrumentType::NotInstrumented => {
+                panic!("Cannot retrieve code from Instruction that was not instrumented!")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
