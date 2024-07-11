@@ -1,8 +1,6 @@
 use crate::ir::component::Component;
 use crate::ir::module::Module;
-use crate::ir::types::InstrumentType::{
-    InstrumentAfter, InstrumentAlternate, InstrumentBefore,
-};
+use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
 use crate::ir::types::{Body, InstrumentType};
 use wasmparser::Operator;
 
@@ -72,6 +70,10 @@ impl FuncIterator {
 
     pub fn inject<'a>(&mut self, body: &mut Body<'a>, instr: Operator<'a>) {
         body.instructions[self.curr_instr].1.add_instr(instr);
+    }
+
+    pub fn get_injected_val<'a>(&'a self, idx: usize, body: &'a Body) -> &Operator {
+        body.instructions[self.curr_instr].1.get_instr(idx)
     }
 }
 
@@ -147,6 +149,11 @@ impl ModuleIterator {
         self.func_iterator
             .inject(&mut module.code_sections[self.curr_func], instr);
     }
+
+    pub fn get_injected_val<'a>(&'a self, idx: usize, module: &'a Module) -> &Operator {
+        self.func_iterator
+            .get_injected_val(idx, &module.code_sections[self.curr_func])
+    }
 }
 
 impl<'a> ComponentIterator<'a> {
@@ -162,7 +169,10 @@ impl<'a> ComponentIterator<'a> {
 
     pub fn reset(&mut self) {
         self.curr_mod = 0;
-        self.mod_iterator.reset(self.component.modules[self.curr_mod].num_functions, self.component.modules[self.curr_mod].code_sections[0].num_instructions);
+        self.mod_iterator.reset(
+            self.component.modules[self.curr_mod].num_functions,
+            self.component.modules[self.curr_mod].code_sections[0].num_instructions,
+        );
     }
 
     fn next_module(&mut self) -> bool {
@@ -216,5 +226,14 @@ impl<'a> ComponentIterator<'a> {
     pub fn inject(&mut self, instr: Operator<'a>) {
         self.mod_iterator
             .inject(&mut self.component.modules[self.curr_mod], instr);
+    }
+
+    pub fn i32(&mut self, value: i32) {
+        self.inject(Operator::I32Const { value });
+    }
+
+    pub fn get_injected_val(&mut self, idx: usize) -> &Operator {
+        self.mod_iterator
+            .get_injected_val(idx, &self.component.modules[self.curr_mod])
     }
 }
