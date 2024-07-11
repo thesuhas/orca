@@ -208,19 +208,22 @@ impl<'a> ComponentIterator<'a> {
             .get_instrument_type(&self.component.modules[self.curr_mod])
     }
 
-    pub fn before(&mut self) {
+    pub fn before(&mut self) -> &mut Self {
         self.mod_iterator
-            .before(&mut self.component.modules[self.curr_mod])
+            .before(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
-    pub fn after(&mut self) {
+    pub fn after(&mut self) -> &mut Self {
         self.mod_iterator
-            .after(&mut self.component.modules[self.curr_mod])
+            .after(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
-    pub fn alternate(&mut self) {
+    pub fn alternate(&mut self) -> &mut Self {
         self.mod_iterator
-            .alternate(&mut self.component.modules[self.curr_mod])
+            .alternate(&mut self.component.modules[self.curr_mod]);
+        self
     }
 
     pub fn inject(&mut self, instr: Operator<'a>) {
@@ -228,8 +231,9 @@ impl<'a> ComponentIterator<'a> {
             .inject(&mut self.component.modules[self.curr_mod], instr);
     }
 
-    pub fn i32(&mut self, value: i32) {
+    pub fn i32(&mut self, value: i32) -> &mut Self {
         self.inject(Operator::I32Const { value });
+        self
     }
 
     pub fn get_injected_val(&mut self, idx: usize) -> &Operator {

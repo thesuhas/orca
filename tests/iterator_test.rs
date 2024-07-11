@@ -90,8 +90,7 @@ fn iterator_inject_i32_before() {
         match comp_it.next() {
             Some(op) => {
                 if is_same_call(op, &interested) {
-                    comp_it.before();
-                    comp_it.i32(0);
+                    comp_it.before().i32(0);
                 }
             }
             None => break,
