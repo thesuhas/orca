@@ -40,6 +40,27 @@ pub struct Component<'a> {
 }
 
 impl<'a> Component<'a> {
+    pub fn new() -> Self {
+        Component {
+            modules: vec![],
+            alias: vec![],
+            core_types: vec![],
+            component_types: vec![],
+            imports: vec![],
+            exports: vec![],
+            instances: vec![],
+            component_instance: vec![],
+            canons: vec![],
+            custom_sections: vec![],
+            num_modules: 0,
+        }
+    }
+
+    pub fn add_module(&mut self, module: Module<'a>) {
+        self.modules.push(module);
+        self.num_modules += 1;
+    }
+
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let mut modules = vec![];
         let mut core_types = vec![];

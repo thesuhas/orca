@@ -103,6 +103,8 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
+    // TODO: should we make this into a struct for better readability?
+    // accessing opeators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
     pub num_instructions: usize,
 }

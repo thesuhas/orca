@@ -1,8 +1,8 @@
+use core::num;
+
 use crate::ir::component::Component;
 use crate::ir::module::Module;
-use crate::ir::types::InstrumentType::{
-    InstrumentAfter, InstrumentAlternate, InstrumentBefore,
-};
+use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
 use crate::ir::types::{Body, InstrumentType};
 use wasmparser::Operator;
 
@@ -37,20 +37,25 @@ impl FuncIterator {
     }
 
     fn has_next(&self) -> bool {
-        self.curr_instr < self.num_instr
+        self.curr_instr + 1 < self.num_instr
     }
 
     fn next<'a>(&'a mut self, body: &'a Body) -> Option<&Operator> {
         if !self.has_next() {
             None
         } else {
-            let instr = &body.instructions[self.curr_instr];
-            println!(
-                "Instruction: {:?} Instrumented Type: {:?}",
-                instr.0, instr.1
-            );
             self.curr_instr += 1;
+            let instr = &body.instructions[self.curr_instr];
             Some(&instr.0)
+        }
+    }
+
+    fn curr_op<'a>(&'a self, body: &'a Body) -> Option<&Operator> {
+        if self.curr_instr < self.num_instr {
+            let instr = &body.instructions[self.curr_instr];
+            Some(&instr.0)
+        } else {
+            None
         }
     }
 
@@ -120,8 +125,9 @@ impl ModuleIterator {
                 .next(&module.code_sections[self.curr_func])
         } else {
             if self.next_function(module) {
+                // return the first instruction of the new function
                 self.func_iterator
-                    .next(&module.code_sections[self.curr_func])
+                    .curr_op(&module.code_sections[self.curr_func])
             } else {
                 None
             }
@@ -151,18 +157,49 @@ impl ModuleIterator {
 
 impl<'a> ComponentIterator<'a> {
     pub fn new(comp: &'a mut Component<'a>) -> Self {
-        let num_modules = comp.modules[0].num_functions;
-        let num_functions = comp.modules[0].code_sections[0].num_instructions;
+        // initializes to the first module
+        let num_funcs = comp.modules[0].num_functions;
+        let num_instrs = comp.modules[0].code_sections[0].num_instructions;
         ComponentIterator {
             component: comp,
             curr_mod: 0,
-            mod_iterator: ModuleIterator::new(num_modules, num_functions),
+            mod_iterator: ModuleIterator::new(num_funcs, num_instrs),
         }
     }
 
+    // // creats component iterator for a single module
+    // // TODO: should we extend the module iterator instead of casting a module to a component?
+    // TODO: can't create a new Component here
+    // pub fn from_module(module: &'a mut Module<'a>) -> Self {
+    //     // create a fresh component
+    //     let mut comp = Component {
+    //          modules : vec![module.clone()],
+    //          core_types : vec![],
+    //          component_types : vec![],
+    //          imports : vec![],
+    //          exports : vec![],
+    //          instances : vec![],
+    //          canons : vec![],
+    //          alias : vec![],
+    //          component_instance : vec![],
+    //          custom_sections : vec![],
+    //         num_modules : 1,
+    //     };
+    //     let num_funcs = comp.modules[0].num_functions;
+    //     let num_instrs = comp.modules[0].code_sections[0].num_instructions;
+    //     ComponentIterator {
+    //         component: &mut comp,
+    //         curr_mod: 0,
+    //         mod_iterator: ModuleIterator::new(module.num_functions, module.code_sections[0].num_instructions),
+    //     }
+    // }
+
     pub fn reset(&mut self) {
         self.curr_mod = 0;
-        self.mod_iterator.reset(self.component.modules[self.curr_mod].num_functions, self.component.modules[self.curr_mod].code_sections[0].num_instructions);
+        self.mod_iterator.reset(
+            self.component.modules[self.curr_mod].num_functions,
+            self.component.modules[self.curr_mod].code_sections[0].num_instructions,
+        );
     }
 
     fn next_module(&mut self) -> bool {
@@ -179,14 +216,41 @@ impl<'a> ComponentIterator<'a> {
         }
     }
 
+    // TODO: How much we want to delegate to module/func iterators?
+    pub fn curr_mod_idx(&self) -> usize {
+        self.curr_mod
+    }
+
+    pub fn curr_func_idx(&self) -> usize {
+        self.mod_iterator.curr_func
+    }
+
+    pub fn curr_instr_idx(&self) -> usize {
+        self.mod_iterator.func_iterator.curr_instr
+    }
+
+    pub fn curr_op(&self) -> Option<&Operator> {
+        self.component.modules[self.curr_mod].code_sections[self.mod_iterator.curr_func]
+            .instructions
+            .get(self.mod_iterator.func_iterator.curr_instr)
+            .map(|instr| &instr.0)
+    }
+
+    pub fn curr_instr_type(&self) -> &InstrumentType {
+        &self.component.modules[self.curr_mod].code_sections[self.mod_iterator.curr_func]
+            .instructions[self.mod_iterator.func_iterator.curr_instr]
+            .1
+    }
+
     pub fn next(&mut self) -> Option<&Operator> {
         if self.mod_iterator.has_next() {
             self.mod_iterator
                 .next(&self.component.modules[self.curr_mod])
         } else {
             if self.next_module() {
-                self.mod_iterator
-                    .next(&self.component.modules[self.curr_mod])
+                self.curr_op()
+                // self.mod_iterator
+                //     .next(&self.component.modules[self.curr_mod])
             } else {
                 None
             }
