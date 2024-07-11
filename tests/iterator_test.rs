@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::Write;
 use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
 use orca::ir::types::InstrumentType;
+use std::fs::File;
+use std::io::Write;
 use wasmparser::Operator;
 
 pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
@@ -246,7 +246,7 @@ fn iterator_verify_injection() {
         };
     }
     let comp = comp_it.get_component();
-    println!("{:?}", comp);    
+    println!("{:?}", comp);
     let result = comp.encode().expect("Error in Encoding");
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
 
