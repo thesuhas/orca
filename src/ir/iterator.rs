@@ -296,6 +296,21 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         self
     }
 
+    pub fn return_stmt(&mut self) -> &mut Self {
+        self.inject(Operator::Return);
+        self
+    }
+
+    pub fn nop(&mut self) -> &mut Self {
+        self.inject(Operator::Nop);
+        self
+    }
+
+    pub fn unreachable(&mut self) -> &mut Self {
+        self.inject(Operator::Unreachable);
+        self
+    }
+
     pub fn if_stmt(&mut self, block_type: wasmparser::ValType) -> &mut Self {
         self.inject(Operator::If {
             blockty: wasmparser::BlockType::Type(block_type),
@@ -315,6 +330,13 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
 
     pub fn block(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
         self.inject(Operator::Block {
+            blockty: block_type,
+        });
+        self
+    }
+
+    pub fn loop_stmt(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
+        self.inject(Operator::Loop {
             blockty: block_type,
         });
         self
@@ -609,6 +631,42 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
 
     pub fn i64_gte_signed(&mut self) -> &mut Self {
         self.inject(Operator::I64GeS);
+        self
+    }
+
+    // Memory Instructions
+    pub fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
+        self.inject(Operator::MemoryInit { data_index, mem });
+        self
+    }
+
+    pub fn memory_size(&mut self, mem: u32) -> &mut Self {
+        self.inject(Operator::MemorySize { mem });
+        self
+    }
+
+    pub fn memory_grow(&mut self, mem: u32) -> &mut Self {
+        self.inject(Operator::MemoryGrow { mem });
+        self
+    }
+
+    pub fn memory_fill(&mut self, mem: u32) -> &mut Self {
+        self.inject(Operator::MemoryFill { mem });
+        self
+    }
+
+    pub fn memory_copy(&mut self, dst_mem: u32, src_mem: u32) -> &mut Self {
+        self.inject(Operator::MemoryCopy { dst_mem, src_mem });
+        self
+    }
+
+    pub fn memory_discard(&mut self, mem: u32) -> &mut Self {
+        self.inject(Operator::MemoryDiscard { mem });
+        self
+    }
+
+    pub fn data_drop(&mut self, data_index: u32) -> &mut Self {
+        self.inject(Operator::DataDrop { data_index });
         self
     }
 
