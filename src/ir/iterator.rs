@@ -1,5 +1,3 @@
-use core::num;
-
 use crate::ir::component::Component;
 use crate::ir::module::Module;
 use crate::ir::types::InstrumentType::{InstrumentAfter, InstrumentAlternate, InstrumentBefore};
