@@ -634,6 +634,21 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         self
     }
 
+    // Floating point
+    pub fn f32(&mut self, val: f32) -> &mut Self {
+        self.inject(Operator::F32Const {
+            value: wasmparser::Ieee32::from(val),
+        });
+        self
+    }
+
+    pub fn f64(&mut self, val: f64) -> &mut Self {
+        self.inject(Operator::F64Const {
+            value: wasmparser::Ieee64::from(val),
+        });
+        self
+    }
+
     // Memory Instructions
     pub fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
         self.inject(Operator::MemoryInit { data_index, mem });
