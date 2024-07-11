@@ -1,4 +1,3 @@
-use crate::ir::types::InstrumentType;
 use wasm_encoder::{
     Alias, ComponentExportKind, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder,
     EntityType, ExportKind, InstanceType, ModuleArg,
@@ -6,7 +5,7 @@ use wasm_encoder::{
 use wasmparser::{
     ComponentAlias, ComponentExternalKind, ComponentFuncResult, ComponentInstantiationArg,
     ComponentType, ComponentTypeDeclaration, CoreType, ExternalKind, InstanceTypeDeclaration,
-    Operator, SubType, TypeRef,
+    SubType, TypeRef,
 };
 
 /// Wrapper for Component External Kind to convert to wasm_encoder compatible enum
@@ -713,30 +712,30 @@ pub fn convert_component_type(ty: ComponentType, enc: ComponentTypeEncoder) {
     }
 }
 
-/// return the InstrumentType of the former if the two operators are the same
-pub fn compare_operator_instr_ty(
-    ops: Vec<(Operator, InstrumentType)>,
-    target: &mut Operator,
-) -> InstrumentType {
-    for (op, instr_ty) in ops.iter() {
-        // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
-        if std::mem::discriminant(op) == std::mem::discriminant(target) {
-            return (*instr_ty).clone();
-        }
-    }
-    InstrumentType::NotInstrumented
-}
+// return the InstrumentType of the former if the two operators are the same
+// pub fn compare_operator_instr_ty(
+//     ops: Vec<(Operator, InstrumentType)>,
+//     target: &mut Operator,
+// ) -> InstrumentType {
+//     for (op, instr_ty) in ops.iter() {
+//         // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
+//         if std::mem::discriminant(op) == std::mem::discriminant(target) {
+//             return (*instr_ty).clone();
+//         }
+//     }
+//     InstrumentType::NotInstrumented
+// }
 
-/// return code to inject if orig matches target
-pub fn compare_operator_for_inject<'a>(
-    ops: Vec<(Operator<'a>, Operator<'a>)>,
-    target: Operator,
-) -> Option<Operator<'a>> {
-    for (orig, inject) in ops.iter() {
-        // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
-        if std::mem::discriminant(orig) == std::mem::discriminant(&target) {
-            return Some((*inject).clone());
-        }
-    }
-    None
-}
+// return code to inject if orig matches target
+// pub fn compare_operator_for_inject<'a>(
+//     ops: Vec<(Operator<'a>, Operator<'a>)>,
+//     target: Operator,
+// ) -> Option<Operator<'a>> {
+//     for (orig, inject) in ops.iter() {
+//         // TODO - This only checks variants and not enclosed values. Raised a PR to add the traits in wasm-tools directly.
+//         if std::mem::discriminant(orig) == std::mem::discriminant(&target) {
+//             return Some((*inject).clone());
+//         }
+//     }
+//     None
+// }

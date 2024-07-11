@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
+use std::mem::discriminant;
 use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
 
@@ -52,22 +53,55 @@ pub enum ElementItems<'a> {
     },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
+// TODO: Add Eq, PartialEq back after wasm-tools has been updated
 /// The type of instrumentation to be applied to an instruction.
-pub enum InstrumentType {
-    InstrumentBefore,
-    InstrumentAfter,
-    InstrumentAlternate,
+pub enum InstrumentType<'a> {
+    InstrumentBefore(Vec<Operator<'a>>),
+    InstrumentAfter(Vec<Operator<'a>>),
+    InstrumentAlternate(Vec<Operator<'a>>),
     NotInstrumented,
 }
 
-impl fmt::Display for InstrumentType {
+impl fmt::Display for InstrumentType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
-            InstrumentType::InstrumentBefore => write!(f, "Instrument Before"),
-            InstrumentType::InstrumentAfter => write!(f, "Instrument After"),
-            InstrumentType::InstrumentAlternate => write!(f, "Instrument Alternate"),
+            InstrumentType::InstrumentBefore(_) => write!(f, "Instrument Before"),
+            InstrumentType::InstrumentAfter(_) => write!(f, "Instrument After"),
+            InstrumentType::InstrumentAlternate(_) => write!(f, "Instrument Alternate"),
             InstrumentType::NotInstrumented => write!(f, "Not Instrumented"),
+        }
+    }
+}
+
+impl PartialEq for InstrumentType<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        discriminant(self) == discriminant(other)
+    }
+}
+
+impl Eq for InstrumentType<'_> {}
+
+impl<'a> InstrumentType<'a> {
+    pub fn add_instr(&mut self, val: Operator<'a>) {
+        match self {
+            InstrumentType::InstrumentBefore(ref mut instrs)
+            | InstrumentType::InstrumentAlternate(ref mut instrs)
+            | InstrumentType::InstrumentAfter(ref mut instrs) => instrs.push(val),
+            InstrumentType::NotInstrumented => {
+                panic!("Cannot inject code into locations that are not instrumented!")
+            }
+        }
+    }
+
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        match self {
+            InstrumentType::InstrumentBefore(ref instrs)
+            | InstrumentType::InstrumentAlternate(ref instrs)
+            | InstrumentType::InstrumentAfter(ref instrs) => instrs.get(idx).unwrap(),
+            InstrumentType::NotInstrumented => {
+                panic!("Cannot retrieve code from Instruction that was not instrumented!")
+            }
         }
     }
 }
@@ -80,7 +114,10 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
-    pub instructions: Vec<(Operator<'a>, InstrumentType)>,
+    // TODO: should we make this into a struct for better readability?
+    // accessing opeators by .0 is not very clear
+    pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
+    pub num_instructions: usize,
 }
 
 /// A constant which is produced in WebAssembly, typically used in global
