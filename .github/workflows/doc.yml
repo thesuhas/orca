@@ -23,7 +23,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: 'target/doc'
+          path: 'target/doc/orca'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
