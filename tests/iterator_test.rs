@@ -6,24 +6,6 @@ use std::fs::File;
 use std::io::Write;
 use wasmparser::Operator;
 
-pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
-    match (op, target) {
-        (
-            Operator::Call {
-                function_index: idx1,
-            },
-            Operator::Call {
-                function_index: idx2,
-            },
-        ) => idx1 == idx2,
-        (Operator::I32Const { value: value1 }, Operator::I32Const { value: value2 }) => {
-            value1 == value2
-        }
-        (Operator::Drop, Operator::Drop) => true,
-        _ => false,
-    }
-}
-
 #[test]
 fn test_iterator_count() {
     let mut count = 0;
@@ -127,7 +109,7 @@ fn iterator_mark_as_before_test() {
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
-        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+        if *comp_it.curr_op().unwrap() == interested {
             comp_it.before();
         }
         if comp_it.next().is_none() {
@@ -143,7 +125,7 @@ fn iterator_mark_as_before_test() {
         let fun_idx = comp_it.curr_func_idx();
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
-        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+        if *comp_it.curr_op().unwrap() == interested {
             assert_ne!(*instr_type, InstrumentType::NotInstrumented);
         }
 
@@ -178,7 +160,7 @@ fn iterator_inject_i32_before() {
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
-        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+        if *comp_it.curr_op().unwrap() == interested {
             comp_it.before().i32(1);
         }
         if comp_it.next().is_none() {
@@ -200,17 +182,14 @@ fn iterator_inject_i32_before() {
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
-        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+        if *comp_it.curr_op().unwrap() == interested {
             assert_eq!(
                 *comp_it.get_instrument_type(),
                 InstrumentType::InstrumentBefore(vec![])
             );
             assert_eq!(
-                is_same_call(
-                    comp_it.get_injected_val(0),
-                    &Operator::I32Const { value: 1 }
-                ),
-                true
+                comp_it.get_injected_val(0),
+                &Operator::I32Const { value: 1 }
             );
         }
         if comp_it.next().is_none() {
@@ -237,15 +216,15 @@ fn iterate(component: &mut Component) {
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
-        if is_same_call(comp_it.curr_op().unwrap(), &before) {
+        if *comp_it.curr_op().unwrap() == before {
             comp_it.before().call(0);
         }
 
-        if is_same_call(comp_it.curr_op().unwrap(), &after) {
+        if *comp_it.curr_op().unwrap() == after {
             comp_it.after().i32(0);
         }
 
-        if is_same_call(comp_it.curr_op().unwrap(), &alternate) {
+        if *comp_it.curr_op().unwrap() == alternate {
             comp_it.alternate().i32(3);
         }
 

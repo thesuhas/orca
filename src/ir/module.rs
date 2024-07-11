@@ -6,7 +6,6 @@ use crate::ir::types::InstrumentType::{
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
 };
-use crate::ir::wrappers::{convert_heap_type, convert_val_type, EncoderEntityType, EncoderValType};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
 
@@ -262,7 +261,7 @@ impl<'a> Module<'a> {
                 imports.import(
                     import.module,
                     import.name,
-                    EncoderEntityType::from(import.ty).ret_original(),
+                    reencode.entity_type(import.ty).unwrap(),
                 );
             }
             module.section(&imports);
@@ -282,11 +281,14 @@ impl<'a> Module<'a> {
                 let table_ty = wasm_encoder::TableType {
                     element_type: wasm_encoder::RefType {
                         nullable: table_ty.element_type.is_nullable(),
-                        heap_type: convert_heap_type(table_ty.element_type.heap_type()),
+                        heap_type: reencode
+                            .heap_type(table_ty.element_type.heap_type())
+                            .unwrap(),
                     },
                     table64: table_ty.table64,
                     minimum: table_ty.initial, // TODO - Check if this maps
                     maximum: table_ty.maximum,
+                    shared: table_ty.shared,
                 };
                 match init {
                     None => tables.table(table_ty),
@@ -314,7 +316,7 @@ impl<'a> Module<'a> {
             for global in self.globals.iter() {
                 globals.global(
                     wasm_encoder::GlobalType {
-                        val_type: convert_val_type(&global.ty.content_type),
+                        val_type: reencode.val_type(global.ty.content_type).unwrap(),
                         mutable: global.ty.mutable,
                         shared: global.ty.shared,
                     },
@@ -359,7 +361,7 @@ impl<'a> Module<'a> {
                         wasm_encoder::Elements::Expressions(
                             wasm_encoder::RefType {
                                 nullable: ty.is_nullable(),
-                                heap_type: convert_heap_type(ty.heap_type()),
+                                heap_type: reencode.heap_type(ty.heap_type()).unwrap(),
                             },
                             &temp_const_exprs,
                         )
@@ -407,7 +409,7 @@ impl<'a> Module<'a> {
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, t) in locals {
-                    converted_locals.push((*c, EncoderValType::from(*t).ret_original()));
+                    converted_locals.push((*c, reencode.val_type(*t).unwrap()));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 for (op, instrument) in instructions {
