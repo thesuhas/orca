@@ -122,7 +122,7 @@ fn iterator_mark_as_before_test() {
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
         println!(
-            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
         if is_same_call(comp_it.curr_op().unwrap(), &interested) {
@@ -142,7 +142,7 @@ fn iterator_mark_as_before_test() {
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
         println!(
-            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
 
@@ -169,7 +169,7 @@ fn iterator_inject_i32_before() {
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
         println!(
-            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
         if is_same_call(comp_it.curr_op().unwrap(), &interested) {
@@ -182,6 +182,8 @@ fn iterator_inject_i32_before() {
 
     comp_it.reset();
 
+    println!("\nAfter instrumentation\n");
+
     loop {
         let op = comp_it.curr_op();
         let mod_idx = comp_it.curr_mod_idx();
@@ -189,7 +191,7 @@ fn iterator_inject_i32_before() {
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
         println!(
-            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
         if is_same_call(comp_it.curr_op().unwrap(), &interested) {

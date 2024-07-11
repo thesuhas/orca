@@ -39,7 +39,14 @@ pub struct Component<'a> {
     pub num_modules: usize,
 }
 
+impl Default for Component<'_> {
+    fn default() -> Self {
+        Component::new()
+    }
+}
+
 impl<'a> Component<'a> {
+
     pub fn new() -> Self {
         Component {
             modules: vec![],
