@@ -199,6 +199,10 @@ impl<'a> ComponentIterator<'a> {
     //     }
     // }
 
+    pub fn get_component(&self) -> &Component {
+        self.component
+    }
+
     pub fn reset(&mut self) {
         self.curr_mod = 0;
         self.mod_iterator.reset(

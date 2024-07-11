@@ -224,32 +224,32 @@ fn iterator_verify_injection() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    {
-        let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
-        let interested = Operator::Call { function_index: 1 };
+    let interested = Operator::Call { function_index: 1 };
 
-        loop {
-            let op = comp_it.curr_op();
-            let mod_idx = comp_it.curr_mod_idx();
-            let fun_idx = comp_it.curr_func_idx();
-            let instr_idx = comp_it.curr_instr_idx();
-            let instr_type = comp_it.get_instrument_type();
-            println!(
-                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, fun_idx, instr_idx, op, instr_type
-            );
-            if is_same_call(comp_it.curr_op().unwrap(), &interested) {
-                comp_it.before().i32(0);
-            }
-            if comp_it.next().is_none() {
-                break;
-            };
+    loop {
+        let op = comp_it.curr_op();
+        let mod_idx = comp_it.curr_mod_idx();
+        let fun_idx = comp_it.curr_func_idx();
+        let instr_idx = comp_it.curr_instr_idx();
+        let instr_type = comp_it.get_instrument_type();
+        println!(
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+            mod_idx, fun_idx, instr_idx, op, instr_type
+        );
+        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+            comp_it.before().i32(0);
         }
+        if comp_it.next().is_none() {
+            break;
+        };
     }
-    
-    let result = component.encode().expect("Error in Encoding");
+    let comp = comp_it.get_component();
+    println!("{:?}", comp);    
+    let result = comp.encode().expect("Error in Encoding");
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
+
     let mut file = match File::create(format!("{}_test.wat", "add_test")) {
         Ok(file) => file,
         Err(e) => {
