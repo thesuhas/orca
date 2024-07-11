@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build Book
+      - name: Build Doc
         run: |
           rustup toolchain install nightly
           RUSTDOCFLAGS="--enable-index-page -Z unstable-options" cargo +nightly doc --no-deps
@@ -24,7 +24,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: 'target/doc/orca'
+          path: 'target/doc'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
