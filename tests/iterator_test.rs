@@ -1,8 +1,8 @@
 use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
-use wasmparser::Operator;
 use orca::ir::types::InstrumentType;
+use wasmparser::Operator;
 
 pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
     match (op, target) {
