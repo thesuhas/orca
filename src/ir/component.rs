@@ -1,14 +1,11 @@
 use crate::error::Error;
 use crate::ir::module::Module;
 use crate::ir::wrappers::{
-    convert_canon, convert_component_export, convert_component_instantiation_arg,
-    convert_component_type, convert_component_val_type, convert_export, convert_instance_type,
-    convert_instantiation_arg, convert_module_type_declaration, convert_params,
-    convert_record_type, convert_results, convert_variant_case, encode_core_type_subtype,
-    process_alias, EncoderComponentExportKind, EncoderComponentTypeRef, EncoderComponentValType,
-    EncoderValType,
+    convert_component_type, convert_instance_type, convert_module_type_declaration,
+    convert_results, convert_variant_case, encode_core_type_subtype, process_alias,
 };
-use wasm_encoder::{ComponentAliasSection, ModuleSection};
+use wasm_encoder::reencode::Reencode;
+use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
     ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
@@ -161,6 +158,7 @@ impl<'a> Component<'a> {
 
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut component = wasm_encoder::Component::new();
+        let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
         // Module parsing
         if !self.modules.is_empty() {
@@ -174,7 +172,7 @@ impl<'a> Component<'a> {
         if !self.alias.is_empty() {
             let mut alias = ComponentAliasSection::new();
             for a in self.alias.iter() {
-                alias.alias(process_alias(a));
+                alias.alias(process_alias(a, &mut reencode));
             }
             component.section(&alias);
         }
@@ -186,11 +184,14 @@ impl<'a> Component<'a> {
                 match ty {
                     CoreType::Sub(subtype) => {
                         let enc = type_section.ty();
-                        encode_core_type_subtype(enc, subtype);
+                        encode_core_type_subtype(enc, subtype, &mut reencode);
                     }
                     CoreType::Module(module) => {
                         for m in module.iter() {
-                            type_section.module(&convert_module_type_declaration((*m).clone()));
+                            type_section.module(&convert_module_type_declaration(
+                                (*m).clone(),
+                                &mut reencode,
+                            ));
                         }
                     }
                 }
@@ -210,19 +211,21 @@ impl<'a> Component<'a> {
                                 enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
                             }
                             wasmparser::ComponentDefinedType::Record(record) => {
-                                enc.record(record.iter().map(convert_record_type));
+                                enc.record(record.iter().map(|record| {
+                                    (record.0, reencode.component_val_type(record.1))
+                                }));
                             }
                             wasmparser::ComponentDefinedType::Variant(variant) => {
                                 enc.variant(variant.iter().map(convert_variant_case))
                             }
                             wasmparser::ComponentDefinedType::List(l) => {
-                                enc.list(EncoderComponentValType::from(*l).ret_original())
+                                enc.list(reencode.component_val_type(*l))
                             }
                             wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
                                 tup.clone()
                                     .into_vec()
                                     .into_iter()
-                                    .map(convert_component_val_type),
+                                    .map(|val_type| reencode.component_val_type(val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Flags(flags) => {
                                 enc.flags(flags.clone().into_vec().into_iter())
@@ -231,11 +234,11 @@ impl<'a> Component<'a> {
                                 enc.enum_type(en.clone().into_vec().into_iter())
                             }
                             wasmparser::ComponentDefinedType::Option(opt) => {
-                                enc.option(convert_component_val_type(*opt))
+                                enc.option(reencode.component_val_type(*opt))
                             }
                             wasmparser::ComponentDefinedType::Result { ok, err } => enc.result(
-                                ok.map(convert_component_val_type),
-                                err.map(convert_component_val_type),
+                                ok.map(|val_type| reencode.component_val_type(val_type)),
+                                err.map(|val_type| reencode.component_val_type(val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
                             wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
@@ -243,13 +246,12 @@ impl<'a> Component<'a> {
                     }
                     ComponentType::Func(func_ty) => {
                         let mut enc = component_ty_section.function();
-                        enc.params(
-                            func_ty
-                                .params
-                                .iter()
-                                .map(|p: &(&str, wasmparser::ComponentValType)| convert_params(*p)),
-                        );
-                        convert_results(func_ty.results.clone(), enc);
+                        enc.params(func_ty.params.iter().map(
+                            |p: &(&str, wasmparser::ComponentValType)| {
+                                (p.0, reencode.component_val_type(p.1))
+                            },
+                        ));
+                        convert_results(func_ty.results.clone(), enc, &mut reencode);
                     }
                     ComponentType::Component(comp) => {
                         let mut new_comp = wasm_encoder::ComponentType::new();
@@ -258,35 +260,31 @@ impl<'a> Component<'a> {
                                 ComponentTypeDeclaration::CoreType(core) => match core {
                                     CoreType::Sub(sub) => {
                                         let enc = new_comp.core_type();
-                                        encode_core_type_subtype(enc, sub);
+                                        encode_core_type_subtype(enc, sub, &mut reencode);
                                     }
                                     CoreType::Module(module) => {
                                         for m in module.iter() {
                                             let enc = new_comp.core_type();
                                             enc.module(&convert_module_type_declaration(
                                                 (*m).clone(),
+                                                &mut reencode,
                                             ));
                                         }
                                     }
                                 },
                                 ComponentTypeDeclaration::Type(typ) => {
                                     let enc = new_comp.ty();
-                                    convert_component_type((*typ).clone(), enc);
+                                    convert_component_type((*typ).clone(), enc, &mut reencode);
                                 }
                                 ComponentTypeDeclaration::Alias(a) => {
-                                    new_comp.alias(process_alias(a));
+                                    new_comp.alias(process_alias(a, &mut reencode));
                                 }
                                 ComponentTypeDeclaration::Export { name, ty } => {
-                                    new_comp.export(
-                                        name.0,
-                                        EncoderComponentTypeRef::from(*ty).ret_original(),
-                                    );
+                                    new_comp.export(name.0, reencode.component_type_ref(*ty));
                                 }
                                 ComponentTypeDeclaration::Import(imp) => {
-                                    new_comp.import(
-                                        imp.name.0,
-                                        EncoderComponentTypeRef::from(imp.ty).ret_original(),
-                                    );
+                                    new_comp
+                                        .import(imp.name.0, reencode.component_type_ref(imp.ty));
                                 }
                             }
                         }
@@ -294,12 +292,12 @@ impl<'a> Component<'a> {
                     }
                     ComponentType::Instance(inst) => {
                         for i in inst.iter() {
-                            component_ty_section.instance(&convert_instance_type((*i).clone()));
+                            component_ty_section
+                                .instance(&convert_instance_type((*i).clone(), &mut reencode));
                         }
                     }
                     ComponentType::Resource { rep, dtor } => {
-                        component_ty_section
-                            .resource(EncoderValType::from(*rep).ret_original(), *dtor);
+                        component_ty_section.resource(reencode.val_type(*rep).unwrap(), *dtor);
                     }
                 }
             }
@@ -310,10 +308,7 @@ impl<'a> Component<'a> {
         if !self.imports.is_empty() {
             let mut imports = wasm_encoder::ComponentImportSection::new();
             for imp in self.imports.iter() {
-                imports.import(
-                    imp.name.0,
-                    EncoderComponentTypeRef::from(imp.ty).ret_original(),
-                );
+                imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
             }
             component.section(&imports);
         }
@@ -324,10 +319,9 @@ impl<'a> Component<'a> {
             for exp in self.exports.iter() {
                 exports.export(
                     exp.name.0,
-                    EncoderComponentExportKind::from(exp.kind).ret_original(),
+                    reencode.component_export_kind(exp.kind),
                     exp.index,
-                    exp.ty
-                        .map(|ty| EncoderComponentTypeRef::from(ty).ret_original()),
+                    exp.ty.map(|ty| reencode.component_type_ref(ty)),
                 );
             }
             component.section(&exports);
@@ -344,11 +338,23 @@ impl<'a> Component<'a> {
                     } => {
                         instances.instantiate(
                             *component_index,
-                            args.iter().map(convert_component_instantiation_arg),
+                            args.iter().map(|arg| {
+                                (
+                                    arg.name,
+                                    reencode.component_export_kind(arg.kind),
+                                    arg.index,
+                                )
+                            }),
                         );
                     }
                     ComponentInstance::FromExports(export) => {
-                        instances.export_items(export.iter().map(convert_component_export));
+                        instances.export_items(export.iter().map(|value| {
+                            (
+                                value.name.0,
+                                reencode.component_export_kind(value.kind),
+                                value.index,
+                            )
+                        }));
                     }
                 }
             }
@@ -361,11 +367,20 @@ impl<'a> Component<'a> {
             for instance in self.instances.iter() {
                 match instance {
                     Instance::Instantiate { module_index, args } => {
-                        instances
-                            .instantiate(*module_index, args.iter().map(convert_instantiation_arg));
+                        instances.instantiate(
+                            *module_index,
+                            args.iter()
+                                .map(|arg| (arg.name, ModuleArg::Instance(arg.index))),
+                        );
                     }
                     Instance::FromExports(exports) => {
-                        instances.export_items(exports.iter().map(convert_export));
+                        instances.export_items(exports.iter().map(|export| {
+                            (
+                                export.name,
+                                wasm_encoder::ExportKind::from(export.kind),
+                                export.index,
+                            )
+                        }));
                     }
                 }
             }
@@ -385,14 +400,21 @@ impl<'a> Component<'a> {
                         canon_sec.lift(
                             *core_func_index,
                             *type_index,
-                            options.iter().map(convert_canon),
+                            options
+                                .iter()
+                                .map(|canon| reencode.canonical_option(*canon)),
                         );
                     }
                     CanonicalFunction::Lower {
                         func_index,
                         options,
                     } => {
-                        canon_sec.lower(*func_index, options.iter().map(convert_canon));
+                        canon_sec.lower(
+                            *func_index,
+                            options
+                                .iter()
+                                .map(|canon| reencode.canonical_option(*canon)),
+                        );
                     }
                     CanonicalFunction::ResourceNew { resource } => {
                         canon_sec.resource_new(*resource);
