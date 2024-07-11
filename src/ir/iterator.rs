@@ -297,6 +297,18 @@ impl<'a> ComponentIterator<'a> {
         self
     }
 
+    pub fn call(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::Call {
+            function_index: idx,
+        });
+        self
+    }
+
+    pub fn end(&mut self) -> &mut Self {
+        self.inject(Operator::End);
+        self
+    }
+
     pub fn get_injected_val(&mut self, idx: usize) -> &Operator {
         self.mod_iterator
             .get_injected_val(idx, &self.component.modules[self.curr_mod])

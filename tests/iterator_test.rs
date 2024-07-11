@@ -19,6 +19,7 @@ pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
         (Operator::I32Const { value: value1 }, Operator::I32Const { value: value2 }) => {
             value1 == value2
         }
+        (Operator::Drop, Operator::Drop) => true,
         _ => false,
     }
 }
@@ -226,7 +227,9 @@ fn iterator_verify_injection() {
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component);
 
-    let interested = Operator::Call { function_index: 1 };
+    let after = Operator::Call { function_index: 1 };
+    let before = Operator::Drop;
+    let alternate = Operator::I32Const { value: 2 };
 
     loop {
         let op = comp_it.curr_op();
@@ -238,9 +241,18 @@ fn iterator_verify_injection() {
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
         );
-        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
-            comp_it.before().i32(0);
+        if is_same_call(comp_it.curr_op().unwrap(), &before) {
+            comp_it.before().call(0);
         }
+
+        if is_same_call(comp_it.curr_op().unwrap(), &after) {
+            comp_it.after().i32(0);
+        }
+
+        if is_same_call(comp_it.curr_op().unwrap(), &alternate) {
+            comp_it.alternate().i32(3);
+        }
+
         if comp_it.next().is_none() {
             break;
         };
