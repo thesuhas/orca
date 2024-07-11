@@ -125,14 +125,11 @@ impl ModuleIterator {
         if self.func_iterator.has_next() {
             self.func_iterator
                 .next(&module.code_sections[self.curr_func])
+        } else if self.next_function(module) {
+            self.func_iterator
+                .curr_op(&module.code_sections[self.curr_func])
         } else {
-            if self.next_function(module) {
-                // return the first instruction of the new function
-                self.func_iterator
-                    .curr_op(&module.code_sections[self.curr_func])
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -174,9 +171,10 @@ impl<'a> ComponentIterator<'a> {
         }
     }
 
-    // // creats component iterator for a single module
+    // // creats component iterator for a standalone module
     // // TODO: should we extend the module iterator instead of casting a module to a component?
-    // TODO: can't create a new Component here
+    // TODO: can't create a new Component here, how should we iterate over just a module
+    // without casting it to a Component
     // pub fn from_module(module: &'a mut Module<'a>) -> Self {
     //     // create a fresh component
     //     let mut comp = Component {
@@ -249,18 +247,16 @@ impl<'a> ComponentIterator<'a> {
             .1
     }
 
+    // TODO: should we implement the std::iter::Iterator trait instead?
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&Operator> {
         if self.mod_iterator.has_next() {
             self.mod_iterator
                 .next(&self.component.modules[self.curr_mod])
+        } else if self.next_module() {
+            self.curr_op()
         } else {
-            if self.next_module() {
-                self.curr_op()
-                // self.mod_iterator
-                //     .next(&self.component.modules[self.curr_mod])
-            } else {
-                None
-            }
+            None
         }
     }
 
