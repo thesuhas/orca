@@ -199,6 +199,10 @@ impl<'a> ComponentIterator<'a> {
     //     }
     // }
 
+    pub fn get_component(&self) -> &Component {
+        self.component
+    }
+
     pub fn reset(&mut self) {
         self.curr_mod = 0;
         self.mod_iterator.reset(
@@ -290,6 +294,18 @@ impl<'a> ComponentIterator<'a> {
 
     pub fn i32(&mut self, value: i32) -> &mut Self {
         self.inject(Operator::I32Const { value });
+        self
+    }
+
+    pub fn call(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::Call {
+            function_index: idx,
+        });
+        self
+    }
+
+    pub fn end(&mut self) -> &mut Self {
+        self.inject(Operator::End);
         self
     }
 

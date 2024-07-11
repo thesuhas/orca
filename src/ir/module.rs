@@ -1,5 +1,8 @@
 use crate::error::Error;
 use crate::ir::convert::parser_to_internal;
+use crate::ir::types::InstrumentType::{
+    InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
+};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
 };
@@ -407,12 +410,58 @@ impl<'a> Module<'a> {
                     converted_locals.push((*c, EncoderValType::from(*t).ret_original()));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                for op in instructions {
-                    function.instruction(
-                        &reencode
-                            .instruction((*op).clone().0)
-                            .expect("Unable to convert Instruction"),
-                    );
+                for (op, instrument) in instructions {
+                    match instrument {
+                        NotInstrumented => {
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                        }
+                        InstrumentBefore(instrs) => {
+                            // First encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                            // Now encode the original instruction
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                        }
+                        InstrumentAfter(instrs) => {
+                            // First encode the original instruction
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                            // Now encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                        }
+                        InstrumentAlternate(instrs) => {
+                            // Only encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                        }
+                    }
                 }
                 code.function(&function);
             }

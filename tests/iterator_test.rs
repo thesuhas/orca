@@ -2,6 +2,8 @@ use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
 use orca::ir::types::InstrumentType;
+use std::fs::File;
+use std::io::Write;
 use wasmparser::Operator;
 
 pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
@@ -17,6 +19,7 @@ pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
         (Operator::I32Const { value: value1 }, Operator::I32Const { value: value2 }) => {
             value1 == value2
         }
+        (Operator::Drop, Operator::Drop) => true,
         _ => false,
     }
 }
@@ -104,7 +107,6 @@ fn test_blocks() {
     }
 }
 
-// TODO: add asserts, I currently test this with eyeballing
 #[test]
 fn iterator_mark_as_before_test() {
     let file = "tests/handwritten/components/add.wat";
@@ -141,6 +143,10 @@ fn iterator_mark_as_before_test() {
         let fun_idx = comp_it.curr_func_idx();
         let instr_idx = comp_it.curr_instr_idx();
         let instr_type = comp_it.get_instrument_type();
+        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+            assert_ne!(*instr_type, InstrumentType::NotInstrumented);
+        }
+
         println!(
             "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
             mod_idx, fun_idx, instr_idx, op, instr_type
@@ -210,5 +216,63 @@ fn iterator_inject_i32_before() {
         if comp_it.next().is_none() {
             break;
         };
+    }
+}
+
+#[test]
+fn iterator_verify_injection() {
+    let file = "tests/handwritten/components/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
+    let mut comp_it = ComponentIterator::new(&mut component);
+
+    let after = Operator::Call { function_index: 1 };
+    let before = Operator::Drop;
+    let alternate = Operator::I32Const { value: 2 };
+
+    loop {
+        let op = comp_it.curr_op();
+        let mod_idx = comp_it.curr_mod_idx();
+        let fun_idx = comp_it.curr_func_idx();
+        let instr_idx = comp_it.curr_instr_idx();
+        let instr_type = comp_it.get_instrument_type();
+        println!(
+            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+            mod_idx, fun_idx, instr_idx, op, instr_type
+        );
+        if is_same_call(comp_it.curr_op().unwrap(), &before) {
+            comp_it.before().call(0);
+        }
+
+        if is_same_call(comp_it.curr_op().unwrap(), &after) {
+            comp_it.after().i32(0);
+        }
+
+        if is_same_call(comp_it.curr_op().unwrap(), &alternate) {
+            comp_it.alternate().i32(3);
+        }
+
+        if comp_it.next().is_none() {
+            break;
+        };
+    }
+    let comp = comp_it.get_component();
+    println!("{:?}", comp);
+    let result = comp.encode().expect("Error in Encoding");
+    let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
+
+    let mut file = match File::create(format!("{}_test.wat", "add_test")) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to create the file: {}", e);
+            return;
+        }
+    };
+
+    // Write the string to the file
+    match file.write_all(out.as_bytes()) {
+        Ok(_) => println!("Data successfully written to the file."),
+        Err(e) => eprintln!("Failed to write to the file: {}", e),
     }
 }
