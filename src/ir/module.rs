@@ -450,6 +450,13 @@ impl<'a> Module<'a> {
         Ok(module)
     }
 
+    /// Add a new Global to the module. Returns the index of the new Global.
+    pub fn add_global(&mut self, global: Global) -> u32 {
+        let index = self.globals.len() as u32;
+        self.globals.push(global);
+        index
+    }
+
     pub fn visitor(self) {
         for (idx, body) in self.code_sections.into_iter().enumerate() {
             println!("Entered Function: {}", idx);
