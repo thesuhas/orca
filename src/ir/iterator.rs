@@ -331,16 +331,6 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
     }
 
     // Numerics
-    pub fn i32(&mut self, value: i32) -> &mut Self {
-        self.inject(Operator::I32Const { value });
-        self
-    }
-
-    pub fn i64(&mut self, value: i64) -> &mut Self {
-        self.inject(Operator::I64Const { value });
-        self
-    }
-
     pub fn local_get(&mut self, idx: u32) -> &mut Self {
         self.inject(Operator::LocalGet { local_index: idx });
         self
@@ -351,8 +341,274 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         self
     }
 
+    // Integers
+    pub fn i32(&mut self, value: i32) -> &mut Self {
+        self.inject(Operator::I32Const { value });
+        self
+    }
+
     pub fn i32_add(&mut self) -> &mut Self {
         self.inject(Operator::I32Add);
+        self
+    }
+
+    pub fn i32_sub(&mut self) -> &mut Self {
+        self.inject(Operator::I32Sub);
+        self
+    }
+
+    pub fn i32_mul(&mut self) -> &mut Self {
+        self.inject(Operator::I32Mul);
+        self
+    }
+
+    pub fn i32_div_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32DivS);
+        self
+    }
+
+    pub fn i32_div_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32DivU);
+        self
+    }
+
+    pub fn i32_rem_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32RemU);
+        self
+    }
+
+    pub fn i32_rem_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32RemS);
+        self
+    }
+
+    pub fn i32_and(&mut self) -> &mut Self {
+        self.inject(Operator::I32And);
+        self
+    }
+
+    pub fn i32_or(&mut self) -> &mut Self {
+        self.inject(Operator::I32Or);
+        self
+    }
+
+    pub fn i32_xor(&mut self) -> &mut Self {
+        self.inject(Operator::I32Xor);
+        self
+    }
+
+    pub fn i32_shl(&mut self) -> &mut Self {
+        self.inject(Operator::I32Shl);
+        self
+    }
+
+    pub fn i32_shr_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32ShrS);
+        self
+    }
+
+    pub fn i32_shr_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32ShrU);
+        self
+    }
+
+    pub fn i32_rotl(&mut self) -> &mut Self {
+        self.inject(Operator::I32Rotl);
+        self
+    }
+
+    pub fn i32_rotr(&mut self) -> &mut Self {
+        self.inject(Operator::I32Rotr);
+        self
+    }
+
+    pub fn i32_eq(&mut self) -> &mut Self {
+        self.inject(Operator::I32Eq);
+        self
+    }
+
+    pub fn i32_eqz(&mut self) -> &mut Self {
+        self.inject(Operator::I32Eqz);
+        self
+    }
+
+    pub fn i32_ne(&mut self) -> &mut Self {
+        self.inject(Operator::I32Ne);
+        self
+    }
+
+    pub fn i32_lt_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32LtU);
+        self
+    }
+
+    pub fn i32_lt_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32LtS);
+        self
+    }
+
+    pub fn i32_gt_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32GtU);
+        self
+    }
+
+    pub fn i32_gt_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32GtS);
+        self
+    }
+
+    pub fn i32_lte_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32LeU);
+        self
+    }
+
+    pub fn i32_lte_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32LeS);
+        self
+    }
+
+    pub fn i32_gte_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I32GeU);
+        self
+    }
+
+    pub fn i32_gte_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I32GeS);
+        self
+    }
+
+    pub fn i64(&mut self, value: i64) -> &mut Self {
+        self.inject(Operator::I64Const { value });
+        self
+    }
+
+    pub fn i64_add(&mut self) -> &mut Self {
+        self.inject(Operator::I64Add);
+        self
+    }
+
+    pub fn i64_sub(&mut self) -> &mut Self {
+        self.inject(Operator::I64Sub);
+        self
+    }
+
+    pub fn i64_mul(&mut self) -> &mut Self {
+        self.inject(Operator::I64Mul);
+        self
+    }
+
+    pub fn i64_div_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64DivS);
+        self
+    }
+
+    pub fn i64_div_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64DivU);
+        self
+    }
+
+    pub fn i64_rem_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64RemU);
+        self
+    }
+
+    pub fn i64_rem_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64RemS);
+        self
+    }
+
+    pub fn i64_and(&mut self) -> &mut Self {
+        self.inject(Operator::I64And);
+        self
+    }
+
+    pub fn i64_or(&mut self) -> &mut Self {
+        self.inject(Operator::I64Or);
+        self
+    }
+
+    pub fn i64_xor(&mut self) -> &mut Self {
+        self.inject(Operator::I64Xor);
+        self
+    }
+
+    pub fn i64_shl(&mut self) -> &mut Self {
+        self.inject(Operator::I64Shl);
+        self
+    }
+
+    pub fn i64_shr_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64ShrS);
+        self
+    }
+
+    pub fn i64_shr_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64ShrU);
+        self
+    }
+
+    pub fn i64_rotl(&mut self) -> &mut Self {
+        self.inject(Operator::I64Rotl);
+        self
+    }
+
+    pub fn i64_rotr(&mut self) -> &mut Self {
+        self.inject(Operator::I64Rotr);
+        self
+    }
+
+    pub fn i64_eq(&mut self) -> &mut Self {
+        self.inject(Operator::I64Eq);
+        self
+    }
+
+    pub fn i64_eqz(&mut self) -> &mut Self {
+        self.inject(Operator::I64Eqz);
+        self
+    }
+
+    pub fn i64_ne(&mut self) -> &mut Self {
+        self.inject(Operator::I64Ne);
+        self
+    }
+
+    pub fn i64_lt_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64LtU);
+        self
+    }
+
+    pub fn i64_lt_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64LtS);
+        self
+    }
+
+    pub fn i64_gt_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64GtU);
+        self
+    }
+
+    pub fn i64_gt_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64GtS);
+        self
+    }
+
+    pub fn i64_lte_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64LeU);
+        self
+    }
+
+    pub fn i64_lte_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64LeS);
+        self
+    }
+
+    pub fn i64_gte_unsigned(&mut self) -> &mut Self {
+        self.inject(Operator::I64GeU);
+        self
+    }
+
+    pub fn i64_gte_signed(&mut self) -> &mut Self {
+        self.inject(Operator::I64GeS);
         self
     }
 
