@@ -1,4 +1,4 @@
-use orca::ir::component::Component;
+use orca::ir::component::{self, Component};
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
 use orca::ir::types::InstrumentType;
@@ -218,13 +218,9 @@ fn iterator_inject_i32_before() {
     }
 }
 
-#[test]
-fn iterator_verify_injection() {
-    let file = "tests/handwritten/components/add.wat";
-
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+// you can also inline this
+fn iterate<'a>(component: &'a mut Component) {
+    let mut comp_it = ComponentIterator::new(component);
 
     let interested = Operator::Call { function_index: 1 };
 
@@ -245,9 +241,18 @@ fn iterator_verify_injection() {
             break;
         };
     }
-    let comp = comp_it.get_component();
-    println!("{:?}", comp);
-    let result = comp.encode().expect("Error in Encoding");
+}
+
+#[test]
+fn iterator_verify_injection() {
+    let file = "tests/handwritten/components/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
+
+    iterate(&mut component);
+
+    let result = component.encode().expect("Error in Encoding");
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
 
     let mut file = match File::create(format!("{}_test.wat", "add_test")) {
@@ -257,7 +262,6 @@ fn iterator_verify_injection() {
             return;
         }
     };
-
     // Write the string to the file
     match file.write_all(out.as_bytes()) {
         Ok(_) => println!("Data successfully written to the file."),

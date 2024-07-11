@@ -15,8 +15,8 @@ pub struct ModuleIterator {
     func_iterator: FuncIterator,
 }
 
-pub struct ComponentIterator<'a> {
-    component: &'a mut Component<'a>,
+pub struct ComponentIterator<'a, 'b> {
+    component: &'a mut Component<'b>,
     curr_mod: usize,
     mod_iterator: ModuleIterator,
 }
@@ -159,8 +159,8 @@ impl ModuleIterator {
     }
 }
 
-impl<'a> ComponentIterator<'a> {
-    pub fn new(comp: &'a mut Component<'a>) -> Self {
+impl<'a, 'b> ComponentIterator<'a, 'b> {
+    pub fn new(comp: &'a mut Component<'b>) -> Self {
         // initializes to the first module
         let num_funcs = comp.modules[0].num_functions;
         let num_instrs = comp.modules[0].code_sections[0].num_instructions;
@@ -198,10 +198,6 @@ impl<'a> ComponentIterator<'a> {
     //         mod_iterator: ModuleIterator::new(module.num_functions, module.code_sections[0].num_instructions),
     //     }
     // }
-
-    pub fn get_component(&self) -> &Component {
-        self.component
-    }
 
     pub fn reset(&mut self) {
         self.curr_mod = 0;
@@ -287,7 +283,7 @@ impl<'a> ComponentIterator<'a> {
         self
     }
 
-    pub fn inject(&mut self, instr: Operator<'a>) {
+    pub fn inject(&mut self, instr: Operator<'b>) {
         self.mod_iterator
             .inject(&mut self.component.modules[self.curr_mod], instr);
     }
