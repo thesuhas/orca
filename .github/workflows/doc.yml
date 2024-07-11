@@ -1,7 +1,7 @@
 name: Deploy
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 jobs:
   deploy:
@@ -16,14 +16,15 @@ jobs:
           fetch-depth: 0
       - name: Build Book
         run: |
-            cargo doc --no-deps
+          rustup toolchain install nightly
+          RUSTDOCFLAGS="--enable-index-page -Z unstable-options" cargo +nightly doc --no-deps
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: 'target/doc'
+          path: 'target/doc/orca'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
