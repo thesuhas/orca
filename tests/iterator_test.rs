@@ -1,8 +1,8 @@
 use orca::ir::component::Component;
 use orca::ir::iterator::ComponentIterator;
 use orca::ir::module::Module;
-use wasmparser::Operator;
 use orca::ir::types::InstrumentType;
+use wasmparser::Operator;
 
 pub fn is_same_call(op: &Operator, target: &Operator) -> bool {
     match (op, target) {
@@ -163,36 +163,50 @@ fn iterator_inject_i32_before() {
     let interested = Operator::Call { function_index: 1 };
 
     loop {
-        match comp_it.next() {
-            Some(op) => {
-                if is_same_call(op, &interested) {
-                    comp_it.before().i32(0);
-                }
-            }
-            None => break,
+        let op = comp_it.curr_op();
+        let mod_idx = comp_it.curr_mod_idx();
+        let fun_idx = comp_it.curr_func_idx();
+        let instr_idx = comp_it.curr_instr_idx();
+        let instr_type = comp_it.get_instrument_type();
+        println!(
+            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            mod_idx, fun_idx, instr_idx, op, instr_type
+        );
+        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+            comp_it.before().i32(1);
         }
+        if comp_it.next().is_none() {
+            break;
+        };
     }
 
     comp_it.reset();
 
     loop {
-        match comp_it.next() {
-            Some(op) => {
-                if is_same_call(op, &interested) {
-                    assert_eq!(
-                        *comp_it.get_instrument_type(),
-                        InstrumentType::InstrumentBefore(vec![])
-                    );
-                    assert_eq!(
-                        is_same_call(
-                            comp_it.get_injected_val(0),
-                            &Operator::I32Const { value: 0 }
-                        ),
-                        true
-                    );
-                }
-            }
-            None => break,
+        let op = comp_it.curr_op();
+        let mod_idx = comp_it.curr_mod_idx();
+        let fun_idx = comp_it.curr_func_idx();
+        let instr_idx = comp_it.curr_instr_idx();
+        let instr_type = comp_it.get_instrument_type();
+        println!(
+            "Mod: {}, Fun: {}, {}: {:?}, {:?}",
+            mod_idx, fun_idx, instr_idx, op, instr_type
+        );
+        if is_same_call(comp_it.curr_op().unwrap(), &interested) {
+            assert_eq!(
+                *comp_it.get_instrument_type(),
+                InstrumentType::InstrumentBefore(vec![])
+            );
+            assert_eq!(
+                is_same_call(
+                    comp_it.get_injected_val(0),
+                    &Operator::I32Const { value: 1 }
+                ),
+                true
+            );
         }
+        if comp_it.next().is_none() {
+            break;
+        };
     }
 }
