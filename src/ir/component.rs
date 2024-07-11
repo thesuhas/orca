@@ -46,7 +46,6 @@ impl Default for Component<'_> {
 }
 
 impl<'a> Component<'a> {
-
     pub fn new() -> Self {
         Component {
             modules: vec![],
