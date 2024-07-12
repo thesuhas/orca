@@ -642,10 +642,180 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         self
     }
 
+    pub fn f32_abs(&mut self) -> &mut Self {
+        self.inject(Operator::F32Abs);
+        self
+    }
+
+    pub fn f32_ceil(&mut self) -> &mut Self {
+        self.inject(Operator::F32Ceil);
+        self
+    }
+
+    pub fn f32_floor(&mut self) -> &mut Self {
+        self.inject(Operator::F32Floor);
+        self
+    }
+
+    pub fn f32_trunc(&mut self) -> &mut Self {
+        self.inject(Operator::F32Trunc);
+        self
+    }
+
+    pub fn f32_sqrt(&mut self) -> &mut Self {
+        self.inject(Operator::F32Sqrt);
+        self
+    }
+
+    pub fn f32_add(&mut self) -> &mut Self {
+        self.inject(Operator::F32Add);
+        self
+    }
+
+    pub fn f32_sub(&mut self) -> &mut Self {
+        self.inject(Operator::F32Sub);
+        self
+    }
+
+    pub fn f32_mul(&mut self) -> &mut Self {
+        self.inject(Operator::F32Mul);
+        self
+    }
+
+    pub fn f32_div(&mut self) -> &mut Self {
+        self.inject(Operator::F32Div);
+        self
+    }
+
+    pub fn f32_min(&mut self) -> &mut Self {
+        self.inject(Operator::F32Min);
+        self
+    }
+
+    pub fn f32_max(&mut self) -> &mut Self {
+        self.inject(Operator::F32Max);
+        self
+    }
+
+    pub fn f32_eq(&mut self) -> &mut Self {
+        self.inject(Operator::F32Eq);
+        self
+    }
+
+    pub fn f32_ne(&mut self) -> &mut Self {
+        self.inject(Operator::F32Ne);
+        self
+    }
+
+    pub fn f32_gt(&mut self) -> &mut Self {
+        self.inject(Operator::F32Gt);
+        self
+    }
+
+    pub fn f32_ge(&mut self) -> &mut Self {
+        self.inject(Operator::F32Ge);
+        self
+    }
+
+    pub fn f32_lt(&mut self) -> &mut Self {
+        self.inject(Operator::F32Lt);
+        self
+    }
+
+    pub fn f32_le(&mut self) -> &mut Self {
+        self.inject(Operator::F32Le);
+        self
+    }
+
     pub fn f64(&mut self, val: f64) -> &mut Self {
         self.inject(Operator::F64Const {
             value: wasmparser::Ieee64::from(val),
         });
+        self
+    }
+
+    pub fn f64_abs(&mut self) -> &mut Self {
+        self.inject(Operator::F64Abs);
+        self
+    }
+
+    pub fn f64_ceil(&mut self) -> &mut Self {
+        self.inject(Operator::F64Ceil);
+        self
+    }
+
+    pub fn f64_floor(&mut self) -> &mut Self {
+        self.inject(Operator::F64Floor);
+        self
+    }
+
+    pub fn f64_trunc(&mut self) -> &mut Self {
+        self.inject(Operator::F64Trunc);
+        self
+    }
+
+    pub fn f64_sqrt(&mut self) -> &mut Self {
+        self.inject(Operator::F64Sqrt);
+        self
+    }
+
+    pub fn f64_add(&mut self) -> &mut Self {
+        self.inject(Operator::F64Add);
+        self
+    }
+
+    pub fn f64_sub(&mut self) -> &mut Self {
+        self.inject(Operator::F64Sub);
+        self
+    }
+
+    pub fn f64_mul(&mut self) -> &mut Self {
+        self.inject(Operator::F64Mul);
+        self
+    }
+
+    pub fn f64_div(&mut self) -> &mut Self {
+        self.inject(Operator::F64Div);
+        self
+    }
+
+    pub fn f64_min(&mut self) -> &mut Self {
+        self.inject(Operator::F64Min);
+        self
+    }
+
+    pub fn f64_max(&mut self) -> &mut Self {
+        self.inject(Operator::F64Max);
+        self
+    }
+
+    pub fn f64_eq(&mut self) -> &mut Self {
+        self.inject(Operator::F64Eq);
+        self
+    }
+
+    pub fn f64_ne(&mut self) -> &mut Self {
+        self.inject(Operator::F64Ne);
+        self
+    }
+
+    pub fn f64_gt(&mut self) -> &mut Self {
+        self.inject(Operator::F64Gt);
+        self
+    }
+
+    pub fn f64_ge(&mut self) -> &mut Self {
+        self.inject(Operator::F64Ge);
+        self
+    }
+
+    pub fn f64_lt(&mut self) -> &mut Self {
+        self.inject(Operator::F64Lt);
+        self
+    }
+
+    pub fn f64_le(&mut self) -> &mut Self {
+        self.inject(Operator::F64Le);
         self
     }
 
