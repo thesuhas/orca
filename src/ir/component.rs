@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::ir::module::Module;
+use crate::ir::types::Global;
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, convert_variant_case, encode_core_type_subtype, process_alias,
@@ -62,6 +63,10 @@ impl<'a> Component<'a> {
     pub fn add_module(&mut self, module: Module<'a>) {
         self.modules.push(module);
         self.num_modules += 1;
+    }
+
+    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> u32 {
+        self.modules[module_idx].add_global(global)
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {

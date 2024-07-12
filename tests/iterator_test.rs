@@ -1,5 +1,5 @@
 use orca::ir::component::Component;
-use orca::ir::iterator::ComponentIterator;
+use orca::ir::iterator::component_iterator::ComponentIterator;
 use orca::ir::module::Module;
 use orca::ir::types::InstrumentType;
 use std::fs::File;
