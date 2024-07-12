@@ -1,11 +1,11 @@
 use crate::error::Error;
-use crate::ir::convert::parser_to_internal;
 use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
 };
+use crate::ir::wrappers::{global, element_items, element_kind, data_segment};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
 
@@ -71,7 +71,7 @@ impl<'a> Module<'a> {
                         .into_iter()
                         .map(|sec| {
                             sec.map_err(Error::from)
-                                .and_then(parser_to_internal::data_segment)
+                                .and_then(data_segment)
                         })
                         .collect::<Result<_, _>>()?;
                 }
@@ -99,7 +99,7 @@ impl<'a> Module<'a> {
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
                         .into_iter()
-                        .map(|g| parser_to_internal::global(g?))
+                        .map(|g| global(g?))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
@@ -116,8 +116,8 @@ impl<'a> Module<'a> {
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
                         let element = element?;
-                        let items = parser_to_internal::element_items(element.items.clone())?;
-                        elements.push((parser_to_internal::element_kind(element.kind)?, items));
+                        let items = element_items(element.items.clone())?;
+                        elements.push((element_kind(element.kind)?, items));
                     }
                 }
                 Payload::DataCountSection { count, range: _ } => {

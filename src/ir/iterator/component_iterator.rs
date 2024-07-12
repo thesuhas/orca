@@ -21,7 +21,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         }
     }
 
-    // // creats component iterator for a standalone module
+    // // creates component iterator for a standalone module
     // // TODO: should we extend the module iterator instead of casting a module to a component?
     // TODO: can't create a new Component here, how should we iterate over just a module
     // without casting it to a Component
@@ -97,7 +97,6 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             .1
     }
 
-    // TODO: should we implement the std::iter::Iterator trait instead?
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&Operator> {
         if self.mod_iterator.has_next() {
