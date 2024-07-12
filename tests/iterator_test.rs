@@ -1,7 +1,8 @@
 use orca::ir::component::Component;
-use orca::ir::iterator::component_iterator::ComponentIterator;
+use orca::ir::injector::component_injector::ComponentInjector;
+use orca::ir::injector::injector_trait::Injector;
 use orca::ir::module::Module;
-use orca::ir::types::InstrumentType;
+use orca::ir::types::{InstrumentType, Location};
 use std::fs::File;
 use std::io::Write;
 use wasmparser::Operator;
@@ -13,21 +14,27 @@ fn test_iterator_count() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentInjector::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        println!(
-            "Mod: {}, Fun: {}, {}: {:?},",
-            mod_idx, fun_idx, instr_idx, op
-        );
-        count += 1;
-        if comp_it.next().is_none() {
-            break;
-        };
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, {}: {:?},",
+                mod_idx, func_idx, instr_idx, op
+            );
+            count += 1;
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
     }
 
     assert_eq!(count, 10);
@@ -40,21 +47,27 @@ fn test_iterator_count_mul_mod() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentInjector::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        println!(
-            "Mod: {}, Fun: {}, {}: {:?},",
-            mod_idx, fun_idx, instr_idx, op
-        );
-        count += 1;
-        if comp_it.next().is_none() {
-            break;
-        };
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, {}: {:?},",
+                mod_idx, func_idx, instr_idx, op
+            );
+            count += 1;
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
     }
     assert_eq!(count, 15);
 }
@@ -72,20 +85,26 @@ fn test_blocks() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
     let mut component = module_to_component(module);
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentInjector::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        println!(
-            "Mod: {}, Fun: {}, {}: {:?},",
-            mod_idx, fun_idx, instr_idx, op
-        );
-        if comp_it.next().is_none() {
-            break;
-        };
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, {}: {:?},",
+                mod_idx, func_idx, instr_idx, op
+            );
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
     }
 }
 
@@ -95,48 +114,61 @@ fn iterator_mark_as_before_test() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentInjector::new(&mut component);
 
     let interested = Operator::Call { function_index: 1 };
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        let instr_type = comp_it.get_instrument_type();
-        println!(
-            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-            mod_idx, fun_idx, instr_idx, op, instr_type
-        );
-        if *comp_it.curr_op().unwrap() == interested {
-            comp_it.before();
+        let instr_type = comp_it.curr_instrument_type();
+
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, func_idx, instr_idx, op, instr_type
+            );
+            if *comp_it.curr_op().unwrap() == interested {
+                comp_it.before();
+            }
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
         }
-        if comp_it.next().is_none() {
-            break;
-        };
     }
 
     comp_it.reset();
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        let instr_type = comp_it.get_instrument_type();
-        if *comp_it.curr_op().unwrap() == interested {
-            assert_ne!(*instr_type, InstrumentType::NotInstrumented);
+        let instr_type = comp_it.curr_instrument_type();
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            if *comp_it.curr_op().unwrap() == interested {
+                assert_ne!(*instr_type, InstrumentType::NotInstrumented);
+            }
+
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, func_idx, instr_idx, op, instr_type
+            );
+
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
         }
-
-        println!(
-            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-            mod_idx, fun_idx, instr_idx, op, instr_type
-        );
-
-        if comp_it.next().is_none() {
-            break;
-        };
     }
 }
 
@@ -146,26 +178,33 @@ fn iterator_inject_i32_before() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentInjector::new(&mut component);
 
     let interested = Operator::Call { function_index: 1 };
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        let instr_type = comp_it.get_instrument_type();
-        println!(
-            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-            mod_idx, fun_idx, instr_idx, op, instr_type
-        );
-        if *comp_it.curr_op().unwrap() == interested {
-            comp_it.before().i32(1);
+        let instr_type = comp_it.curr_instrument_type();
+
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, func_idx, instr_idx, op, instr_type
+            );
+            if *comp_it.curr_op().unwrap() == interested {
+                comp_it.before().i32(1);
+            }
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
         }
-        if comp_it.next().is_none() {
-            break;
-        };
     }
 
     comp_it.reset();
@@ -174,33 +213,40 @@ fn iterator_inject_i32_before() {
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        let instr_type = comp_it.get_instrument_type();
-        println!(
-            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-            mod_idx, fun_idx, instr_idx, op, instr_type
-        );
-        if *comp_it.curr_op().unwrap() == interested {
-            assert_eq!(
-                *comp_it.get_instrument_type(),
-                InstrumentType::InstrumentBefore(vec![])
+        let instr_type = comp_it.curr_instrument_type();
+
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, func_idx, instr_idx, op, instr_type
             );
-            assert_eq!(
-                comp_it.get_injected_val(0),
-                &Operator::I32Const { value: 1 }
-            );
+            if *comp_it.curr_op().unwrap() == interested {
+                assert_eq!(
+                    *comp_it.curr_instrument_type(),
+                    InstrumentType::InstrumentBefore(vec![])
+                );
+                assert_eq!(
+                    comp_it.get_injected_val(0),
+                    &Operator::I32Const { value: 1 }
+                );
+            }
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
         }
-        if comp_it.next().is_none() {
-            break;
-        };
     }
 }
 
 // you can also inline this
 fn iterate(component: &mut Component) {
-    let mut comp_it = ComponentIterator::new(component);
+    let mut comp_it = ComponentInjector::new(component);
 
     let after = Operator::Call { function_index: 1 };
     let before = Operator::Drop;
@@ -208,29 +254,36 @@ fn iterate(component: &mut Component) {
 
     loop {
         let op = comp_it.curr_op();
-        let mod_idx = comp_it.curr_mod_idx();
-        let fun_idx = comp_it.curr_func_idx();
-        let instr_idx = comp_it.curr_instr_idx();
-        let instr_type = comp_it.get_instrument_type();
-        println!(
-            "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-            mod_idx, fun_idx, instr_idx, op, instr_type
-        );
-        if *comp_it.curr_op().unwrap() == before {
-            comp_it.before().call(0);
-        }
+        let instr_type = comp_it.curr_instrument_type();
 
-        if *comp_it.curr_op().unwrap() == after {
-            comp_it.after().i32(0);
-        }
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = comp_it.curr_loc()
+        {
+            println!(
+                "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
+                mod_idx, func_idx, instr_idx, op, instr_type
+            );
+            if *comp_it.curr_op().unwrap() == before {
+                comp_it.before().call(0);
+            }
 
-        if *comp_it.curr_op().unwrap() == alternate {
-            comp_it.alternate().i32(3);
-        }
+            if *comp_it.curr_op().unwrap() == after {
+                comp_it.after().i32(0);
+            }
 
-        if comp_it.next().is_none() {
-            break;
-        };
+            if *comp_it.curr_op().unwrap() == alternate {
+                comp_it.alternate().i32(3);
+            }
+
+            if comp_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
     }
 }
 

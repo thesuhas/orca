@@ -5,7 +5,7 @@ use crate::ir::types::InstrumentType::{
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
 };
-use crate::ir::wrappers::{global, element_items, element_kind, data_segment};
+use crate::ir::wrappers::{data_segment, element_items, element_kind, global};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
 
@@ -69,10 +69,7 @@ impl<'a> Module<'a> {
                 Payload::DataSection(data_section_reader) => {
                     data = data_section_reader
                         .into_iter()
-                        .map(|sec| {
-                            sec.map_err(Error::from)
-                                .and_then(data_segment)
-                        })
+                        .map(|sec| sec.map_err(Error::from).and_then(data_segment))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::TableSection(table_section_reader) => {

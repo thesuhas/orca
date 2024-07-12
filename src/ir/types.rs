@@ -103,6 +103,18 @@ impl<'a> InstrumentType<'a> {
     }
 }
 
+pub enum Location {
+    Component {
+        mod_idx: usize,
+        func_idx: usize,
+        instr_idx: usize,
+    },
+    Module {
+        func_idx: usize,
+        instr_idx: usize,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).

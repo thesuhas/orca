@@ -1,3 +1,5 @@
+use crate::error::Error;
+use crate::ir::types::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InitExpr};
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
@@ -6,8 +8,6 @@ use wasmparser::{
     ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
     InstanceTypeDeclaration, SubType,
 };
-use crate::error::Error;
-use crate::ir::types::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InitExpr};
 type Result<T> = std::result::Result<T, Error>;
 
 // Not added to wasm-tools
