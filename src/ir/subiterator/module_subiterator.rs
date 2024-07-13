@@ -2,6 +2,7 @@ use crate::ir::subiterator::function_subiterator::FuncSubIterator;
 use crate::ir::types::Location;
 use std::collections::HashMap;
 
+/// Sub-iterator for a Module. Keeps track of current location in a Module.
 pub struct ModuleSubIterator {
     pub(crate) curr_func: usize,
     num_funcs: usize,

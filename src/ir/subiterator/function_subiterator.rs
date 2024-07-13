@@ -1,3 +1,4 @@
+/// Sub-iterator for a Function. Keeps track of current location in a Function.
 pub struct FuncSubIterator {
     pub(crate) curr_instr: usize,
     num_instr: usize,
