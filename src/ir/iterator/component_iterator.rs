@@ -134,17 +134,15 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
     fn curr_op(&self) -> Option<&Operator> {
         if self.comp_iterator.end() {
             None
+        } else if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.comp_iterator.curr_loc()
+        {
+            Some(&self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].0)
         } else {
-            if let Location::Component {
-                mod_idx,
-                func_idx,
-                instr_idx,
-            } = self.comp_iterator.curr_loc()
-            {
-                Some(&self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].0)
-            } else {
-                panic!("Should have gotten Component Location and not Module Location!")
-            }
+            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 
@@ -156,7 +154,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            &self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
                 .1
                 .get_instr(idx)
         } else {

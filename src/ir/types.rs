@@ -1,15 +1,27 @@
-use std::fmt;
+//! Intermediate representation of sections in a wasm module.
+use crate::error::Error;
 use std::fmt::Formatter;
+use std::fmt::{self};
 use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
+
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 /// Globals in a wasm module.
 pub struct Global {
     pub ty: GlobalType,
     pub init_expr: InitExpr,
+}
+
+impl Global {
+    pub(crate) fn from_wasmparser(global: wasmparser::Global) -> Result<Global> {
+        let ty = global.ty;
+        let init_expr = InitExpr::eval(&global.init_expr);
+        Ok(Global { ty, init_expr })
+    }
 }
 
 /// orca's representation of function types, shortened from walrus
@@ -40,6 +52,15 @@ pub struct DataSegment<'a> {
     pub data: &'a [u8],
 }
 
+impl DataSegment<'_> {
+    pub fn from_wasmparser(data: wasmparser::Data) -> Result<DataSegment> {
+        Ok(DataSegment {
+            kind: DataSegmentKind::from_wasmparser(data.kind)?,
+            data: data.data,
+        })
+    }
+}
+
 /// The kind of data segment.
 #[derive(Debug, Clone)]
 pub enum DataSegmentKind<'a> {
@@ -54,6 +75,21 @@ pub enum DataSegmentKind<'a> {
     },
 }
 
+impl DataSegmentKind<'_> {
+    pub(crate) fn from_wasmparser(kind: wasmparser::DataKind) -> Result<DataSegmentKind> {
+        Ok(match kind {
+            wasmparser::DataKind::Passive => DataSegmentKind::Passive,
+            wasmparser::DataKind::Active {
+                memory_index,
+                offset_expr,
+            } => DataSegmentKind::Active {
+                memory_index,
+                offset_expr,
+            },
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Kind of Element
 pub enum ElementKind<'a> {
@@ -65,6 +101,22 @@ pub enum ElementKind<'a> {
     Declared,
 }
 
+impl ElementKind<'_> {
+    pub(crate) fn from_wasmparser(kind: wasmparser::ElementKind) -> Result<ElementKind> {
+        match kind {
+            wasmparser::ElementKind::Passive => Ok(ElementKind::Passive),
+            wasmparser::ElementKind::Declared => Ok(ElementKind::Declared),
+            wasmparser::ElementKind::Active {
+                table_index,
+                offset_expr,
+            } => Ok(ElementKind::Active {
+                table_index,
+                offset_expr,
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Type of element
 pub enum ElementItems<'a> {
@@ -73,6 +125,28 @@ pub enum ElementItems<'a> {
         ty: RefType,
         exprs: Vec<ConstExpr<'a>>,
     },
+}
+
+impl ElementItems<'_> {
+    pub(crate) fn from_wasmparser(items: wasmparser::ElementItems) -> Result<ElementItems> {
+        match items {
+            wasmparser::ElementItems::Functions(reader) => {
+                let functions = reader
+                    .into_iter()
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                Ok(ElementItems::Functions(functions))
+            }
+            wasmparser::ElementItems::Expressions(ref_type, reader) => {
+                let exprs = reader
+                    .into_iter()
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                Ok(ElementItems::ConstExprs {
+                    ty: ref_type,
+                    exprs,
+                })
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

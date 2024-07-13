@@ -76,10 +76,8 @@ impl ModuleSubIterator {
     pub(crate) fn next(&mut self) -> bool {
         if self.func_iterator.has_next() {
             self.func_iterator.next()
-        } else if self.next_function() {
-            true
         } else {
-            false
+            self.next_function()
         }
     }
 }

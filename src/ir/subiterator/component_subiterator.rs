@@ -97,10 +97,8 @@ impl ComponentSubIterator {
     pub fn next(&mut self) -> bool {
         if self.mod_iterator.has_next() {
             self.mod_iterator.next()
-        } else if self.next_module() {
-            true
         } else {
-            false
+            self.next_module()
         }
     }
 }
