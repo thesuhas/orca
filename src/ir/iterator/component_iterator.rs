@@ -13,6 +13,7 @@ pub struct ComponentIterator<'a, 'b> {
 
 #[allow(dead_code)]
 impl<'a, 'b> ComponentIterator<'a, 'b> {
+    /// Creates a new Component Iterator
     pub fn new(comp: &'a mut Component<'b>) -> Self {
         // Creates Module -> Function -> Number of Instructions
         let mut metadata = HashMap::new();
@@ -33,6 +34,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
 
 // Note: Marked Trait as the same lifetime as component
 impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
+    /// Injects an Operator at the current location
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Component {
             mod_idx,
@@ -48,6 +50,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentBefore
     fn before(&mut self) -> &mut Self {
         if let Location::Component {
             mod_idx,
@@ -63,6 +66,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentAfter
     fn after(&mut self) -> &mut Self {
         if let Location::Component {
             mod_idx,
@@ -78,6 +82,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentAlternate
     fn alternate(&mut self) -> &mut Self {
         if let Location::Component {
             mod_idx,
@@ -93,10 +98,12 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Resets the Component Iterator
     fn reset(&mut self) {
         self.comp_iterator.reset();
     }
 
+    /// Goes to the next instruction
     fn next(&mut self) -> Option<&Operator> {
         match self.comp_iterator.next() {
             false => None,
@@ -104,10 +111,12 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Returns the current location
     fn curr_loc(&self) -> Location {
         self.comp_iterator.curr_loc()
     }
 
+    /// Returns the Instrumentation at the current Location
     fn curr_instrument_type(&self) -> &InstrumentType {
         if let Location::Component {
             mod_idx,
@@ -121,6 +130,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Returns the instruction at the current location
     fn curr_op(&self) -> Option<&Operator> {
         if self.comp_iterator.end() {
             None
@@ -138,6 +148,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
         if let Location::Component {
             mod_idx,

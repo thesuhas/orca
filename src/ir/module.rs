@@ -12,23 +12,31 @@ use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType,
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
+    /// Types
     pub types: Vec<SubType>,
+    /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
     pub functions: Vec<u32>,
     /// Each table has a type and optional initialization expression.
     pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    /// Memories
     pub memories: Vec<MemoryType>,
+    /// Globals
     pub globals: Vec<Global>,
+    /// Data Sections
     pub data: Vec<DataSegment<'a>>,
     pub data_count_section_exists: bool,
+    /// Exports
     pub exports: Vec<Export<'a>>,
-    // Index of the start function.
+    /// Index of the start function.
     pub start: Option<u32>,
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
+    /// Function Bodies
     pub code_sections: Vec<Body<'a>>,
+    /// Custom Sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
-    // Number of functions
+    /// Number of functions
     pub num_functions: usize,
 }
 
