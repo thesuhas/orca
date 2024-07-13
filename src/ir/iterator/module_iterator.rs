@@ -7,12 +7,15 @@ use wasmparser::Operator;
 
 /// Iterator for a Module.
 pub struct ModuleIterator<'a, 'b> {
+    /// The Module to Iterate
     module: &'a mut Module<'b>,
+    /// The SubIterator for this Module
     mod_iterator: ModuleSubIterator,
 }
 
 #[allow(dead_code)]
 impl<'a, 'b> ModuleIterator<'a, 'b> {
+    /// Creates a new ModuleIterator
     pub fn new(module: &'a mut Module<'b>) -> Self {
         // Creates Function -> Number of Instructions
         let mut metadata = HashMap::new();
@@ -29,6 +32,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
 
 // Note: Marked Trait as the same lifetime as component
 impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
+    /// Injects an Operator into the current location
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Module {
             func_idx,
@@ -43,6 +47,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentBefore
     fn before(&mut self) -> &mut Self {
         if let Location::Module {
             func_idx,
@@ -57,6 +62,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentAfter
     fn after(&mut self) -> &mut Self {
         if let Location::Module {
             func_idx,
@@ -71,6 +77,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Marks the current location as InstrumentAlternate
     fn alternate(&mut self) -> &mut Self {
         if let Location::Module {
             func_idx,
@@ -85,10 +92,12 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Resets the Module Iterator
     fn reset(&mut self) {
         self.mod_iterator.reset();
     }
 
+    /// Goes to the next instruction and returns the instruction
     fn next(&mut self) -> Option<&Operator> {
         match self.mod_iterator.next() {
             false => None,
@@ -96,10 +105,12 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Returns the current Location
     fn curr_loc(&self) -> Location {
         self.mod_iterator.curr_loc()
     }
 
+    /// Returns the Instrumentation at the current Location
     fn curr_instrument_type(&self) -> &InstrumentType {
         if let Location::Module {
             func_idx,
@@ -112,6 +123,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Returns the current instruction
     fn curr_op(&self) -> Option<&Operator> {
         if self.mod_iterator.end() {
             None
@@ -128,6 +140,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
         if let Location::Module {
             func_idx,
