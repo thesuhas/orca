@@ -6,11 +6,9 @@ use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
 
 #[derive(Debug, Clone)]
-/// orca's representation of globals
+/// Globals in a wasm module.
 pub struct Global {
     pub ty: GlobalType,
-    // TODO: We might want to build our own representation of econstant expression
-    // seee https://docs.rs/walrus/latest/src/walrus/const_expr.rs.html#13-22
     pub init_expr: InitExpr,
 }
 
@@ -33,6 +31,7 @@ pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType 
 }
 
 #[derive(Debug, Clone)]
+/// Data Segment in a wasm module.
 pub struct DataSegment<'a> {
     /// The kind of data segment.
     pub kind: DataSegmentKind<'a>,
@@ -50,32 +49,33 @@ pub enum DataSegmentKind<'a> {
         /// The memory index for the data segment.
         memory_index: u32,
         /// The initialization operator for the data segment.
-        offset_expr: wasmparser::ConstExpr<'a>,
+        offset_expr: ConstExpr<'a>,
     },
 }
 
 #[derive(Debug, Clone)]
+/// Kind of Element
 pub enum ElementKind<'a> {
     Passive,
     Active {
         table_index: Option<u32>,
-        offset_expr: wasmparser::ConstExpr<'a>,
+        offset_expr: ConstExpr<'a>,
     },
     Declared,
 }
 
 #[derive(Debug, Clone)]
+/// Type of element
 pub enum ElementItems<'a> {
     Functions(Vec<u32>),
     ConstExprs {
         ty: RefType,
-        exprs: Vec<wasmparser::ConstExpr<'a>>,
+        exprs: Vec<ConstExpr<'a>>,
     },
 }
 
 #[derive(Debug, Clone)]
-// TODO: Add Eq, PartialEq back after wasm-tools has been updated
-/// The type of instrumentation to be applied to an instruction.
+/// Type of instrumentation to be applied to an instruction.
 pub enum InstrumentType<'a> {
     InstrumentBefore(Vec<Operator<'a>>),
     InstrumentAfter(Vec<Operator<'a>>),
@@ -126,7 +126,21 @@ impl<'a> InstrumentType<'a> {
     }
 }
 
+/// Used to represent a unique location in a wasm component or module.
+pub enum Location {
+    Component {
+        mod_idx: usize,
+        func_idx: usize,
+        instr_idx: usize,
+    },
+    Module {
+        func_idx: usize,
+        instr_idx: usize,
+    },
+}
+
 #[derive(Debug, Clone)]
+/// Body of a function in a wasm module
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
     /// Note that these do not include the function parameters which are given
@@ -134,8 +148,7 @@ pub struct Body<'a> {
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, ValType)>,
-    // TODO: should we make this into a struct for better readability?
-    // accessing opeators by .0 is not very clear
+    // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
     pub num_instructions: usize,
 }
@@ -165,7 +178,7 @@ impl InitExpr {
             F64Const { value } => InitExpr::Value(Value::F64(f64::from_bits(value.bits()))),
             V128Const { value } => InitExpr::Value(Value::V128(v128_to_u128(&value))),
             GlobalGet { global_index } => InitExpr::Global(global_index),
-            // Marking nullable as true as its a null reference
+            // Marking nullable as true as it's a null reference
             RefNull { hty } => InitExpr::RefNull(RefType::new(true, hty).unwrap()),
             RefFunc { function_index } => InitExpr::RefFunc(function_index),
             _ => panic!("invalid constant expression"),
@@ -222,7 +235,7 @@ pub enum Value {
 }
 
 impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Value::I32(i) => i.fmt(f),
             Value::I64(i) => i.fmt(f),

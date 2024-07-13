@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::ir::module::Module;
+use crate::ir::types::Global;
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, convert_variant_case, encode_core_type_subtype, process_alias,
@@ -12,25 +13,27 @@ use wasmparser::{
 };
 
 #[derive(Debug, Clone)]
+/// Intermediate Representation of a wasm component.
 pub struct Component<'a> {
-    /// Needs to contain:
-    /// 1. Modules
+    /// Modules
     pub modules: Vec<Module<'a>>,
-    /// 2. Alias
+    ///Alias
     pub alias: Vec<ComponentAlias<'a>>,
-    /// 3. Types
+    /// Core Types
     pub core_types: Vec<CoreType<'a>>,
+    /// Component Types
     pub component_types: Vec<ComponentType<'a>>,
-    /// 4. Import
+    /// Imports
     pub imports: Vec<ComponentImport<'a>>,
-    /// 5. Export
+    /// Exports
     pub exports: Vec<ComponentExport<'a>>,
-    /// 6. Instances
+    /// Core Instances
     pub instances: Vec<Instance<'a>>,
+    /// Component Instances
     pub component_instance: Vec<ComponentInstance<'a>>,
-    /// 7. Canons
+    /// Canons
     pub canons: Vec<CanonicalFunction>,
-    /// 8. Custom sections
+    /// Custom sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
     /// Number of modules
     pub num_modules: usize,
@@ -62,6 +65,10 @@ impl<'a> Component<'a> {
     pub fn add_module(&mut self, module: Module<'a>) {
         self.modules.push(module);
         self.num_modules += 1;
+    }
+
+    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> u32 {
+        self.modules[module_idx].add_global(global)
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {

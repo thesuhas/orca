@@ -1,17 +1,18 @@
 use crate::error::Error;
-use crate::ir::convert::parser_to_internal;
 use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType, Type,
 };
+use crate::ir::wrappers::{data_segment, element_items, element_kind, global};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
 
 use super::types::valtype_to_wasmencoder_type;
 
 #[derive(Clone, Debug)]
+/// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
     pub types: Vec<Type>,
     pub imports: Vec<Import<'a>>,
@@ -19,17 +20,23 @@ pub struct Module<'a> {
     pub functions: Vec<u32>,
     /// Each table has a type and optional initialization expression.
     pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    /// Memories
     pub memories: Vec<MemoryType>,
+    /// Globals
     pub globals: Vec<Global>,
+    /// Data Sections
     pub data: Vec<DataSegment<'a>>,
     pub data_count_section_exists: bool,
+    /// Exports
     pub exports: Vec<Export<'a>>,
-    // Index of the start function.
+    /// Index of the start function.
     pub start: Option<u32>,
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
+    /// Function Bodies
     pub code_sections: Vec<Body<'a>>,
+    /// Custom Sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
-    // Number of functions
+    /// Number of functions
     pub num_functions: usize,
 }
 
@@ -79,10 +86,7 @@ impl<'a> Module<'a> {
                 Payload::DataSection(data_section_reader) => {
                     data = data_section_reader
                         .into_iter()
-                        .map(|sec| {
-                            sec.map_err(Error::from)
-                                .and_then(parser_to_internal::data_segment)
-                        })
+                        .map(|sec| sec.map_err(Error::from).and_then(data_segment))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::TableSection(table_section_reader) => {
@@ -109,7 +113,7 @@ impl<'a> Module<'a> {
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
                         .into_iter()
-                        .map(|g| parser_to_internal::global(g?))
+                        .map(|g| global(g?))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
@@ -126,8 +130,8 @@ impl<'a> Module<'a> {
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
                         let element = element?;
-                        let items = parser_to_internal::element_items(element.items.clone())?;
-                        elements.push((parser_to_internal::element_kind(element.kind)?, items));
+                        let items = element_items(element.items.clone())?;
+                        elements.push((element_kind(element.kind)?, items));
                     }
                 }
                 Payload::DataCountSection { count, range: _ } => {
