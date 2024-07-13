@@ -243,7 +243,7 @@ fn iterator_verify_injection() {
 
     iterate(&mut component);
 
-    let result = component.encode().expect("Error in Encoding");
+    let result = component.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
 
     let mut file = match File::create(format!("{}_test.wat", "add_test")) {

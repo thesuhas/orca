@@ -132,10 +132,7 @@ pub fn convert_variant_case<'a>(
     let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
     (
         variant.name,
-        match variant.ty {
-            None => None,
-            Some(ty) => Some(reencode.component_val_type(ty)),
-        },
+        variant.ty.map(|ty| reencode.component_val_type(ty)),
         variant.refines,
     )
 }
