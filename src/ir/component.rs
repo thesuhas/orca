@@ -163,7 +163,7 @@ impl<'a> Component<'a> {
         })
     }
 
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    pub fn encode(&self) -> Vec<u8> {
         let mut component = wasm_encoder::Component::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
@@ -171,17 +171,8 @@ impl<'a> Component<'a> {
         if !self.modules.is_empty() {
             // Parse each module
             for m in self.modules.iter() {
-                component.section(&ModuleSection(&m.encode()?));
+                component.section(&ModuleSection(&m.encode()));
             }
-        }
-
-        // Alias parsing
-        if !self.alias.is_empty() {
-            let mut alias = ComponentAliasSection::new();
-            for a in self.alias.iter() {
-                alias.alias(process_alias(a, &mut reencode));
-            }
-            component.section(&alias);
         }
 
         // Core Types
@@ -394,6 +385,15 @@ impl<'a> Component<'a> {
             component.section(&instances);
         }
 
+        // Alias parsing
+        if !self.alias.is_empty() {
+            let mut alias = ComponentAliasSection::new();
+            for a in self.alias.iter() {
+                alias.alias(process_alias(a, &mut reencode));
+            }
+            component.section(&alias);
+        }
+
         // Canons parsing
         if !self.canons.is_empty() {
             let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
@@ -444,7 +444,7 @@ impl<'a> Component<'a> {
                 data: std::borrow::Cow::Borrowed(data),
             });
         }
-        Ok(component.finish())
+        component.finish()
     }
 
     /// Print every instruction

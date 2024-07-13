@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 use std::mem::discriminant;
+use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
 
@@ -9,6 +10,25 @@ use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
 pub struct Global {
     pub ty: GlobalType,
     pub init_expr: InitExpr,
+}
+
+/// orca's representation of function types, shortened from walrus
+/// https://docs.rs/walrus/latest/walrus/struct.Type.html
+#[derive(Debug, Clone)]
+pub struct Type {
+    pub params: Box<[ValType]>,
+    pub results: Box<[ValType]>,
+}
+
+impl Type {
+    pub fn new(params: Box<[ValType]>, results: Box<[ValType]>) -> Self {
+        Self { params, results }
+    }
+}
+
+pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType {
+    let mut reencoder = wasm_encoder::reencode::RoundtripReencoder;
+    reencoder.val_type(*val_type).unwrap()
 }
 
 #[derive(Debug, Clone)]

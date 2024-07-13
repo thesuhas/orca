@@ -3,17 +3,18 @@ use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType, Type,
 };
 use crate::ir::wrappers::{data_segment, element_items, element_kind, global};
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
+use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
+
+use super::types::valtype_to_wasmencoder_type;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
-    /// Types
-    pub types: Vec<SubType>,
+    pub types: Vec<Type>,
     /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
@@ -71,8 +72,16 @@ impl<'a> Module<'a> {
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    for rec_group in type_section_reader.into_iter() {
-                        types.extend(rec_group?.into_types());
+                    // for rec_group in type_section_reader.into_iter() {
+                    //     types.extend(rec_group?.into_types());
+                    // }
+                    for ty in type_section_reader.into_iter_err_on_gc_types() {
+                        let fun_ty = ty?;
+                        let params = fun_ty.params().to_vec().into_boxed_slice();
+
+                        let results = fun_ty.results().to_vec().into_boxed_slice();
+
+                        types.push(Type::new(params, results));
                     }
                 }
                 Payload::DataSection(data_section_reader) => {
@@ -245,18 +254,43 @@ impl<'a> Module<'a> {
         })
     }
 
-    pub fn encode_only_module(&self) -> Result<Vec<u8>, Error> {
-        Ok(self.encode().unwrap().finish())
+    /// Emit the module into a wasm binary file.
+    pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
+        let module = self.encode();
+        let wasm = module.finish();
+        std::fs::write(file_name, wasm)?;
+        Ok(())
     }
 
-    pub fn encode(&self) -> Result<wasm_encoder::Module, Error> {
+    /// Encode the module into a wasm binary.
+    pub fn encode_only_module(&self) -> Vec<u8> {
+        self.encode().finish()
+    }
+
+    pub(crate) fn encode(&self) -> wasm_encoder::Module {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
-            for subtype in self.types.iter() {
-                types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
+
+            for ty in self.types.iter() {
+                // let a = ty.params;
+                // map ty.params to valtypes
+
+                let params = ty
+                    .params
+                    .iter()
+                    .map(valtype_to_wasmencoder_type)
+                    .collect::<Vec<_>>();
+                let results = ty
+                    .results
+                    .iter()
+                    .map(valtype_to_wasmencoder_type)
+                    .collect::<Vec<_>>();
+
+                types.function(params, results);
+                // types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
             }
             module.section(&types);
         }
@@ -504,7 +538,20 @@ impl<'a> Module<'a> {
             });
         }
 
-        Ok(module)
+        module
+    }
+
+    /// Add a new type to the module, returns the index of the new type.
+    pub fn add_type(&mut self, param: &[ValType], ret: &[ValType]) -> u32 {
+        let index = self.types.len() as u32;
+        let ty = Type::new(param.into(), ret.into());
+        self.types.push(ty);
+        index
+    }
+
+    /// Get type from index of the type section
+    pub fn get_type(&self, index: u32) -> Option<&Type> {
+        self.types.get(index as usize)
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.
@@ -525,5 +572,31 @@ impl<'a> Module<'a> {
                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
             }
         }
+    }
+
+    /// create fresh module
+    pub fn new() -> Self {
+        Module {
+            types: vec![],
+            imports: vec![],
+            functions: vec![],
+            tables: vec![],
+            memories: vec![],
+            globals: vec![],
+            exports: vec![],
+            start: None,
+            elements: vec![],
+            data_count_section_exists: false,
+            code_sections: vec![],
+            data: vec![],
+            custom_sections: vec![],
+            num_functions: 0,
+        }
+    }
+}
+
+impl<'a> Default for Module<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }

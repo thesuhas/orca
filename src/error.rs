@@ -3,6 +3,7 @@ use wasmparser::BinaryReaderError;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
+/// Error for parsing
 pub enum Error {
     BinaryReaderError(BinaryReaderError),
     UnknownVersion(u32),

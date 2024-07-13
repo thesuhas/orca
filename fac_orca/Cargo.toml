@@ -1,0 +1,9 @@
+[package]
+name = "fac_orca"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+orca = { path = "../../orca" }
+wasmprinter = "0.213.0"
+wasmparser = "0.213.0"
