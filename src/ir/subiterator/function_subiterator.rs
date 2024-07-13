@@ -1,11 +1,12 @@
-pub struct FuncIterator {
+pub struct FuncSubIterator {
     pub(crate) curr_instr: usize,
     num_instr: usize,
 }
 
-impl FuncIterator {
+#[allow(dead_code)]
+impl FuncSubIterator {
     pub fn new(num_instr: usize) -> Self {
-        FuncIterator {
+        FuncSubIterator {
             curr_instr: 0,
             num_instr,
         }
@@ -27,5 +28,9 @@ impl FuncIterator {
             self.curr_instr += 1;
             true
         }
+    }
+
+    pub fn end(&mut self) -> bool {
+        self.curr_instr == self.num_instr
     }
 }

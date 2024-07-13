@@ -2,7 +2,7 @@ use crate::ir::types::{InstrumentType, Location};
 use wasmparser::Operator;
 
 #[allow(dead_code)]
-pub trait Injector<'a> {
+pub trait Iterator<'a> {
     fn inject(&mut self, instr: Operator<'a>);
 
     fn before(&mut self) -> &mut Self;
@@ -595,9 +595,4 @@ pub trait Injector<'a> {
         self.inject(Operator::Drop);
         self
     }
-
-    // fn get_injected_val(&mut self, idx: usize) -> &Operator {
-    //     self.mod_iterator
-    //         .get_injected_val(idx, &self.component.modules[self.curr_mod])
-    // }
 }

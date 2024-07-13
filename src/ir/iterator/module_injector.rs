@@ -1,17 +1,17 @@
-use crate::ir::injector::injector_trait::Injector;
-use crate::ir::iterator::module_iterator::ModuleIterator;
+use crate::ir::iterator::iterator_trait::Iterator;
 use crate::ir::module::Module;
+use crate::ir::subiterator::module_subiterator::ModuleSubIterator;
 use crate::ir::types::{InstrumentType, Location};
 use std::collections::HashMap;
 use wasmparser::Operator;
 
-pub struct ModuleInjector<'a, 'b> {
+pub struct ModuleIterator<'a, 'b> {
     module: &'a mut Module<'b>,
-    mod_iterator: ModuleIterator,
+    mod_iterator: ModuleSubIterator,
 }
 
 #[allow(dead_code)]
-impl<'a, 'b> ModuleInjector<'a, 'b> {
+impl<'a, 'b> ModuleIterator<'a, 'b> {
     pub fn new(module: &'a mut Module<'b>) -> Self {
         // Creates Function -> Number of Instructions
         let mut metadata = HashMap::new();
@@ -19,15 +19,15 @@ impl<'a, 'b> ModuleInjector<'a, 'b> {
             metadata.insert(idx, func.num_instructions);
         }
         let num_funcs = module.num_functions;
-        ModuleInjector {
+        ModuleIterator {
             module,
-            mod_iterator: ModuleIterator::new(num_funcs, metadata),
+            mod_iterator: ModuleSubIterator::new(num_funcs, metadata),
         }
     }
 }
 
 // Note: Marked Trait as the same lifetime as component
-impl<'a, 'b> Injector<'b> for ModuleInjector<'a, 'b> {
+impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Module {
             func_idx,

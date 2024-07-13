@@ -1,6 +1,6 @@
 use orca::ir::component::Component;
-use orca::ir::injector::component_injector::ComponentInjector;
-use orca::ir::injector::injector_trait::Injector;
+use orca::ir::iterator::component_iterator::ComponentIterator;
+use orca::ir::iterator::iterator_trait::Iterator;
 use orca::ir::module::Module;
 use orca::ir::types::{InstrumentType, Location};
 use std::fs::File;
@@ -14,7 +14,7 @@ fn test_iterator_count() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentInjector::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
@@ -47,7 +47,7 @@ fn test_iterator_count_mul_mod() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentInjector::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
@@ -85,7 +85,7 @@ fn test_blocks() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
     let mut component = module_to_component(module);
-    let mut comp_it = ComponentInjector::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     loop {
         let op = comp_it.curr_op();
@@ -114,7 +114,7 @@ fn iterator_mark_as_before_test() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentInjector::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     let interested = Operator::Call { function_index: 1 };
 
@@ -178,7 +178,7 @@ fn iterator_inject_i32_before() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentInjector::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component);
 
     let interested = Operator::Call { function_index: 1 };
 
@@ -246,7 +246,7 @@ fn iterator_inject_i32_before() {
 
 // you can also inline this
 fn iterate(component: &mut Component) {
-    let mut comp_it = ComponentInjector::new(component);
+    let mut comp_it = ComponentIterator::new(component);
 
     let after = Operator::Call { function_index: 1 };
     let before = Operator::Drop;

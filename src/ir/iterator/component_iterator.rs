@@ -1,92 +1,154 @@
-use crate::ir::iterator::module_iterator::ModuleIterator;
-use crate::ir::types::Location;
+use crate::ir::component::Component;
+use crate::ir::iterator::iterator_trait::Iterator;
+use crate::ir::subiterator::component_subiterator::ComponentSubIterator;
+use crate::ir::types::{InstrumentType, Location};
 use std::collections::HashMap;
+use wasmparser::Operator;
 
-pub struct ComponentIterator {
-    curr_mod: usize,
-    num_mods: usize,
-    mod_iterator: ModuleIterator,
-    metadata: HashMap<usize, HashMap<usize, usize>>,
+pub struct ComponentIterator<'a, 'b> {
+    comp: &'a mut Component<'b>,
+    comp_iterator: ComponentSubIterator,
 }
 
-impl ComponentIterator {
-    pub fn new(
-        curr_mod: usize,
-        num_mods: usize,
-        metadata: HashMap<usize, HashMap<usize, usize>>,
-    ) -> Self {
-        // initializes to the first module
+#[allow(dead_code)]
+impl<'a, 'b> ComponentIterator<'a, 'b> {
+    pub fn new(comp: &'a mut Component<'b>) -> Self {
+        // Creates Module -> Function -> Number of Instructions
+        let mut metadata = HashMap::new();
+        for (mod_idx, m) in comp.modules.iter().enumerate() {
+            let mut mod_metadata = HashMap::new();
+            for (idx, func) in m.code_sections.iter().enumerate() {
+                mod_metadata.insert(idx, func.num_instructions);
+            }
+            metadata.insert(mod_idx, mod_metadata);
+        }
+        let num_modules = comp.num_modules;
         ComponentIterator {
-            curr_mod,
-            num_mods,
-            metadata: metadata.clone(),
-            mod_iterator: ModuleIterator::new(
-                metadata.get(&0).unwrap().keys().len(),
-                (*metadata.get(&curr_mod).unwrap()).clone(),
-            ),
+            comp,
+            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata),
         }
     }
+}
 
-    pub fn reset(&mut self) {
-        self.curr_mod = 0;
-        self.mod_iterator
-            .reset_from_comp_iterator((*self.metadata.get(&self.curr_mod).unwrap()).clone());
-    }
-
-    fn next_module(&mut self) -> bool {
-        self.curr_mod += 1;
-        if self.curr_mod < self.num_mods {
-            // If we're defining a new module, we have to reset function
-            self.mod_iterator = ModuleIterator::new(
-                self.metadata.get(&self.curr_mod).unwrap().keys().len(),
-                self.metadata.get(&self.curr_mod).unwrap().clone(),
-            );
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn curr_mod_idx(&self) -> usize {
-        self.curr_mod
-    }
-
-    pub fn curr_func_idx(&self) -> usize {
-        self.mod_iterator.curr_func
-    }
-
-    pub fn curr_instr_idx(&self) -> usize {
-        self.mod_iterator.func_iterator.curr_instr
-    }
-
-    pub fn end(&self) -> bool {
-        self.curr_mod == self.num_mods
-    }
-
-    pub fn curr_loc(&self) -> Location {
-        if let Location::Module {
+// Note: Marked Trait as the same lifetime as component
+impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
+    fn inject(&mut self, instr: Operator<'b>) {
+        if let Location::Component {
+            mod_idx,
             func_idx,
             instr_idx,
-        } = self.mod_iterator.curr_loc()
+        } = self.curr_loc()
         {
-            Location::Component {
-                mod_idx: self.curr_mod,
-                func_idx,
-                instr_idx,
-            }
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .add_instr(instr)
         } else {
-            panic!("Should have gotten Module Location from Module Iterator and not Component Location!");
+            panic!("Should have gotten component location!")
         }
     }
 
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> bool {
-        if self.mod_iterator.has_next() {
-            self.mod_iterator.next()
-        } else if self.next_module() {
-            true
+    fn before(&mut self) -> &mut Self {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.curr_loc()
+        {
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                InstrumentType::InstrumentBefore(vec![]);
+            self
         } else {
-            false
+            panic!("Should have gotten component location!")
+        }
+    }
+
+    fn after(&mut self) -> &mut Self {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.curr_loc()
+        {
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                InstrumentType::InstrumentAfter(vec![]);
+            self
+        } else {
+            panic!("Should have gotten component location!")
+        }
+    }
+
+    fn alternate(&mut self) -> &mut Self {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.curr_loc()
+        {
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                InstrumentType::InstrumentAlternate(vec![]);
+            self
+        } else {
+            panic!("Should have gotten component location!")
+        }
+    }
+
+    fn reset(&mut self) {
+        self.comp_iterator.reset();
+    }
+
+    fn next(&mut self) -> Option<&Operator> {
+        match self.comp_iterator.next() {
+            false => None,
+            true => self.curr_op(),
+        }
+    }
+
+    fn curr_loc(&self) -> Location {
+        self.comp_iterator.curr_loc()
+    }
+
+    fn curr_instrument_type(&self) -> &InstrumentType {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.comp_iterator.curr_loc()
+        {
+            &self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
+
+    fn curr_op(&self) -> Option<&Operator> {
+        if self.comp_iterator.end() {
+            None
+        } else {
+            if let Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+            } = self.comp_iterator.curr_loc()
+            {
+                Some(&self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].0)
+            } else {
+                panic!("Should have gotten Component Location and not Module Location!")
+            }
+        }
+    }
+
+    fn get_injected_val(&self, idx: usize) -> &Operator {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.comp_iterator.curr_loc()
+        {
+            &self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_instr(idx)
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 }

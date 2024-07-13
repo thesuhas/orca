@@ -1,22 +1,22 @@
-use crate::ir::iterator::function_iterator::FuncIterator;
+use crate::ir::subiterator::function_subiterator::FuncSubIterator;
 use crate::ir::types::Location;
 use std::collections::HashMap;
 
-pub struct ModuleIterator {
+pub struct ModuleSubIterator {
     pub(crate) curr_func: usize,
     num_funcs: usize,
     // Function -> Number of Instructions
     metadata: HashMap<usize, usize>,
-    pub(crate) func_iterator: FuncIterator,
+    pub(crate) func_iterator: FuncSubIterator,
 }
 
-impl ModuleIterator {
+impl ModuleSubIterator {
     pub fn new(num_funcs: usize, metadata: HashMap<usize, usize>) -> Self {
-        ModuleIterator {
+        ModuleSubIterator {
             curr_func: 0,
             num_funcs,
             metadata: metadata.clone(),
-            func_iterator: FuncIterator::new(*metadata.get(&0).unwrap()),
+            func_iterator: FuncSubIterator::new(*metadata.get(&0).unwrap()),
         }
     }
 
@@ -49,7 +49,7 @@ impl ModuleIterator {
     fn next_function(&mut self) -> bool {
         self.curr_func += 1;
         if self.curr_func < self.num_funcs {
-            self.func_iterator = FuncIterator::new(*self.metadata.get(&self.curr_func).unwrap());
+            self.func_iterator = FuncSubIterator::new(*self.metadata.get(&self.curr_func).unwrap());
             true
         } else {
             false
