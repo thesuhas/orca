@@ -13,6 +13,7 @@ use wasmparser::{
 };
 
 #[derive(Debug, Clone)]
+/// Intermediate Representation of a wasm component.
 pub struct Component<'a> {
     /// Needs to contain:
     /// 1. Modules

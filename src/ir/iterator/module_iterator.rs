@@ -5,6 +5,7 @@ use crate::ir::types::{InstrumentType, Location};
 use std::collections::HashMap;
 use wasmparser::Operator;
 
+/// Iterator for a Module.
 pub struct ModuleIterator<'a, 'b> {
     module: &'a mut Module<'b>,
     mod_iterator: ModuleSubIterator,

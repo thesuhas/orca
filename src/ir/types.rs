@@ -5,12 +5,14 @@ use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
 
 #[derive(Debug, Clone)]
+/// Globals in a wasm module.
 pub struct Global {
     pub ty: GlobalType,
     pub init_expr: InitExpr,
 }
 
 #[derive(Debug, Clone)]
+/// Data Segment in a wasm module.
 pub struct DataSegment<'a> {
     /// The kind of data segment.
     pub kind: DataSegmentKind<'a>,
@@ -33,6 +35,7 @@ pub enum DataSegmentKind<'a> {
 }
 
 #[derive(Debug, Clone)]
+/// Kind of Element
 pub enum ElementKind<'a> {
     Passive,
     Active {
@@ -43,6 +46,7 @@ pub enum ElementKind<'a> {
 }
 
 #[derive(Debug, Clone)]
+/// Type of element
 pub enum ElementItems<'a> {
     Functions(Vec<u32>),
     ConstExprs {
@@ -52,7 +56,7 @@ pub enum ElementItems<'a> {
 }
 
 #[derive(Debug, Clone)]
-/// The type of instrumentation to be applied to an instruction.
+/// Type of instrumentation to be applied to an instruction.
 pub enum InstrumentType<'a> {
     InstrumentBefore(Vec<Operator<'a>>),
     InstrumentAfter(Vec<Operator<'a>>),
@@ -103,6 +107,7 @@ impl<'a> InstrumentType<'a> {
     }
 }
 
+/// Used to represent a unique location in a wasm component or module.
 pub enum Location {
     Component {
         mod_idx: usize,
@@ -116,6 +121,7 @@ pub enum Location {
 }
 
 #[derive(Debug, Clone)]
+/// Body of a function in a wasm module
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
     /// Note that these do not include the function parameters which are given

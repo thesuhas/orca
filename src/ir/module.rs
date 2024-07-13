@@ -10,6 +10,7 @@ use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
 
 #[derive(Clone, Debug)]
+/// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
     pub types: Vec<SubType>,
     pub imports: Vec<Import<'a>>,

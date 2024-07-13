@@ -5,6 +5,7 @@ use crate::ir::types::{InstrumentType, Location};
 use std::collections::HashMap;
 use wasmparser::Operator;
 
+/// Iterator for a Component.
 pub struct ComponentIterator<'a, 'b> {
     comp: &'a mut Component<'b>,
     comp_iterator: ComponentSubIterator,
