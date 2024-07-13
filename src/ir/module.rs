@@ -1,3 +1,5 @@
+//! Intermediate Representation of a wasm module.
+
 use crate::error::Error;
 use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
@@ -5,7 +7,6 @@ use crate::ir::types::InstrumentType::{
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType, Type,
 };
-use crate::ir::wrappers::{data_segment, element_items, element_kind, global};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
 
@@ -87,7 +88,10 @@ impl<'a> Module<'a> {
                 Payload::DataSection(data_section_reader) => {
                     data = data_section_reader
                         .into_iter()
-                        .map(|sec| sec.map_err(Error::from).and_then(data_segment))
+                        .map(|sec| {
+                            sec.map_err(Error::from)
+                                .and_then(DataSegment::from_wasmparser)
+                        })
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::TableSection(table_section_reader) => {
@@ -114,7 +118,7 @@ impl<'a> Module<'a> {
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
                         .into_iter()
-                        .map(|g| global(g?))
+                        .map(|g| Global::from_wasmparser(g?))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
@@ -131,8 +135,8 @@ impl<'a> Module<'a> {
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
                         let element = element?;
-                        let items = element_items(element.items.clone())?;
-                        elements.push((element_kind(element.kind)?, items));
+                        let items = ElementItems::from_wasmparser(element.items.clone())?;
+                        elements.push((ElementKind::from_wasmparser(element.kind)?, items));
                     }
                 }
                 Payload::DataCountSection { count, range: _ } => {

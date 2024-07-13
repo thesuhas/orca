@@ -1,3 +1,5 @@
+//! Intermediate Representation of a wasm component.
+
 use crate::error::Error;
 use crate::ir::module::Module;
 use crate::ir::types::Global;
