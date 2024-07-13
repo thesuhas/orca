@@ -13,6 +13,7 @@ pub struct Global {
 }
 
 /// orca's representation of function types, shortened from walrus
+/// https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Debug, Clone)]
 pub struct Type {
     pub params: Box<[ValType]>,

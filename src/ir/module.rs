@@ -15,6 +15,7 @@ use super::types::valtype_to_wasmencoder_type;
 /// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
     pub types: Vec<Type>,
+    /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
     pub functions: Vec<u32>,
