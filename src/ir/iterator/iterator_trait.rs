@@ -1,10 +1,11 @@
-///! Iterator trait that must be satisfied by all Iterators. Enables code injection and traversal. Instructions are from [here]
-///!
-///! [here] = https://webassembly.github.io/spec/core/binary/instructions.html
 use crate::ir::types::{InstrumentType, Location};
 use wasmparser::Operator;
 
 #[allow(dead_code)]
+/// Iterator trait that must be satisfied by all Iterators. Enables code injection and traversal.
+/// Instructions as defined [here].
+///
+/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
 pub trait Iterator<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);
