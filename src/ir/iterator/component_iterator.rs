@@ -7,7 +7,9 @@ use wasmparser::Operator;
 
 /// Iterator for a Component.
 pub struct ComponentIterator<'a, 'b> {
+    /// The Component to iterate
     comp: &'a mut Component<'b>,
+    /// The SubIterator for this Component
     comp_iterator: ComponentSubIterator,
 }
 
