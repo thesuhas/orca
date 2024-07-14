@@ -127,16 +127,14 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     fn curr_op(&self) -> Option<&Operator> {
         if self.mod_iterator.end() {
             None
+        } else if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = self.mod_iterator.curr_loc()
+        {
+            Some(&self.module.code_sections[func_idx].instructions[instr_idx].0)
         } else {
-            if let Location::Module {
-                func_idx,
-                instr_idx,
-            } = self.mod_iterator.curr_loc()
-            {
-                Some(&self.module.code_sections[func_idx].instructions[instr_idx].0)
-            } else {
-                panic!("Should have gotten Module Location!")
-            }
+            panic!("Should have gotten Module Location!")
         }
     }
 
@@ -147,7 +145,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             instr_idx,
         } = self.mod_iterator.curr_loc()
         {
-            &self.module.code_sections[func_idx].instructions[instr_idx]
+            self.module.code_sections[func_idx].instructions[instr_idx]
                 .1
                 .get_instr(idx)
         } else {

@@ -1,5 +1,3 @@
-use crate::error::Error;
-use crate::ir::types::{DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InitExpr};
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
@@ -8,7 +6,6 @@ use wasmparser::{
     ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
     InstanceTypeDeclaration, SubType,
 };
-type Result<T> = std::result::Result<T, Error>;
 
 // Not added to wasm-tools
 /// Convert ModuleTypeDeclaration to ModuleType
@@ -135,10 +132,7 @@ pub fn convert_variant_case<'a>(
     let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
     (
         variant.name,
-        match variant.ty {
-            None => None,
-            Some(ty) => Some(reencode.component_val_type(ty)),
-        },
+        variant.ty.map(|ty| reencode.component_val_type(ty)),
         variant.refines,
     )
 }
@@ -357,65 +351,4 @@ pub fn convert_component_type(
             enc.resource(reencode.val_type(rep).unwrap(), dtor);
         }
     }
-}
-
-pub fn global(global: wasmparser::Global) -> Result<Global> {
-    Ok(Global {
-        ty: global.ty,
-        init_expr: InitExpr::eval(&global.init_expr),
-    })
-}
-
-pub fn element_items(items: wasmparser::ElementItems) -> Result<ElementItems> {
-    match items {
-        wasmparser::ElementItems::Functions(reader) => {
-            let functions = reader
-                .into_iter()
-                .collect::<std::result::Result<Vec<_>, _>>()?;
-            Ok(ElementItems::Functions(functions))
-        }
-        wasmparser::ElementItems::Expressions(ref_type, reader) => {
-            let exprs = reader
-                .into_iter()
-                .collect::<std::result::Result<Vec<_>, _>>()?;
-            Ok(ElementItems::ConstExprs {
-                ty: ref_type,
-                exprs,
-            })
-        }
-    }
-}
-
-pub fn element_kind(kind: wasmparser::ElementKind) -> Result<ElementKind> {
-    match kind {
-        wasmparser::ElementKind::Passive => Ok(ElementKind::Passive),
-        wasmparser::ElementKind::Declared => Ok(ElementKind::Declared),
-        wasmparser::ElementKind::Active {
-            table_index,
-            offset_expr,
-        } => Ok(ElementKind::Active {
-            table_index,
-            offset_expr,
-        }),
-    }
-}
-
-fn data_kind(kind: wasmparser::DataKind) -> Result<DataSegmentKind> {
-    Ok(match kind {
-        wasmparser::DataKind::Passive => DataSegmentKind::Passive,
-        wasmparser::DataKind::Active {
-            memory_index,
-            offset_expr,
-        } => DataSegmentKind::Active {
-            memory_index,
-            offset_expr,
-        },
-    })
-}
-
-pub fn data_segment(data: wasmparser::Data) -> Result<DataSegment> {
-    Ok(DataSegment {
-        kind: data_kind(data.kind)?,
-        data: data.data,
-    })
 }

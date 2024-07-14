@@ -10,7 +10,7 @@ fn round_trip_module(testname: &str, folder: &str) {
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
 
     let module = Module::parse_only_module(&buff, false).unwrap();
-    let result = module.encode_only_module().unwrap();
+    let result = module.encode_only_module();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     assert_eq!(out, original);
