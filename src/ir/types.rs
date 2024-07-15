@@ -228,6 +228,40 @@ pub struct Body<'a> {
     pub num_instructions: usize,
 }
 
+// 'b should outlive 'a
+impl <'a, 'b> Body <'a> 
+    where 'b: 'a
+{
+pub fn new() -> Self {
+    Self {
+            locals: Vec::new(),
+            instructions: Vec::new(),
+            num_instructions: 0,
+        }
+    }
+
+    pub fn add_instr (&mut self, instr: Operator<'b>, instr_type: InstrumentType <'b>) {
+        self.instructions.push((instr, instr_type));
+        self.num_instructions += 1;
+    }
+
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        &self.instructions[idx].0
+    }
+
+    pub fn get_instr_type(&self, idx: usize) -> &InstrumentType {
+        &self.instructions[idx].1
+    }
+
+    pub fn add_local(&mut self, count: u32, ty: ValType) {
+        self.locals.push((count, ty));
+    }
+
+    pub fn get_local(&self, idx: usize) -> (u32, ValType) {
+        self.locals[idx]
+    }
+}
+
 /// A constant which is produced in WebAssembly, typically used in global
 /// initializers or element/data offsets.
 #[derive(Debug, Copy, Clone)]

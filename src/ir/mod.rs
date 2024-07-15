@@ -6,3 +6,4 @@ pub mod module;
 pub mod subiterator;
 pub mod types;
 pub mod wrappers;
+pub mod function;

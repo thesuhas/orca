@@ -565,6 +565,27 @@ impl<'a> Module<'a> {
         index
     }
 
+    /// Add a new function to the module. Returns the index of the imported function
+    /// Note: this as no effect on the code or function section
+    // TODO: In walrus, add_import_func after adding a function has no effect
+    pub fn add_import_func(
+        &mut self,
+        module: &'a str,
+        name: &'a str,
+        ty_id: u32,
+    ) -> u32 {
+        let index = self.imports.len() as u32;
+        let import = Import {
+            module,
+            name,
+            ty: wasmparser::TypeRef::Func(ty_id),
+        };
+        self.imports.push(import);
+        self.num_functions += 1;
+
+        index
+    }
+
     pub fn visitor(self) {
         for (idx, body) in self.code_sections.into_iter().enumerate() {
             println!("Entered Function: {}", idx);
