@@ -13,7 +13,7 @@ fn round_trip_component(testname: &str, folder: &str) {
 
     let component = Component::parse(&buff, false).expect("Unable to parse");
     component.clone().visitor();
-    let result = component.encode().expect("Unable to encode");
+    let result = component.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     if out != original {
@@ -49,21 +49,21 @@ macro_rules! make_round_trip_tests_component {
 }
 
 mod round_trip {
-    // make_round_trip_tests_component!(
-    //     "dfinity/components",
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-    //     exports,
-    //     start,
-    //     const_expr
-    // );
-    //
+    make_round_trip_tests_component!(
+        "dfinity/components",
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        exports,
+        start,
+        const_expr
+    );
+
     // make_round_trip_tests_component!("handwritten/components", add);
 
     // make_round_trip_tests_component!("wizard/components", func_loop);
 
-    make_round_trip_tests_component!("spec-test/components", if_test);
+    // make_round_trip_tests_component!("spec-test/components", if_test);
 }

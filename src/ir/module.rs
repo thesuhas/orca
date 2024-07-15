@@ -1,30 +1,45 @@
+//! Intermediate Representation of a wasm module.
+
 use crate::error::Error;
-use crate::ir::convert::parser_to_internal;
-use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType,
+use crate::ir::types::InstrumentType::{
+    InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
-use crate::ir::wrappers::{convert_heap_type, convert_val_type, EncoderEntityType, EncoderValType};
+use crate::ir::types::{
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType, Type,
+};
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, SubType, TableType};
+use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
+
+use super::types::valtype_to_wasmencoder_type;
 
 #[derive(Clone, Debug)]
+/// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
-    pub types: Vec<SubType>,
+    pub types: Vec<Type>,
+    /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
     pub functions: Vec<u32>,
     /// Each table has a type and optional initialization expression.
     pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    /// Memories
     pub memories: Vec<MemoryType>,
+    /// Globals
     pub globals: Vec<Global>,
+    /// Data Sections
     pub data: Vec<DataSegment<'a>>,
     pub data_count_section_exists: bool,
+    /// Exports
     pub exports: Vec<Export<'a>>,
-    // Index of the start function.
+    /// Index of the start function.
     pub start: Option<u32>,
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
+    /// Function Bodies
     pub code_sections: Vec<Body<'a>>,
+    /// Custom Sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    /// Number of functions
+    pub num_functions: usize,
 }
 
 impl<'a> Module<'a> {
@@ -58,8 +73,16 @@ impl<'a> Module<'a> {
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    for rec_group in type_section_reader.into_iter() {
-                        types.extend(rec_group?.into_types());
+                    // for rec_group in type_section_reader.into_iter() {
+                    //     types.extend(rec_group?.into_types());
+                    // }
+                    for ty in type_section_reader.into_iter_err_on_gc_types() {
+                        let fun_ty = ty?;
+                        let params = fun_ty.params().to_vec().into_boxed_slice();
+
+                        let results = fun_ty.results().to_vec().into_boxed_slice();
+
+                        types.push(Type::new(params, results));
                     }
                 }
                 Payload::DataSection(data_section_reader) => {
@@ -67,7 +90,7 @@ impl<'a> Module<'a> {
                         .into_iter()
                         .map(|sec| {
                             sec.map_err(Error::from)
-                                .and_then(parser_to_internal::data_segment)
+                                .and_then(DataSegment::from_wasmparser)
                         })
                         .collect::<Result<_, _>>()?;
                 }
@@ -95,7 +118,7 @@ impl<'a> Module<'a> {
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
                         .into_iter()
-                        .map(|g| parser_to_internal::global(g?))
+                        .map(|g| Global::from_wasmparser(g?))
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
@@ -112,8 +135,8 @@ impl<'a> Module<'a> {
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
                         let element = element?;
-                        let items = parser_to_internal::element_items(element.items.clone())?;
-                        elements.push((parser_to_internal::element_kind(element.kind)?, items));
+                        let items = ElementItems::from_wasmparser(element.items.clone())?;
+                        elements.push((ElementKind::from_wasmparser(element.kind)?, items));
                     }
                 }
                 Payload::DataCountSection { count, range: _ } => {
@@ -153,13 +176,14 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool = instructions
+                    let instructions_bool: Vec<_> = instructions
                         .into_iter()
                         .map(|op| (op, InstrumentType::NotInstrumented))
                         .collect();
                     code_sections.push(Body {
                         locals,
-                        instructions: instructions_bool,
+                        instructions: instructions_bool.clone(),
+                        num_instructions: instructions_bool.len(),
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -227,24 +251,50 @@ impl<'a> Module<'a> {
             start,
             elements,
             data_count_section_exists: data_section_count.is_some(),
-            code_sections,
+            code_sections: code_sections.clone(),
             data,
             custom_sections,
+            num_functions: code_sections.len(),
         })
     }
 
-    pub fn encode_only_module(&self) -> Result<Vec<u8>, Error> {
-        Ok(self.encode().unwrap().finish())
+    /// Emit the module into a wasm binary file.
+    pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
+        let module = self.encode();
+        let wasm = module.finish();
+        std::fs::write(file_name, wasm)?;
+        Ok(())
     }
 
-    pub fn encode(&self) -> Result<wasm_encoder::Module, Error> {
+    /// Encode the module into a wasm binary.
+    pub fn encode_only_module(&self) -> Vec<u8> {
+        self.encode().finish()
+    }
+
+    pub(crate) fn encode(&self) -> wasm_encoder::Module {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
-            for subtype in self.types.iter() {
-                types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
+
+            for ty in self.types.iter() {
+                // let a = ty.params;
+                // map ty.params to valtypes
+
+                let params = ty
+                    .params
+                    .iter()
+                    .map(valtype_to_wasmencoder_type)
+                    .collect::<Vec<_>>();
+                let results = ty
+                    .results
+                    .iter()
+                    .map(valtype_to_wasmencoder_type)
+                    .collect::<Vec<_>>();
+
+                types.function(params, results);
+                // types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
             }
             module.section(&types);
         }
@@ -255,7 +305,7 @@ impl<'a> Module<'a> {
                 imports.import(
                     import.module,
                     import.name,
-                    EncoderEntityType::from(import.ty).ret_original(),
+                    reencode.entity_type(import.ty).unwrap(),
                 );
             }
             module.section(&imports);
@@ -275,11 +325,14 @@ impl<'a> Module<'a> {
                 let table_ty = wasm_encoder::TableType {
                     element_type: wasm_encoder::RefType {
                         nullable: table_ty.element_type.is_nullable(),
-                        heap_type: convert_heap_type(table_ty.element_type.heap_type()),
+                        heap_type: reencode
+                            .heap_type(table_ty.element_type.heap_type())
+                            .unwrap(),
                     },
                     table64: table_ty.table64,
                     minimum: table_ty.initial, // TODO - Check if this maps
                     maximum: table_ty.maximum,
+                    shared: table_ty.shared,
                 };
                 match init {
                     None => tables.table(table_ty),
@@ -307,7 +360,7 @@ impl<'a> Module<'a> {
             for global in self.globals.iter() {
                 globals.global(
                     wasm_encoder::GlobalType {
-                        val_type: convert_val_type(&global.ty.content_type),
+                        val_type: reencode.val_type(global.ty.content_type).unwrap(),
                         mutable: global.ty.mutable,
                         shared: global.ty.shared,
                     },
@@ -352,7 +405,7 @@ impl<'a> Module<'a> {
                         wasm_encoder::Elements::Expressions(
                             wasm_encoder::RefType {
                                 nullable: ty.is_nullable(),
-                                heap_type: convert_heap_type(ty.heap_type()),
+                                heap_type: reencode.heap_type(ty.heap_type()).unwrap(),
                             },
                             &temp_const_exprs,
                         )
@@ -395,19 +448,66 @@ impl<'a> Module<'a> {
             for Body {
                 locals,
                 instructions,
+                num_instructions: _,
             } in self.code_sections.iter()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, t) in locals {
-                    converted_locals.push((*c, EncoderValType::from(*t).ret_original()));
+                    converted_locals.push((*c, reencode.val_type(*t).unwrap()));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                for op in instructions {
-                    function.instruction(
-                        &reencode
-                            .instruction((*op).clone().0)
-                            .expect("Unable to convert Instruction"),
-                    );
+                for (op, instrument) in instructions {
+                    match instrument {
+                        NotInstrumented => {
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                        }
+                        InstrumentBefore(instrs) => {
+                            // First encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                            // Now encode the original instruction
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                        }
+                        InstrumentAfter(instrs) => {
+                            // First encode the original instruction
+                            function.instruction(
+                                &reencode
+                                    .instruction((*op).clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                            // Now encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                        }
+                        InstrumentAlternate(instrs) => {
+                            // Only encode the new instructions
+                            for instr in instrs {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                        }
+                    }
                 }
                 code.function(&function);
             }
@@ -442,7 +542,27 @@ impl<'a> Module<'a> {
             });
         }
 
-        Ok(module)
+        module
+    }
+
+    /// Add a new type to the module, returns the index of the new type.
+    pub fn add_type(&mut self, param: &[ValType], ret: &[ValType]) -> u32 {
+        let index = self.types.len() as u32;
+        let ty = Type::new(param.into(), ret.into());
+        self.types.push(ty);
+        index
+    }
+
+    /// Get type from index of the type section
+    pub fn get_type(&self, index: u32) -> Option<&Type> {
+        self.types.get(index as usize)
+    }
+
+    /// Add a new Global to the module. Returns the index of the new Global.
+    pub fn add_global(&mut self, global: Global) -> u32 {
+        let index = self.globals.len() as u32;
+        self.globals.push(global);
+        index
     }
 
     pub fn visitor(self) {
@@ -456,5 +576,31 @@ impl<'a> Module<'a> {
                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
             }
         }
+    }
+
+    /// create fresh module
+    pub fn new() -> Self {
+        Module {
+            types: vec![],
+            imports: vec![],
+            functions: vec![],
+            tables: vec![],
+            memories: vec![],
+            globals: vec![],
+            exports: vec![],
+            start: None,
+            elements: vec![],
+            data_count_section_exists: false,
+            code_sections: vec![],
+            data: vec![],
+            custom_sections: vec![],
+            num_functions: 0,
+        }
+    }
+}
+
+impl<'a> Default for Module<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }

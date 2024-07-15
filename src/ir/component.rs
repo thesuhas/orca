@@ -1,44 +1,78 @@
+//! Intermediate Representation of a wasm component.
+
 use crate::error::Error;
 use crate::ir::module::Module;
-use crate::ir::types::InstrumentType;
+use crate::ir::types::Global;
 use crate::ir::wrappers::{
-    compare_operator_for_inject, compare_operator_instr_ty, convert_canon,
-    convert_component_export, convert_component_instantiation_arg, convert_component_type,
-    convert_component_val_type, convert_export, convert_instance_type, convert_instantiation_arg,
-    convert_module_type_declaration, convert_params, convert_record_type, convert_results,
-    convert_variant_case, encode_core_type_subtype, process_alias, EncoderComponentExportKind,
-    EncoderComponentTypeRef, EncoderComponentValType, EncoderValType,
+    convert_component_type, convert_instance_type, convert_module_type_declaration,
+    convert_results, convert_variant_case, encode_core_type_subtype, process_alias,
 };
-use wasm_encoder::{ComponentAliasSection, ModuleSection};
+use wasm_encoder::reencode::Reencode;
+use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Operator, Parser, Payload,
+    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
 };
 
 #[derive(Debug, Clone)]
+/// Intermediate Representation of a wasm component.
 pub struct Component<'a> {
-    /// Needs to contain:
-    /// 1. Modules
+    /// Modules
     pub modules: Vec<Module<'a>>,
-    /// 2. Alias
+    ///Alias
     pub alias: Vec<ComponentAlias<'a>>,
-    /// 3. Types
+    /// Core Types
     pub core_types: Vec<CoreType<'a>>,
+    /// Component Types
     pub component_types: Vec<ComponentType<'a>>,
-    /// 4. Import
+    /// Imports
     pub imports: Vec<ComponentImport<'a>>,
-    /// 5. Export
+    /// Exports
     pub exports: Vec<ComponentExport<'a>>,
-    /// 6. Instances
+    /// Core Instances
     pub instances: Vec<Instance<'a>>,
+    /// Component Instances
     pub component_instance: Vec<ComponentInstance<'a>>,
-    /// 7. Canons
+    /// Canons
     pub canons: Vec<CanonicalFunction>,
-    /// 8. Custom sections
+    /// Custom sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    /// Number of modules
+    pub num_modules: usize,
+}
+
+impl Default for Component<'_> {
+    fn default() -> Self {
+        Component::new()
+    }
 }
 
 impl<'a> Component<'a> {
+    pub fn new() -> Self {
+        Component {
+            modules: vec![],
+            alias: vec![],
+            core_types: vec![],
+            component_types: vec![],
+            imports: vec![],
+            exports: vec![],
+            instances: vec![],
+            component_instance: vec![],
+            canons: vec![],
+            custom_sections: vec![],
+            num_modules: 0,
+        }
+    }
+
+    pub fn add_module(&mut self, module: Module<'a>) {
+        self.modules.push(module);
+        self.num_modules += 1;
+    }
+
+    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> u32 {
+        self.modules[module_idx].add_global(global)
+    }
+
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let mut modules = vec![];
         let mut core_types = vec![];
@@ -117,7 +151,7 @@ impl<'a> Component<'a> {
             }
         }
         Ok(Component {
-            modules,
+            modules: modules.clone(),
             alias,
             core_types,
             component_types,
@@ -127,27 +161,20 @@ impl<'a> Component<'a> {
             component_instance,
             canons,
             custom_sections,
+            num_modules: modules.len(),
         })
     }
 
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+    pub fn encode(&self) -> Vec<u8> {
         let mut component = wasm_encoder::Component::new();
+        let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
         // Module parsing
         if !self.modules.is_empty() {
             // Parse each module
             for m in self.modules.iter() {
-                component.section(&ModuleSection(&m.encode()?));
+                component.section(&ModuleSection(&m.encode()));
             }
-        }
-
-        // Alias parsing
-        if !self.alias.is_empty() {
-            let mut alias = ComponentAliasSection::new();
-            for a in self.alias.iter() {
-                alias.alias(process_alias(a));
-            }
-            component.section(&alias);
         }
 
         // Core Types
@@ -157,11 +184,14 @@ impl<'a> Component<'a> {
                 match ty {
                     CoreType::Sub(subtype) => {
                         let enc = type_section.ty();
-                        encode_core_type_subtype(enc, subtype);
+                        encode_core_type_subtype(enc, subtype, &mut reencode);
                     }
                     CoreType::Module(module) => {
                         for m in module.iter() {
-                            type_section.module(&convert_module_type_declaration((*m).clone()));
+                            type_section.module(&convert_module_type_declaration(
+                                (*m).clone(),
+                                &mut reencode,
+                            ));
                         }
                     }
                 }
@@ -181,19 +211,21 @@ impl<'a> Component<'a> {
                                 enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
                             }
                             wasmparser::ComponentDefinedType::Record(record) => {
-                                enc.record(record.iter().map(convert_record_type));
+                                enc.record(record.iter().map(|record| {
+                                    (record.0, reencode.component_val_type(record.1))
+                                }));
                             }
                             wasmparser::ComponentDefinedType::Variant(variant) => {
                                 enc.variant(variant.iter().map(convert_variant_case))
                             }
                             wasmparser::ComponentDefinedType::List(l) => {
-                                enc.list(EncoderComponentValType::from(*l).ret_original())
+                                enc.list(reencode.component_val_type(*l))
                             }
                             wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
                                 tup.clone()
                                     .into_vec()
                                     .into_iter()
-                                    .map(convert_component_val_type),
+                                    .map(|val_type| reencode.component_val_type(val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Flags(flags) => {
                                 enc.flags(flags.clone().into_vec().into_iter())
@@ -202,11 +234,11 @@ impl<'a> Component<'a> {
                                 enc.enum_type(en.clone().into_vec().into_iter())
                             }
                             wasmparser::ComponentDefinedType::Option(opt) => {
-                                enc.option(convert_component_val_type(*opt))
+                                enc.option(reencode.component_val_type(*opt))
                             }
                             wasmparser::ComponentDefinedType::Result { ok, err } => enc.result(
-                                ok.map(convert_component_val_type),
-                                err.map(convert_component_val_type),
+                                ok.map(|val_type| reencode.component_val_type(val_type)),
+                                err.map(|val_type| reencode.component_val_type(val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
                             wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
@@ -214,13 +246,12 @@ impl<'a> Component<'a> {
                     }
                     ComponentType::Func(func_ty) => {
                         let mut enc = component_ty_section.function();
-                        enc.params(
-                            func_ty
-                                .params
-                                .iter()
-                                .map(|p: &(&str, wasmparser::ComponentValType)| convert_params(*p)),
-                        );
-                        convert_results(func_ty.results.clone(), enc);
+                        enc.params(func_ty.params.iter().map(
+                            |p: &(&str, wasmparser::ComponentValType)| {
+                                (p.0, reencode.component_val_type(p.1))
+                            },
+                        ));
+                        convert_results(func_ty.results.clone(), enc, &mut reencode);
                     }
                     ComponentType::Component(comp) => {
                         let mut new_comp = wasm_encoder::ComponentType::new();
@@ -229,35 +260,31 @@ impl<'a> Component<'a> {
                                 ComponentTypeDeclaration::CoreType(core) => match core {
                                     CoreType::Sub(sub) => {
                                         let enc = new_comp.core_type();
-                                        encode_core_type_subtype(enc, sub);
+                                        encode_core_type_subtype(enc, sub, &mut reencode);
                                     }
                                     CoreType::Module(module) => {
                                         for m in module.iter() {
                                             let enc = new_comp.core_type();
                                             enc.module(&convert_module_type_declaration(
                                                 (*m).clone(),
+                                                &mut reencode,
                                             ));
                                         }
                                     }
                                 },
                                 ComponentTypeDeclaration::Type(typ) => {
                                     let enc = new_comp.ty();
-                                    convert_component_type((*typ).clone(), enc);
+                                    convert_component_type((*typ).clone(), enc, &mut reencode);
                                 }
                                 ComponentTypeDeclaration::Alias(a) => {
-                                    new_comp.alias(process_alias(a));
+                                    new_comp.alias(process_alias(a, &mut reencode));
                                 }
                                 ComponentTypeDeclaration::Export { name, ty } => {
-                                    new_comp.export(
-                                        name.0,
-                                        EncoderComponentTypeRef::from(*ty).ret_original(),
-                                    );
+                                    new_comp.export(name.0, reencode.component_type_ref(*ty));
                                 }
                                 ComponentTypeDeclaration::Import(imp) => {
-                                    new_comp.import(
-                                        imp.name.0,
-                                        EncoderComponentTypeRef::from(imp.ty).ret_original(),
-                                    );
+                                    new_comp
+                                        .import(imp.name.0, reencode.component_type_ref(imp.ty));
                                 }
                             }
                         }
@@ -265,12 +292,12 @@ impl<'a> Component<'a> {
                     }
                     ComponentType::Instance(inst) => {
                         for i in inst.iter() {
-                            component_ty_section.instance(&convert_instance_type((*i).clone()));
+                            component_ty_section
+                                .instance(&convert_instance_type((*i).clone(), &mut reencode));
                         }
                     }
                     ComponentType::Resource { rep, dtor } => {
-                        component_ty_section
-                            .resource(EncoderValType::from(*rep).ret_original(), *dtor);
+                        component_ty_section.resource(reencode.val_type(*rep).unwrap(), *dtor);
                     }
                 }
             }
@@ -281,10 +308,7 @@ impl<'a> Component<'a> {
         if !self.imports.is_empty() {
             let mut imports = wasm_encoder::ComponentImportSection::new();
             for imp in self.imports.iter() {
-                imports.import(
-                    imp.name.0,
-                    EncoderComponentTypeRef::from(imp.ty).ret_original(),
-                );
+                imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
             }
             component.section(&imports);
         }
@@ -295,10 +319,9 @@ impl<'a> Component<'a> {
             for exp in self.exports.iter() {
                 exports.export(
                     exp.name.0,
-                    EncoderComponentExportKind::from(exp.kind).ret_original(),
+                    reencode.component_export_kind(exp.kind),
                     exp.index,
-                    exp.ty
-                        .map(|ty| EncoderComponentTypeRef::from(ty).ret_original()),
+                    exp.ty.map(|ty| reencode.component_type_ref(ty)),
                 );
             }
             component.section(&exports);
@@ -315,11 +338,23 @@ impl<'a> Component<'a> {
                     } => {
                         instances.instantiate(
                             *component_index,
-                            args.iter().map(convert_component_instantiation_arg),
+                            args.iter().map(|arg| {
+                                (
+                                    arg.name,
+                                    reencode.component_export_kind(arg.kind),
+                                    arg.index,
+                                )
+                            }),
                         );
                     }
                     ComponentInstance::FromExports(export) => {
-                        instances.export_items(export.iter().map(convert_component_export));
+                        instances.export_items(export.iter().map(|value| {
+                            (
+                                value.name.0,
+                                reencode.component_export_kind(value.kind),
+                                value.index,
+                            )
+                        }));
                     }
                 }
             }
@@ -332,15 +367,33 @@ impl<'a> Component<'a> {
             for instance in self.instances.iter() {
                 match instance {
                     Instance::Instantiate { module_index, args } => {
-                        instances
-                            .instantiate(*module_index, args.iter().map(convert_instantiation_arg));
+                        instances.instantiate(
+                            *module_index,
+                            args.iter()
+                                .map(|arg| (arg.name, ModuleArg::Instance(arg.index))),
+                        );
                     }
                     Instance::FromExports(exports) => {
-                        instances.export_items(exports.iter().map(convert_export));
+                        instances.export_items(exports.iter().map(|export| {
+                            (
+                                export.name,
+                                wasm_encoder::ExportKind::from(export.kind),
+                                export.index,
+                            )
+                        }));
                     }
                 }
             }
             component.section(&instances);
+        }
+
+        // Alias parsing
+        if !self.alias.is_empty() {
+            let mut alias = ComponentAliasSection::new();
+            for a in self.alias.iter() {
+                alias.alias(process_alias(a, &mut reencode));
+            }
+            component.section(&alias);
         }
 
         // Canons parsing
@@ -356,14 +409,21 @@ impl<'a> Component<'a> {
                         canon_sec.lift(
                             *core_func_index,
                             *type_index,
-                            options.iter().map(convert_canon),
+                            options
+                                .iter()
+                                .map(|canon| reencode.canonical_option(*canon)),
                         );
                     }
                     CanonicalFunction::Lower {
                         func_index,
                         options,
                     } => {
-                        canon_sec.lower(*func_index, options.iter().map(convert_canon));
+                        canon_sec.lower(
+                            *func_index,
+                            options
+                                .iter()
+                                .map(|canon| reencode.canonical_option(*canon)),
+                        );
                     }
                     CanonicalFunction::ResourceNew { resource } => {
                         canon_sec.resource_new(*resource);
@@ -386,7 +446,7 @@ impl<'a> Component<'a> {
                 data: std::borrow::Cow::Borrowed(data),
             });
         }
-        Ok(component.finish())
+        component.finish()
     }
 
     /// Print every instruction
@@ -398,76 +458,76 @@ impl<'a> Component<'a> {
         }
     }
 
-    /// flip the instrument type according to the instruction of interest
-    pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
-        // This function is responsible for visiting every instruction
-        for (mod_idx, module) in self.modules.iter_mut().enumerate() {
-            println!("Entered Module: {}", mod_idx);
-            for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
-                println!("Entered Function: {}", func_idx);
-                // Each function index should match to a code section
-                // for (local_idx, local_ty) in body.locals.iter() {
-                //     println!("Local {}: {}", local_idx, local_ty);
-                // }
-                for (instr_idx, (instr, ref mut instrumented)) in
-                    body.instructions.iter_mut().enumerate()
-                {
-                    println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
-                    *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
-                }
-            }
-        }
-    }
+    // flip the instrument type according to the instruction of interest
+    // pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
+    //     // This function is responsible for visiting every instruction
+    //     for (mod_idx, module) in self.modules.iter_mut().enumerate() {
+    //         println!("Entered Module: {}", mod_idx);
+    //         for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
+    //             println!("Entered Function: {}", func_idx);
+    //             // Each function index should match to a code section
+    //             // for (local_idx, local_ty) in body.locals.iter() {
+    //             //     println!("Local {}: {}", local_idx, local_ty);
+    //             // }
+    //             for (instr_idx, (instr, ref mut instrumented)) in
+    //                 body.instructions.iter_mut().enumerate()
+    //             {
+    //                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
+    //                 *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
+    //             }
+    //         }
+    //     }
+    // }
 
-    pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
-        for (_module_idx, module) in self.modules.iter_mut().enumerate() {
-            for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
-                // Each function index should match to a code section
-                for (local_idx, local_ty) in body.locals.iter() {
-                    println!("Local {}: {}", local_idx, local_ty);
-                }
-
-                let mut changes = Vec::new();
-
-                for (idx, (instr, instrumented)) in body.instructions.iter_mut().enumerate() {
-                    if *instrumented != InstrumentType::NotInstrumented {
-                        match compare_operator_for_inject(code_injections.clone(), instr.clone()) {
-                            Some(inject) => {
-                                if *instrumented == InstrumentType::InstrumentAlternate {
-                                    // Replace the value
-                                    changes.push((idx, inject, InstrumentType::NotInstrumented));
-                                } else if *instrumented == InstrumentType::InstrumentBefore {
-                                    *instrumented = InstrumentType::NotInstrumented;
-                                    changes.push((idx, inject, InstrumentType::NotInstrumented));
-                                } else {
-                                    *instrumented = InstrumentType::NotInstrumented;
-                                    changes.push((
-                                        idx + 1,
-                                        inject,
-                                        InstrumentType::NotInstrumented,
-                                    ));
-                                }
-                            }
-                            None => {
-                                // If nothing matches, reset instrumentation
-                                *instrumented = InstrumentType::NotInstrumented;
-                            }
-                        }
-                    }
-                }
-
-                // Apply changes
-                let mut offset = 0;
-                for (idx, op, instr) in changes {
-                    if instr == InstrumentType::InstrumentAlternate {
-                        body.instructions[idx + offset] = (op, instr);
-                    } else {
-                        body.instructions
-                            .insert(idx + offset, (op, InstrumentType::NotInstrumented));
-                        offset += 1;
-                    }
-                }
-            }
-        }
-    }
+    // pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
+    //     for (_module_idx, module) in self.modules.iter_mut().enumerate() {
+    //         for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
+    //             // Each function index should match to a code section
+    //             for (local_idx, local_ty) in body.locals.iter() {
+    //                 println!("Local {}: {}", local_idx, local_ty);
+    //             }
+    //
+    //             let mut changes = Vec::new();
+    //
+    //             for (idx, (instr, instrumented)) in body.instructions.iter_mut().enumerate() {
+    //                 if *instrumented != InstrumentType::NotInstrumented {
+    //                     match compare_operator_for_inject(code_injections.clone(), instr.clone()) {
+    //                         Some(inject) => {
+    //                             if *instrumented == InstrumentType::InstrumentAlternate {
+    //                                 // Replace the value
+    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
+    //                             } else if *instrumented == InstrumentType::InstrumentBefore {
+    //                                 *instrumented = InstrumentType::NotInstrumented;
+    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
+    //                             } else {
+    //                                 *instrumented = InstrumentType::NotInstrumented;
+    //                                 changes.push((
+    //                                     idx + 1,
+    //                                     inject,
+    //                                     InstrumentType::NotInstrumented,
+    //                                 ));
+    //                             }
+    //                         }
+    //                         None => {
+    //                             // If nothing matches, reset instrumentation
+    //                             *instrumented = InstrumentType::NotInstrumented;
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //
+    //             // Apply changes
+    //             let mut offset = 0;
+    //             for (idx, op, instr) in changes {
+    //                 if instr == InstrumentType::InstrumentAlternate {
+    //                     body.instructions[idx + offset] = (op, instr);
+    //                 } else {
+    //                     body.instructions
+    //                         .insert(idx + offset, (op, InstrumentType::NotInstrumented));
+    //                     offset += 1;
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
