@@ -1,3 +1,5 @@
+//! Iterator to traverse a Module
+
 use crate::ir::iterator::iterator_trait::Iterator;
 use crate::ir::module::Module;
 use crate::ir::subiterator::module_subiterator::ModuleSubIterator;

@@ -1,3 +1,5 @@
+//! SubIterator for a Module
+
 use crate::ir::subiterator::function_subiterator::FuncSubIterator;
 use crate::ir::types::Location;
 use std::collections::HashMap;
