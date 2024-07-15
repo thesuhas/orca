@@ -1,3 +1,5 @@
+//! Trait that needs to be satisfied by all iterators
+
 use crate::ir::types::{InstrumentType, Location};
 use wasmparser::Operator;
 

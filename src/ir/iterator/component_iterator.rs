@@ -1,3 +1,5 @@
+//! Iterator to traverse a Component
+
 use crate::ir::component::Component;
 use crate::ir::iterator::iterator_trait::Iterator;
 use crate::ir::subiterator::component_subiterator::ComponentSubIterator;

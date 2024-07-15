@@ -1,3 +1,5 @@
+//! SubIterator for a Component
+
 use crate::ir::subiterator::module_subiterator::ModuleSubIterator;
 use crate::ir::types::Location;
 use std::collections::HashMap;
