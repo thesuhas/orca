@@ -1,4 +1,4 @@
-///! Iterators to traverse either a Component or a Module. Supports injection of Instructions at specific locations.
+//! Iterators to traverse either a Component or a Module. Supports injection of Instructions at specific locations.
 
 /// Iterator to traverse a Component
 pub mod component_iterator;
