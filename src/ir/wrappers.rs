@@ -1,4 +1,4 @@
-///! Wrapper functions
+//! Wrapper functions
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
