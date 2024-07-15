@@ -6,3 +6,5 @@
 
 mod error;
 pub mod ir;
+pub mod iterator;
+pub mod subiterator;
