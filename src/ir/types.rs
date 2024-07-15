@@ -5,7 +5,8 @@ use std::fmt::{self};
 use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
-use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
+use wasm_encoder::SectionId::Data;
+use wasmparser::{ConstExpr, Data, GlobalType, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -30,6 +31,62 @@ impl Global {
 pub struct Type {
     pub params: Box<[ValType]>,
     pub results: Box<[ValType]>,
+}
+
+pub enum DataType {
+    I32,
+    I64,
+    F32,
+    F64,
+    V128,
+    FuncRef,
+    ExternRef,
+    Any,
+    None,
+    NoExtern,
+    NoFunc,
+    Eq,
+    Struct,
+    Array,
+    I31,
+    Exn,
+    NoExn,
+    Module(u32),
+    RecGroup(u32),
+    CoreTypeId(u32), // TODO: Look at this
+}
+
+impl From<ValType> for DataType {
+    fn from(value: ValType) -> Self {
+        match value {
+            ValType::I32 => DataType::I32,
+            ValType::I64 => DataType::I64,
+            ValType::F32 => DataType::F32,
+            ValType::F64 => DataType::F64,
+            ValType::V128 => DataType::V128,
+            ValType::Ref(reftype) => match reftype {
+                wasmparser::HeapType::Abstract { shared, ty } => match ty {
+                    wasmparser::AbstractHeapType::Func => DataType::FuncRef,
+                    wasmparser::AbstractHeapType::Extern => DataType::ExternRef,
+                    wasmparser::AbstractHeapType::Any => DataType::Any,
+                    wasmparser::AbstractHeapType::None => DataType::None,
+                    wasmparser::AbstractHeapType::NoExtern => DataType::NoExtern,
+                    wasmparser::AbstractHeapType::NoFunc => DataType::NoFunc,
+                    wasmparser::AbstractHeapType::Eq => DataType::Eq,
+                    wasmparser::AbstractHeapType::Struct => DataType::Struct,
+                    wasmparser::AbstractHeapType::Array => DataType::Array,
+                    wasmparser::AbstractHeapType::I31 => DataType::I31,
+                    wasmparser::AbstractHeapType::Exn => DataType::Exn,
+                    wasmparser::AbstractHeapType::NoExn => DataType::NoExn,
+                },
+                wasmparser::HeapType::Concrete(u) => match u {
+                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module(idx),
+                    wasmparser::UnpackedIndex::RecGroup(idx) => DataType::RecGroup(idx),
+                    wasmparser::UnpackedIndex::Id(id) => panic!("Not supported yet!"),
+                },
+            },
+        }
+    }
 }
 
 impl Type {
