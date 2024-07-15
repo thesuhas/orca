@@ -1,9 +1,9 @@
 //! Iterator to traverse a Component
 
 use crate::ir::component::Component;
-use crate::ir::iterator::iterator_trait::Iterator;
-use crate::ir::subiterator::component_subiterator::ComponentSubIterator;
 use crate::ir::types::{InstrumentType, Location};
+use crate::iterator::iterator_trait::Iterator;
+use crate::subiterator::component_subiterator::ComponentSubIterator;
 use std::collections::HashMap;
 use wasmparser::Operator;
 

@@ -1,8 +1,8 @@
 use orca::ir::component::Component;
-use orca::ir::iterator::component_iterator::ComponentIterator;
-use orca::ir::iterator::iterator_trait::Iterator;
 use orca::ir::module::Module;
 use orca::ir::types::{InstrumentType, Location};
+use orca::iterator::component_iterator::ComponentIterator;
+use orca::iterator::iterator_trait::Iterator;
 use std::fs::File;
 use std::io::Write;
 use wasmparser::Operator;

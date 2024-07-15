@@ -1,7 +1,7 @@
 //! SubIterator for a Component
 
-use crate::ir::subiterator::module_subiterator::ModuleSubIterator;
 use crate::ir::types::Location;
+use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
 
 /// Sub-iterator for a Component. Keeps track of current location in a Component.
