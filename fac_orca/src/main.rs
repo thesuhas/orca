@@ -3,23 +3,23 @@
 //!
 //! You can run this wasm file with `fact.js`
 
-use orca::ir::module::*;
-use wasmparser::ValType;
 use orca::ir::function::FunctionBuilder;
+use orca::ir::module::*;
+use orca::ir::types::*;
 
 fn main() {
-
     let mut module = Module::new();
-    let log_type_id = module.add_type(&[ValType::I32], &[]);
+    let log_type_id = module.add_type(&[DataType::I32], &[]);
     let log_func_id = module.add_import_func("env", "log", log_type_id);
 
-    let mut factorial = FunctionBuilder::new(&[ValType::I32], &[ValType::I32]);
+    let mut factorial = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
 
     // Create our parameter and our two locals.
     let n = 0u32;
-    let i = factorial.add_local(ValType::I32);
-    let res = factorial.add_local(ValType::I32);
+    let i = factorial.add_local(DataType::I32);
+    let res = factorial.add_local(DataType::I32);
 
+    #[rustfmt::skip]
     factorial
         // (local.set $i (local.get $n))
         .local_get(n)

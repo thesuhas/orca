@@ -5,18 +5,17 @@ use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
 use crate::ir::types::{
-    convert_to_wasmencoder_valtype, Body, DataSegment, DataSegmentKind, ElementItems, ElementKind,
-    Global, InstrumentType, Type,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global, InstrumentType,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
+use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType};
 
-use super::types::{valtype_to_wasmencoder_type, DataType};
+use super::types::DataType;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
 pub struct Module<'a> {
-    pub types: Vec<Type>,
+    pub types: Vec<FuncType>,
     /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
@@ -80,11 +79,20 @@ impl<'a> Module<'a> {
                     // }
                     for ty in type_section_reader.into_iter_err_on_gc_types() {
                         let fun_ty = ty?;
-                        let params = fun_ty.params().to_vec().into_boxed_slice();
+                        let params = fun_ty
+                            .params()
+                            .iter()
+                            .map(|x| DataType::from(*x))
+                            .collect::<Vec<_>>()
+                            .into_boxed_slice();
+                        let results = fun_ty
+                            .results()
+                            .iter()
+                            .map(|x| DataType::from(*x))
+                            .collect::<Vec<_>>()
+                            .into_boxed_slice();
 
-                        let results = fun_ty.results().to_vec().into_boxed_slice();
-
-                        types.push(Type::new(params, results));
+                        types.push(FuncType::new(params, results));
                     }
                 }
                 Payload::DataSection(data_section_reader) => {
@@ -285,22 +293,18 @@ impl<'a> Module<'a> {
             let mut types = wasm_encoder::TypeSection::new();
 
             for ty in self.types.iter() {
-                // let a = ty.params;
-                // map ty.params to valtypes
-
                 let params = ty
                     .params
                     .iter()
-                    .map(valtype_to_wasmencoder_type)
+                    .map(wasm_encoder::ValType::from)
                     .collect::<Vec<_>>();
                 let results = ty
                     .results
                     .iter()
-                    .map(valtype_to_wasmencoder_type)
+                    .map(wasm_encoder::ValType::from)
                     .collect::<Vec<_>>();
 
                 types.function(params, results);
-                // types.subtype(&wasm_encoder::SubType::try_from(subtype.clone()).unwrap());
             }
             module.section(&types);
         }
@@ -458,8 +462,8 @@ impl<'a> Module<'a> {
             } in self.code_sections.iter()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
-                for (c, t) in locals {
-                    converted_locals.push((*c, convert_to_wasmencoder_valtype(t)));
+                for (c, ty) in locals {
+                    converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 for (op, instrument) in instructions {
@@ -552,15 +556,18 @@ impl<'a> Module<'a> {
     }
 
     /// Add a new type to the module, returns the index of the new type.
-    pub fn add_type(&mut self, param: &[ValType], ret: &[ValType]) -> u32 {
+    pub fn add_type(&mut self, param: &[DataType], ret: &[DataType]) -> u32 {
         let index = self.types.len() as u32;
-        let ty = Type::new(param.into(), ret.into());
+        let ty = FuncType::new(
+            param.to_vec().into_boxed_slice(),
+            ret.to_vec().into_boxed_slice(),
+        );
         self.types.push(ty);
         index
     }
 
     /// Get type from index of the type section
-    pub fn get_type(&self, index: u32) -> Option<&Type> {
+    pub fn get_type(&self, index: u32) -> Option<&FuncType> {
         self.types.get(index as usize)
     }
 

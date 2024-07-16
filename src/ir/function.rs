@@ -2,14 +2,14 @@
 
 use crate::ir::module::Module;
 use crate::ir::types::Body;
+use crate::ir::types::DataType;
 use wasmparser::Operator;
-use wasmparser::ValType;
 
 // TODO: probably need better reasoning with lifetime here
 pub struct FunctionBuilder<'a> {
     // pub(crate) id: u32, // function index
-    pub(crate) params: Vec<ValType>,
-    pub(crate) results: Vec<ValType>,
+    pub(crate) params: Vec<DataType>,
+    pub(crate) results: Vec<DataType>,
     pub(crate) num_locals: u32,
     #[allow(dead_code)]
     // TODO: how to add function name?
@@ -19,7 +19,7 @@ pub struct FunctionBuilder<'a> {
 }
 
 impl<'a> FunctionBuilder<'a> {
-    pub fn new(params: &[ValType], results: &[ValType]) -> Self {
+    pub fn new(params: &[DataType], results: &[DataType]) -> Self {
         Self {
             params: params.to_vec(),
             results: results.to_vec(),
@@ -50,7 +50,7 @@ impl<'a> FunctionBuilder<'a> {
 
     /// add a local and return local index
     /// (note that local indices start after)
-    pub fn add_local(&mut self, ty: ValType) -> u32 {
+    pub fn add_local(&mut self, ty: DataType) -> u32 {
         let index = self.params.len() as u32 + self.num_locals;
         self.num_locals += 1;
         // if ValType exists in body.locals, increment count
