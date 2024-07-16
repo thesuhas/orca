@@ -49,23 +49,23 @@ macro_rules! make_round_trip_tests_component {
 }
 
 mod round_trip {
-    // make_round_trip_tests_component!(
-    //     "dfinity/components",
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-    //     exports,
-    //     start,
-    //     const_expr
-    // );
+    make_round_trip_tests_component!(
+        "dfinity/components",
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        exports,
+        start,
+        const_expr
+    );
 
-    // make_round_trip_tests_component!("handwritten/components", add);
+    make_round_trip_tests_component!("handwritten/components", add);
 
-    // make_round_trip_tests_component!("wizard/components", func_loop);
+    make_round_trip_tests_component!("wizard/components", func_loop);
 
-    // make_round_trip_tests_component!("spec-test/components", if_test);
+    make_round_trip_tests_component!("spec-test/components", if_test);
 
-    make_round_trip_tests_component!("spin", hello_world);
+    // make_round_trip_tests_component!("spin", hello_world);
 }
