@@ -5,12 +5,13 @@ use crate::ir::types::InstrumentType::{
     InstrumentAfter, InstrumentAlternate, InstrumentBefore, NotInstrumented,
 };
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global, InstrumentType, Type,
+    convert_to_wasmencoder_valtype, Body, DataSegment, DataSegmentKind, ElementItems, ElementKind,
+    Global, InstrumentType, Type,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType, ValType};
 
-use super::types::valtype_to_wasmencoder_type;
+use super::types::{valtype_to_wasmencoder_type, DataType};
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
@@ -153,7 +154,10 @@ impl<'a> Module<'a> {
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
-                    println!("Locals: {:?}", locals);
+                    let locals: Vec<(u32, DataType)> = locals
+                        .iter()
+                        .map(|(idx, valtype)| (*idx, DataType::from(*valtype)))
+                        .collect();
                     let instructions = body
                         .get_operators_reader()?
                         .into_iter()
@@ -455,7 +459,7 @@ impl<'a> Module<'a> {
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, t) in locals {
-                    converted_locals.push((*c, reencode.val_type(*t).unwrap()));
+                    converted_locals.push((*c, convert_to_wasmencoder_valtype(t)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 for (op, instrument) in instructions {

@@ -32,6 +32,186 @@ pub struct Type {
     pub results: Box<[ValType]>,
 }
 
+/// Orca's representation of ValType
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DataType {
+    I32,
+    I64,
+    F32,
+    F64,
+    V128,
+    FuncRef,
+    ExternRef,
+    Any,
+    None,
+    NoExtern,
+    NoFunc,
+    Eq,
+    Struct,
+    Array,
+    I31,
+    Exn,
+    NoExn,
+    Module(u32),
+    RecGroup(u32),
+    CoreTypeId(u32), // TODO: Look at this
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            DataType::I32 => write!(f, "DataType: I32"),
+            DataType::I64 => write!(f, "DataType: I64"),
+            DataType::F32 => write!(f, "DataType: F32"),
+            DataType::F64 => write!(f, "DataType: F64"),
+            DataType::V128 => write!(f, "DataType: V128"),
+            DataType::FuncRef => write!(f, "DataType: FuncRef"),
+            DataType::ExternRef => write!(f, "DataType: ExternRef"),
+            DataType::Any => write!(f, "DataType: Any"),
+            DataType::None => write!(f, "DataType: None"),
+            DataType::NoExtern => write!(f, "DataType: NoExtern"),
+            DataType::NoFunc => write!(f, "DataType: NoFunc"),
+            DataType::Eq => write!(f, "DataType: Eq"),
+            DataType::Struct => write!(f, "DataType: Struct"),
+            DataType::Array => write!(f, "DataType: Array"),
+            DataType::I31 => write!(f, "DataType: I31"),
+            DataType::Exn => write!(f, "DataType: Exn"),
+            DataType::NoExn => write!(f, "DataType: NoExn"),
+            DataType::Module(idx) => write!(f, "DataType: Module {:?}", idx),
+            DataType::RecGroup(idx) => write!(f, "DataType: RecGroup {:?}", idx),
+            DataType::CoreTypeId(idx) => write!(f, "DataType: CoreTypeId {:?}", idx),
+        }
+    }
+}
+
+impl From<ValType> for DataType {
+    fn from(value: ValType) -> Self {
+        match value {
+            ValType::I32 => DataType::I32,
+            ValType::I64 => DataType::I64,
+            ValType::F32 => DataType::F32,
+            ValType::F64 => DataType::F64,
+            ValType::V128 => DataType::V128,
+            ValType::Ref(reftype) => match reftype.heap_type() {
+                wasmparser::HeapType::Abstract { shared: _, ty } => match ty {
+                    wasmparser::AbstractHeapType::Func => DataType::FuncRef,
+                    wasmparser::AbstractHeapType::Extern => DataType::ExternRef,
+                    wasmparser::AbstractHeapType::Any => DataType::Any,
+                    wasmparser::AbstractHeapType::None => DataType::None,
+                    wasmparser::AbstractHeapType::NoExtern => DataType::NoExtern,
+                    wasmparser::AbstractHeapType::NoFunc => DataType::NoFunc,
+                    wasmparser::AbstractHeapType::Eq => DataType::Eq,
+                    wasmparser::AbstractHeapType::Struct => DataType::Struct,
+                    wasmparser::AbstractHeapType::Array => DataType::Array,
+                    wasmparser::AbstractHeapType::I31 => DataType::I31,
+                    wasmparser::AbstractHeapType::Exn => DataType::Exn,
+                    wasmparser::AbstractHeapType::NoExn => DataType::NoExn,
+                },
+                wasmparser::HeapType::Concrete(u) => match u {
+                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module(idx),
+                    wasmparser::UnpackedIndex::RecGroup(idx) => DataType::RecGroup(idx),
+                    wasmparser::UnpackedIndex::Id(_id) => panic!("Not supported yet!"),
+                },
+            },
+        }
+    }
+}
+
+/// Converts from Orca's DataType to wasm_encoder::ValType
+pub fn convert_to_wasmencoder_valtype(ty: &DataType) -> wasm_encoder::ValType {
+    match ty {
+        DataType::I32 => wasm_encoder::ValType::I32,
+        DataType::I64 => wasm_encoder::ValType::I64,
+        DataType::F32 => wasm_encoder::ValType::F32,
+        DataType::F64 => wasm_encoder::ValType::F64,
+        DataType::V128 => wasm_encoder::ValType::V128,
+        DataType::FuncRef => wasm_encoder::ValType::FUNCREF,
+        DataType::ExternRef => wasm_encoder::ValType::EXTERNREF,
+        DataType::Any => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Any,
+            },
+        }),
+        DataType::None => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::None,
+            },
+        }),
+        DataType::NoExtern => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::NoExtern,
+            },
+        }),
+        DataType::NoFunc => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::NoFunc,
+            },
+        }),
+        DataType::Eq => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Eq,
+            },
+        }),
+        DataType::Struct => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Struct,
+            },
+        }),
+        DataType::Array => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Array,
+            },
+        }),
+        DataType::I31 => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::I31,
+            },
+        }),
+        DataType::Exn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::Exn,
+            },
+        }),
+        DataType::NoExn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Abstract {
+                shared: false,
+                ty: AbstractHeapType::NoExn,
+            },
+        }),
+        DataType::Module(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
+        }),
+        DataType::RecGroup(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
+        }),
+        DataType::CoreTypeId(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+            nullable: false,
+            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
+        }),
+    }
+}
+
 impl Type {
     pub fn new(params: Box<[ValType]>, results: Box<[ValType]>) -> Self {
         Self { params, results }
@@ -222,7 +402,7 @@ pub struct Body<'a> {
     /// indices before the locals. So if a function has 2 parameters and a local
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
-    pub locals: Vec<(u32, ValType)>,
+    pub locals: Vec<(u32, DataType)>,
     // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
     pub num_instructions: usize,

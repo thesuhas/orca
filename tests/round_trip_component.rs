@@ -12,9 +12,9 @@ fn round_trip_component(testname: &str, folder: &str) {
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
 
     let component = Component::parse(&buff, false).expect("Unable to parse");
-    component.clone().visitor();
+    // component.clone().visitor();
     let result = component.encode();
-    let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
@@ -61,9 +61,11 @@ mod round_trip {
         const_expr
     );
 
-    // make_round_trip_tests_component!("handwritten/components", add);
+    make_round_trip_tests_component!("handwritten/components", add);
 
-    // make_round_trip_tests_component!("wizard/components", func_loop);
+    make_round_trip_tests_component!("wizard/components", func_loop);
 
-    // make_round_trip_tests_component!("spec-test/components", if_test);
+    make_round_trip_tests_component!("spec-test/components", if_test);
+
+    // make_round_trip_tests_component!("spin", hello_world);
 }
