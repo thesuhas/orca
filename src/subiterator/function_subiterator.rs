@@ -1,3 +1,5 @@
+//! SubIterator for a Function
+
 /// Sub-iterator for a Function. Keeps track of current location in a Function.
 pub struct FuncSubIterator {
     /// The current instruction the SubIterator is at

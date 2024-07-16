@@ -1,7 +1,9 @@
-use crate::ir::iterator::iterator_trait::Iterator;
+//! Iterator to traverse a Module
+
 use crate::ir::module::Module;
-use crate::ir::subiterator::module_subiterator::ModuleSubIterator;
 use crate::ir::types::{InstrumentType, Location};
+use crate::iterator::iterator_trait::Iterator;
+use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
 use wasmparser::Operator;
 

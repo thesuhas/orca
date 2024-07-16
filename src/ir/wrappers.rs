@@ -1,3 +1,4 @@
+//! Wrapper functions
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
@@ -125,19 +126,6 @@ pub fn convert_results(
 }
 
 // Not added to wasm-tools
-/// Convert variant case
-pub fn convert_variant_case<'a>(
-    variant: &'a wasmparser::VariantCase<'a>,
-) -> (&'a str, Option<wasm_encoder::ComponentValType>, Option<u32>) {
-    let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
-    (
-        variant.name,
-        variant.ty.map(|ty| reencode.component_val_type(ty)),
-        variant.refines,
-    )
-}
-
-// Not added to wasm-tools
 /// CoreTypeEncoding
 pub fn encode_core_type_subtype(
     enc: CoreTypeEncoder,
@@ -217,7 +205,13 @@ pub fn convert_component_type(
                     );
                 }
                 wasmparser::ComponentDefinedType::Variant(variant) => {
-                    def_enc.variant(variant.iter().map(convert_variant_case))
+                    def_enc.variant(variant.iter().map(|variant| {
+                        (
+                            variant.name,
+                            variant.ty.map(|ty| reencode.component_val_type(ty)),
+                            variant.refines,
+                        )
+                    }))
                 }
                 wasmparser::ComponentDefinedType::List(l) => {
                     def_enc.list(reencode.component_val_type(l))

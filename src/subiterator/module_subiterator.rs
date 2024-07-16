@@ -1,5 +1,7 @@
-use crate::ir::subiterator::function_subiterator::FuncSubIterator;
+//! SubIterator for a Module
+
 use crate::ir::types::Location;
+use crate::subiterator::function_subiterator::FuncSubIterator;
 use std::collections::HashMap;
 
 /// Sub-iterator for a Module. Keeps track of current location in a Module.

@@ -5,7 +5,7 @@ use crate::ir::module::Module;
 use crate::ir::types::Global;
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
-    convert_results, convert_variant_case, encode_core_type_subtype, process_alias,
+    convert_results, encode_core_type_subtype, process_alias,
 };
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection};
@@ -216,7 +216,13 @@ impl<'a> Component<'a> {
                                 }));
                             }
                             wasmparser::ComponentDefinedType::Variant(variant) => {
-                                enc.variant(variant.iter().map(convert_variant_case))
+                                enc.variant(variant.iter().map(|variant| {
+                                    (
+                                        variant.name,
+                                        variant.ty.map(|ty| reencode.component_val_type(ty)),
+                                        variant.refines,
+                                    )
+                                }))
                             }
                             wasmparser::ComponentDefinedType::List(l) => {
                                 enc.list(reencode.component_val_type(*l))
