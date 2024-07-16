@@ -24,14 +24,6 @@ impl Global {
     }
 }
 
-/// orca's representation of function types, shortened from walrus
-/// https://docs.rs/walrus/latest/walrus/struct.Type.html
-#[derive(Debug, Clone)]
-pub struct Type {
-    pub params: Box<[ValType]>,
-    pub results: Box<[ValType]>,
-}
-
 /// Orca's representation of ValType
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DataType {
@@ -118,109 +110,119 @@ impl From<ValType> for DataType {
 }
 
 /// Converts from Orca's DataType to wasm_encoder::ValType
-pub fn convert_to_wasmencoder_valtype(ty: &DataType) -> wasm_encoder::ValType {
-    match ty {
-        DataType::I32 => wasm_encoder::ValType::I32,
-        DataType::I64 => wasm_encoder::ValType::I64,
-        DataType::F32 => wasm_encoder::ValType::F32,
-        DataType::F64 => wasm_encoder::ValType::F64,
-        DataType::V128 => wasm_encoder::ValType::V128,
-        DataType::FuncRef => wasm_encoder::ValType::FUNCREF,
-        DataType::ExternRef => wasm_encoder::ValType::EXTERNREF,
-        DataType::Any => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Any,
-            },
-        }),
-        DataType::None => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::None,
-            },
-        }),
-        DataType::NoExtern => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::NoExtern,
-            },
-        }),
-        DataType::NoFunc => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::NoFunc,
-            },
-        }),
-        DataType::Eq => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Eq,
-            },
-        }),
-        DataType::Struct => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Struct,
-            },
-        }),
-        DataType::Array => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Array,
-            },
-        }),
-        DataType::I31 => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::I31,
-            },
-        }),
-        DataType::Exn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::Exn,
-            },
-        }),
-        DataType::NoExn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Abstract {
-                shared: false,
-                ty: AbstractHeapType::NoExn,
-            },
-        }),
-        DataType::Module(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
-        }),
-        DataType::RecGroup(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
-        }),
-        DataType::CoreTypeId(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-            nullable: false,
-            heap_type: wasm_encoder::HeapType::Concrete { 0: *idx },
-        }),
-    }
-}
-
-impl Type {
-    pub fn new(params: Box<[ValType]>, results: Box<[ValType]>) -> Self {
-        Self { params, results }
+impl From<&DataType> for wasm_encoder::ValType {
+    fn from(ty: &DataType) -> Self {
+        match ty {
+            DataType::I32 => wasm_encoder::ValType::I32,
+            DataType::I64 => wasm_encoder::ValType::I64,
+            DataType::F32 => wasm_encoder::ValType::F32,
+            DataType::F64 => wasm_encoder::ValType::F64,
+            DataType::V128 => wasm_encoder::ValType::V128,
+            DataType::FuncRef => wasm_encoder::ValType::FUNCREF,
+            DataType::ExternRef => wasm_encoder::ValType::EXTERNREF,
+            DataType::Any => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Any,
+                },
+            }),
+            DataType::None => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::None,
+                },
+            }),
+            DataType::NoExtern => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoExtern,
+                },
+            }),
+            DataType::NoFunc => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoFunc,
+                },
+            }),
+            DataType::Eq => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Eq,
+                },
+            }),
+            DataType::Struct => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Struct,
+                },
+            }),
+            DataType::Array => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Array,
+                },
+            }),
+            DataType::I31 => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::I31,
+                },
+            }),
+            DataType::Exn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Exn,
+                },
+            }),
+            DataType::NoExn => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoExn,
+                },
+            }),
+            DataType::Module(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Concrete(*idx),
+            }),
+            DataType::RecGroup(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Concrete(*idx),
+            }),
+            DataType::CoreTypeId(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Concrete(*idx),
+            }),
+        }
     }
 }
 
 pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType {
     let mut reencoder = wasm_encoder::reencode::RoundtripReencoder;
     reencoder.val_type(*val_type).unwrap()
+}
+
+/// orca's representation of function types, shortened from walrus
+/// https://docs.rs/walrus/latest/walrus/struct.Type.html
+#[derive(Debug, Clone)]
+pub struct FuncType {
+    pub params: Box<[DataType]>,
+    pub results: Box<[DataType]>,
+}
+
+impl FuncType {
+    pub fn new(params: Box<[DataType]>, results: Box<[DataType]>) -> Self {
+        Self { params, results }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -406,6 +408,39 @@ pub struct Body<'a> {
     // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
     pub num_instructions: usize,
+}
+
+#[allow(clippy::new_without_default)]
+// 'b should outlive 'a
+impl<'a, 'b> Body<'a>
+where
+    'b: 'a,
+{
+    pub fn new() -> Self {
+        Self {
+            locals: Vec::new(),
+            instructions: Vec::new(),
+            num_instructions: 0,
+        }
+    }
+
+    pub fn add_instr(&mut self, instr: Operator<'b>) {
+        self.instructions
+            .push((instr, InstrumentType::NotInstrumented));
+        self.num_instructions += 1;
+    }
+
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        &self.instructions[idx].0
+    }
+
+    pub fn get_instr_type(&self, idx: usize) -> &InstrumentType {
+        &self.instructions[idx].1
+    }
+
+    pub fn end(&mut self) {
+        self.add_instr(Operator::End);
+    }
 }
 
 /// A constant which is produced in WebAssembly, typically used in global
