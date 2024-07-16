@@ -92,37 +92,45 @@ impl<'a> Component<'a> {
             // ComponentStartSection { .. } => { /* ... */ }
             match payload {
                 Payload::ComponentImportSection(import_section_reader) => {
-                    imports = import_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?
+                    imports.append(
+                        &mut import_section_reader
+                            .into_iter()
+                            .collect::<Result<_, _>>()?,
+                    );
                 }
                 Payload::ComponentExportSection(export_section_reader) => {
-                    exports = export_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    exports.append(
+                        &mut export_section_reader
+                            .into_iter()
+                            .collect::<Result<_, _>>()?,
+                    );
                 }
                 Payload::InstanceSection(instance_section_reader) => {
-                    instances = instance_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    instances.append(
+                        &mut instance_section_reader
+                            .into_iter()
+                            .collect::<Result<_, _>>()?,
+                    );
                 }
                 Payload::CoreTypeSection(core_type_reader) => {
-                    core_types = core_type_reader.into_iter().collect::<Result<_, _>>()?;
+                    core_types.append(&mut core_type_reader.into_iter().collect::<Result<_, _>>()?);
                 }
                 Payload::ComponentTypeSection(component_type_reader) => {
-                    component_types = component_type_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    component_types.append(
+                        &mut component_type_reader
+                            .into_iter()
+                            .collect::<Result<_, _>>()?,
+                    );
                 }
                 Payload::ComponentInstanceSection(component_instances) => {
-                    component_instance =
-                        component_instances.into_iter().collect::<Result<_, _>>()?;
+                    component_instance
+                        .append(&mut component_instances.into_iter().collect::<Result<_, _>>()?);
                 }
                 Payload::ComponentAliasSection(alias_reader) => {
-                    alias = alias_reader.into_iter().collect::<Result<_, _>>()?;
+                    alias.append(&mut alias_reader.into_iter().collect::<Result<_, _>>()?);
                 }
                 Payload::ComponentCanonicalSection(canon_reader) => {
-                    canons = canon_reader.into_iter().collect::<Result<_, _>>()?;
+                    canons.append(&mut canon_reader.into_iter().collect::<Result<_, _>>()?);
                 }
                 Payload::ModuleSection {
                     parser,

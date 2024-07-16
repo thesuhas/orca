@@ -9,4 +9,4 @@ wasmparser = "0.213.0"
 
 [dev-dependencies]
 wasmprinter = "0.213.0"
-wat = "1.0.57"
+wat = "1.213.0"
