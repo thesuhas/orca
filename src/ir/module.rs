@@ -19,6 +19,7 @@ pub struct Module<'a> {
     /// Imports
     pub imports: Vec<Import<'a>>,
     /// Mapping from function index to type index.
+    /// Note that |functions| == |code_sections| == num_functions
     pub functions: Vec<u32>,
     /// Each table has a type and optional initialization expression.
     pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
@@ -38,7 +39,7 @@ pub struct Module<'a> {
     pub code_sections: Vec<Body<'a>>,
     /// Custom Sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
-    /// Number of functions
+    /// Number of local functions (not counting imported functions)
     pub num_functions: usize,
 }
 
@@ -152,6 +153,7 @@ impl<'a> Module<'a> {
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
+                    println!("Locals: {:?}", locals);
                     let instructions = body
                         .get_operators_reader()?
                         .into_iter()
@@ -568,12 +570,7 @@ impl<'a> Module<'a> {
     /// Add a new function to the module. Returns the index of the imported function
     /// Note: this as no effect on the code or function section
     // TODO: In walrus, add_import_func after adding a function has no effect
-    pub fn add_import_func(
-        &mut self,
-        module: &'a str,
-        name: &'a str,
-        ty_id: u32,
-    ) -> u32 {
+    pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: u32) -> u32 {
         let index = self.imports.len() as u32;
         let import = Import {
             module,
@@ -581,9 +578,17 @@ impl<'a> Module<'a> {
             ty: wasmparser::TypeRef::Func(ty_id),
         };
         self.imports.push(import);
-        self.num_functions += 1;
 
         index
+    }
+
+    pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
+        let export = Export {
+            name,
+            kind: wasmparser::ExternalKind::Func,
+            index: func_idx,
+        };
+        self.exports.push(export);
     }
 
     pub fn visitor(self) {

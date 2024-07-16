@@ -228,20 +228,23 @@ pub struct Body<'a> {
     pub num_instructions: usize,
 }
 
+#[allow(clippy::new_without_default)]
 // 'b should outlive 'a
-impl <'a, 'b> Body <'a> 
-    where 'b: 'a
+impl<'a, 'b> Body<'a>
+where
+    'b: 'a,
 {
-pub fn new() -> Self {
-    Self {
+    pub fn new() -> Self {
+        Self {
             locals: Vec::new(),
             instructions: Vec::new(),
             num_instructions: 0,
         }
     }
 
-    pub fn add_instr (&mut self, instr: Operator<'b>, instr_type: InstrumentType <'b>) {
-        self.instructions.push((instr, instr_type));
+    pub fn add_instr(&mut self, instr: Operator<'b>) {
+        self.instructions
+            .push((instr, InstrumentType::NotInstrumented));
         self.num_instructions += 1;
     }
 
@@ -253,12 +256,8 @@ pub fn new() -> Self {
         &self.instructions[idx].1
     }
 
-    pub fn add_local(&mut self, count: u32, ty: ValType) {
-        self.locals.push((count, ty));
-    }
-
-    pub fn get_local(&self, idx: usize) -> (u32, ValType) {
-        self.locals[idx]
+    pub fn end(&mut self) {
+        self.add_instr(Operator::End);
     }
 }
 
