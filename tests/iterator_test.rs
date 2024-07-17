@@ -89,10 +89,7 @@ fn test_blocks() {
             instr_idx,
         } = mod_it.curr_loc()
         {
-            println!(
-                "Fun: {}, {}: {:?},",
-                func_idx, instr_idx, op
-            );
+            println!("Fun: {}, {}: {:?},", func_idx, instr_idx, op);
             if mod_it.next().is_none() {
                 break;
             };
