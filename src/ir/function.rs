@@ -3,6 +3,7 @@
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
+use crate::opcode::Opcode;
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
@@ -69,91 +70,11 @@ impl<'a> FunctionBuilder<'a> {
 
         index
     }
+}
 
-    pub fn local_get(&mut self, local_index: u32) -> &mut Self {
-        self.body.add_instr(Operator::LocalGet { local_index });
-        self
-    }
-
-    pub fn local_set(&mut self, local_index: u32) -> &mut Self {
-        self.body.add_instr(Operator::LocalSet { local_index });
-        self
-    }
-
-    pub fn i32_const(&mut self, value: i32) -> &mut Self {
-        self.body.add_instr(Operator::I32Const { value });
-        self
-    }
-
-    pub fn i64_const(&mut self, value: i64) -> &mut Self {
-        self.body.add_instr(Operator::I64Const { value });
-        self
-    }
-
-    pub fn f32_const(&mut self, value: f32) -> &mut Self {
-        self.body.add_instr(Operator::F32Const {
-            value: value.into(),
-        });
-        self
-    }
-
-    pub fn f64_const(&mut self, value: f64) -> &mut Self {
-        self.body.add_instr(Operator::F64Const {
-            value: value.into(),
-        });
-        self
-    }
-
-    // TODO: do some checking here?
-    pub fn binop(&mut self, op: Operator<'a>) -> &mut Self {
-        self.body.add_instr(op);
-        self
-    }
-
-    // TODO: how to reason with BlockType, is there a better abstraction,
-    // do they really matter?
-    /// Inject a block statement. Indicates the start of a block
-    pub fn block(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
-        self.body.add_instr(Operator::Block {
-            blockty: block_type,
-        });
-        self
-    }
-
-    /// Inject a loop statement. Indicates the start of a loop
-    // TODO: walrus does this with closures, do we want to swithc to that?
-    // (same question for if_stmt)
-    pub fn loop_stmt(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
-        self.body.add_instr(Operator::Loop {
-            blockty: block_type,
-        });
-        self
-    }
-
-    pub fn if_stmt(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
-        self.body.add_instr(Operator::If {
-            blockty: block_type,
-        });
-        self
-    }
-
-    pub fn else_stmt(&mut self) -> &mut Self {
-        self.body.add_instr(Operator::Else);
-        self
-    }
-
-    pub fn end(&mut self) -> &mut Self {
-        self.body.add_instr(Operator::End);
-        self
-    }
-
-    pub fn call(&mut self, function_index: u32) -> &mut Self {
-        self.body.add_instr(Operator::Call { function_index });
-        self
-    }
-
-    pub fn br(&mut self, relative_depth: u32) -> &mut Self {
-        self.body.add_instr(Operator::Br { relative_depth });
-        self
+impl<'a> Opcode<'a> for FunctionBuilder<'a> {
+    /// Inject an operator at the current location
+    fn inject(&mut self, instr: Operator<'a>) {
+        self.body.add_instr(instr)
     }
 }
