@@ -206,6 +206,7 @@ impl From<&DataType> for wasm_encoder::ValType {
     }
 }
 
+/// Converts wasmparser::ValType to wasm_encoder::ValType
 pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType {
     let mut reencoder = wasm_encoder::reencode::RoundtripReencoder;
     reencoder.val_type(*val_type).unwrap()
@@ -332,56 +333,141 @@ impl ElementItems<'_> {
 }
 
 #[derive(Debug, Clone)]
-/// Type of instrumentation to be applied to an instruction.
-pub enum InstrumentType<'a> {
-    InstrumentBefore(Vec<Operator<'a>>),
-    InstrumentAfter(Vec<Operator<'a>>),
-    InstrumentAlternate(Vec<Operator<'a>>),
+/// Instrumentation Data that is stored with every instruction
+pub enum Instrument<'a> {
     NotInstrumented,
+    Instrumented {
+        before: Vec<Operator<'a>>,
+        after: Vec<Operator<'a>>,
+        alternate: Vec<Operator<'a>>,
+        current: InstrumentationMode,
+    },
 }
 
-impl fmt::Display for InstrumentType<'_> {
+#[derive(Debug, Clone)]
+/// Mode of Instruction in case the instruction is marked as Instrumented
+pub enum InstrumentationMode {
+    Before,
+    After,
+    Alternate,
+}
+
+impl fmt::Display for Instrument<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            InstrumentType::InstrumentBefore(_) => write!(f, "Instrument Before"),
-            InstrumentType::InstrumentAfter(_) => write!(f, "Instrument After"),
-            InstrumentType::InstrumentAlternate(_) => write!(f, "Instrument Alternate"),
-            InstrumentType::NotInstrumented => write!(f, "Not Instrumented"),
+        match self {
+            Instrument::NotInstrumented => write!(f, "Not Instrumented"),
+            Instrument::Instrumented {before, after, alternate, current: _current} => write!(f, "Instrumented:\n Before: {:?} instructions\n After: {:?} instructions\n Alternate: {:?} instructions\n", before.len(), after.len(), alternate.len())
         }
     }
 }
 
-impl PartialEq for InstrumentType<'_> {
+impl PartialEq for Instrument<'_> {
     fn eq(&self, other: &Self) -> bool {
         discriminant(self) == discriminant(other)
     }
 }
 
-impl Eq for InstrumentType<'_> {}
+impl Eq for Instrument<'_> {}
 
-impl<'a> InstrumentType<'a> {
+impl<'a> Instrument<'a> {
+    /// Add an instruction to the current InstrumentationMode's list
     pub fn add_instr(&mut self, val: Operator<'a>) {
         match self {
-            InstrumentType::InstrumentBefore(ref mut instrs)
-            | InstrumentType::InstrumentAlternate(ref mut instrs)
-            | InstrumentType::InstrumentAfter(ref mut instrs) => instrs.push(val),
-            InstrumentType::NotInstrumented => {
+            Instrument::NotInstrumented => {
                 panic!("Cannot inject code into locations that are not instrumented!")
             }
+            Instrument::Instrumented {
+                before,
+                after,
+                alternate,
+                current,
+            } => match current {
+                InstrumentationMode::Before => before.push(val),
+                InstrumentationMode::After => after.push(val),
+                InstrumentationMode::Alternate => alternate.push(val),
+            },
         }
     }
 
+    /// Get an instruction to the current InstrumentationMode's list
     pub fn get_instr(&self, idx: usize) -> &Operator {
         match self {
-            InstrumentType::InstrumentBefore(ref instrs)
-            | InstrumentType::InstrumentAlternate(ref instrs)
-            | InstrumentType::InstrumentAfter(ref instrs) => instrs.get(idx).unwrap(),
-            InstrumentType::NotInstrumented => {
+            Instrument::NotInstrumented => {
                 panic!("Cannot retrieve code from Instruction that was not instrumented!")
             }
+            Instrument::Instrumented {
+                before,
+                after,
+                alternate,
+                current,
+            } => match current {
+                InstrumentationMode::Before => before.get(idx).unwrap(),
+                InstrumentationMode::After => after.get(idx).unwrap(),
+                InstrumentationMode::Alternate => alternate.get(idx).unwrap(),
+            },
+        }
+    }
+
+    /// Set the current Instrumentation Mode on instrumented instructions. Can also be used to switch Instrumentation Modes at the current location
+    pub fn set_curr(&mut self, ty: InstrumentationMode) {
+        match self {
+            Instrument::NotInstrumented => panic!(
+                "Cannot set current instrumentation type on instruction that are not instrumented!"
+            ),
+            Instrument::Instrumented {
+                before: _before,
+                after: _after,
+                alternate: _alternate,
+                current,
+            } => *current = ty,
+        }
+    }
+
+    /// Get the current Instrumentation Mode
+    pub fn get_curr(&self) -> InstrumentType {
+        match self {
+            Instrument::NotInstrumented => InstrumentType::NotInstrumented,
+            Instrument::Instrumented {
+                before: _before,
+                after: _after,
+                alternate: _alternate,
+                current,
+            } => match current {
+                InstrumentationMode::Before => InstrumentType::InstrumentBefore,
+                InstrumentationMode::After => InstrumentType::InstrumentAfter,
+                InstrumentationMode::Alternate => InstrumentType::InstrumentAlternate,
+            },
         }
     }
 }
+
+#[derive(Debug, Clone)]
+/// Type of instrumentation to be applied to an instruction.
+pub enum InstrumentType {
+    InstrumentBefore,
+    InstrumentAfter,
+    InstrumentAlternate,
+    NotInstrumented,
+}
+
+impl fmt::Display for InstrumentType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            InstrumentType::InstrumentBefore => write!(f, "Instrument Before"),
+            InstrumentType::InstrumentAfter => write!(f, "Instrument After"),
+            InstrumentType::InstrumentAlternate => write!(f, "Instrument Alternate"),
+            InstrumentType::NotInstrumented => write!(f, "Not Instrumented"),
+        }
+    }
+}
+
+impl PartialEq for InstrumentType {
+    fn eq(&self, other: &Self) -> bool {
+        discriminant(self) == discriminant(other)
+    }
+}
+
+impl Eq for InstrumentType {}
 
 /// Used to represent a unique location in a wasm component or module.
 pub enum Location {
@@ -406,7 +492,7 @@ pub struct Body<'a> {
     /// index 2 will refer to the local here.
     pub locals: Vec<(u32, DataType)>,
     // accessing operators by .0 is not very clear
-    pub instructions: Vec<(Operator<'a>, InstrumentType<'a>)>,
+    pub instructions: Vec<(Operator<'a>, Instrument<'a>)>,
     pub num_instructions: usize,
 }
 
@@ -425,8 +511,7 @@ where
     }
 
     pub fn add_instr(&mut self, instr: Operator<'b>) {
-        self.instructions
-            .push((instr, InstrumentType::NotInstrumented));
+        self.instructions.push((instr, Instrument::NotInstrumented));
         self.num_instructions += 1;
     }
 
@@ -434,7 +519,7 @@ where
         &self.instructions[idx].0
     }
 
-    pub fn get_instr_type(&self, idx: usize) -> &InstrumentType {
+    pub fn get_instr_type(&self, idx: usize) -> &Instrument {
         &self.instructions[idx].1
     }
 

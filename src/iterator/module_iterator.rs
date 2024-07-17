@@ -1,7 +1,7 @@
 //! Iterator to traverse a Module
 
 use crate::ir::module::Module;
-use crate::ir::types::{InstrumentType, Location};
+use crate::ir::types::{InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::module_subiterator::ModuleSubIterator;
@@ -59,8 +59,9 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.module.code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentBefore(vec![]);
+            self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .set_curr(InstrumentationMode::Before);
             self
         } else {
             panic!("Should have gotten Module Location!")
@@ -74,8 +75,9 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.module.code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentAfter(vec![]);
+            self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .set_curr(InstrumentationMode::After);
             self
         } else {
             panic!("Should have gotten Module Location!")
@@ -89,8 +91,9 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.module.code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentAlternate(vec![]);
+            self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .set_curr(InstrumentationMode::Alternate);
             self
         } else {
             panic!("Should have gotten Module Location!")
@@ -116,13 +119,15 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     }
 
     /// Returns the Instrumentation at the current Location
-    fn curr_instrument_type(&self) -> &InstrumentType {
+    fn curr_instrument_type(&self) -> InstrumentType {
         if let Location::Module {
             func_idx,
             instr_idx,
         } = self.mod_iterator.curr_loc()
         {
-            &self.module.code_sections[func_idx].instructions[instr_idx].1
+            self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
         } else {
             panic!("Should have gotten Module Location and not Module Location!")
         }

@@ -1,7 +1,7 @@
 //! Iterator to traverse a Component
 
 use crate::ir::component::Component;
-use crate::ir::types::{InstrumentType, Location};
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
@@ -65,8 +65,23 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentBefore(vec![]);
+            if self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
+                == InstrumentType::NotInstrumented
+            {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                    Instrument::Instrumented {
+                        before: vec![],
+                        after: vec![],
+                        alternate: vec![],
+                        current: InstrumentationMode::Before,
+                    }
+            } else {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                    .1
+                    .set_curr(InstrumentationMode::Before);
+            }
             self
         } else {
             panic!("Should have gotten component location!")
@@ -81,8 +96,23 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentAfter(vec![]);
+            if self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
+                == InstrumentType::NotInstrumented
+            {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                    Instrument::Instrumented {
+                        before: vec![],
+                        after: vec![],
+                        alternate: vec![],
+                        current: InstrumentationMode::After,
+                    }
+            } else {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                    .1
+                    .set_curr(InstrumentationMode::After);
+            }
             self
         } else {
             panic!("Should have gotten component location!")
@@ -97,8 +127,23 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
-                InstrumentType::InstrumentAlternate(vec![]);
+            if self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
+                == InstrumentType::NotInstrumented
+            {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
+                    Instrument::Instrumented {
+                        before: vec![],
+                        after: vec![],
+                        alternate: vec![],
+                        current: InstrumentationMode::Alternate,
+                    }
+            } else {
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                    .1
+                    .set_curr(InstrumentationMode::Alternate);
+            }
             self
         } else {
             panic!("Should have gotten component location!")
@@ -124,14 +169,16 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
     }
 
     /// Returns the Instrumentation at the current Location
-    fn curr_instrument_type(&self) -> &InstrumentType {
+    fn curr_instrument_type(&self) -> InstrumentType {
         if let Location::Component {
             mod_idx,
             func_idx,
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            &self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1
+            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }

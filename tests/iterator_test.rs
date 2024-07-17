@@ -1,6 +1,6 @@
 use orca::ir::component::Component;
 use orca::ir::module::Module;
-use orca::ir::types::{InstrumentType, Location};
+use orca::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
@@ -147,7 +147,7 @@ fn iterator_mark_as_before_test() {
         } = comp_it.curr_loc()
         {
             if *comp_it.curr_op().unwrap() == interested {
-                assert_ne!(*instr_type, InstrumentType::NotInstrumented);
+                assert_ne!(instr_type, InstrumentType::NotInstrumented);
             }
 
             println!(
@@ -219,8 +219,8 @@ fn iterator_inject_i32_before() {
             );
             if *comp_it.curr_op().unwrap() == interested {
                 assert_eq!(
-                    *comp_it.curr_instrument_type(),
-                    InstrumentType::InstrumentBefore(vec![])
+                    comp_it.curr_instrument_type(),
+                    InstrumentType::InstrumentBefore
                 );
                 assert_eq!(
                     comp_it.get_injected_val(0),

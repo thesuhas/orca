@@ -218,13 +218,13 @@ impl<'a> Component<'a> {
                             wasmparser::ComponentDefinedType::Primitive(p) => {
                                 enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
                             }
-                            wasmparser::ComponentDefinedType::Record(record) => {
-                                enc.record(record.iter().map(|record| {
+                            wasmparser::ComponentDefinedType::Record(records) => {
+                                enc.record(records.iter().map(|record| {
                                     (record.0, reencode.component_val_type(record.1))
                                 }));
                             }
-                            wasmparser::ComponentDefinedType::Variant(variant) => {
-                                enc.variant(variant.iter().map(|variant| {
+                            wasmparser::ComponentDefinedType::Variant(variants) => {
+                                enc.variant(variants.iter().map(|variant| {
                                     (
                                         variant.name,
                                         variant.ty.map(|ty| reencode.component_val_type(ty)),
@@ -236,10 +236,8 @@ impl<'a> Component<'a> {
                                 enc.list(reencode.component_val_type(*l))
                             }
                             wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
-                                tup.clone()
-                                    .into_vec()
-                                    .into_iter()
-                                    .map(|val_type| reencode.component_val_type(val_type)),
+                                tup.into_iter()
+                                    .map(|val_type| reencode.component_val_type(*val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Flags(flags) => {
                                 enc.flags(flags.clone().into_vec().into_iter())
