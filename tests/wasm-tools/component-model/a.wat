@@ -22,3 +22,4 @@
   )
   (import "three" (instance (;0;) (type 1)))
   (export (;1;) "four" (value $v))
+)
