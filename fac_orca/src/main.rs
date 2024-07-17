@@ -6,6 +6,7 @@
 use orca::ir::function::FunctionBuilder;
 use orca::ir::module::*;
 use orca::ir::types::*;
+use orca::opcode::Opcode;
 
 fn main() {
     let mut module = Module::new();
@@ -25,7 +26,7 @@ fn main() {
         .local_get(n)
         .local_set(i)
         // (local.set $res (i32.const 1))
-        .i32_const(1)
+        .i32(1)
         .local_set(res)
             .block(wasmparser::BlockType::Empty) // label 1
                 .loop_stmt(wasmparser::BlockType::Empty) // label 2
@@ -34,8 +35,8 @@ fn main() {
                     .call(log_func_id)
                     // (i32.eq (local.get $i) (i32.const 0))
                     .local_get(i)
-                    .i32_const(0)
-                    .binop(wasmparser::Operator::I32Eq)
+                    .i32(0)
+                    .i32_eq()
                     .if_stmt(wasmparser::BlockType::Empty)
                         // (then (br to outside block @1))
                         .br(2)
@@ -43,12 +44,12 @@ fn main() {
                         // (local.set $res (i32.mul (local.get $i) (local.get $res)))
                         .local_get(i)
                         .local_get(res)
-                        .binop(wasmparser::Operator::I32Mul)
+                        .i32_mul()
                         .local_set(res)
                         // (local.set $i (i32.sub (local.get $i) (i32.const 1))))
                         .local_get(i)
-                        .i32_const(1)
-                        .binop(wasmparser::Operator::I32Sub)
+                        .i32(1)
+                        .i32_sub()
                         .local_set(i)
                     .end()
                     .br(0) // back to loop @2

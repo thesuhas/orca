@@ -3,6 +3,7 @@
 use crate::ir::component::Component;
 use crate::ir::types::{InstrumentType, Location};
 use crate::iterator::iterator_trait::Iterator;
+use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
 use std::collections::HashMap;
 use wasmparser::Operator;
@@ -36,8 +37,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
     }
 }
 
-// Note: Marked Trait as the same lifetime as component
-impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
+impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     /// Injects an Operator at the current location
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Component {
@@ -53,7 +53,10 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten component location!")
         }
     }
+}
 
+// Note: Marked Trait as the same lifetime as component
+impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
     /// Marks the current location as InstrumentBefore
     fn before(&mut self) -> &mut Self {
         if let Location::Component {
