@@ -1,6 +1,9 @@
+//! Trait that defines the injection behaviour for iterators.
+
 use wasmparser::Operator;
 
 #[allow(dead_code)]
+/// Defines injection behaviour for Iterators. Takes a [wasmparser Operator](https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html) and instructions are defined [here](https://webassembly.github.io/spec/core/binary/instructions.html).
 pub trait Opcode<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);
@@ -95,7 +98,7 @@ pub trait Opcode<'a> {
 
     // Integers
     /// Inject an i32.const instruction
-    fn i32(&mut self, value: i32) -> &mut Self {
+    fn i32_const(&mut self, value: i32) -> &mut Self {
         self.inject(Operator::I32Const { value });
         self
     }
@@ -257,7 +260,7 @@ pub trait Opcode<'a> {
     }
 
     /// Inject an i64.const
-    fn i64(&mut self, value: i64) -> &mut Self {
+    fn i64_const(&mut self, value: i64) -> &mut Self {
         self.inject(Operator::I64Const { value });
         self
     }
@@ -420,7 +423,7 @@ pub trait Opcode<'a> {
 
     // Floating point
     /// Inject a f32.const instruction
-    fn f32(&mut self, val: f32) -> &mut Self {
+    fn f32_const(&mut self, val: f32) -> &mut Self {
         self.inject(Operator::F32Const {
             value: wasmparser::Ieee32::from(val),
         });
@@ -530,7 +533,7 @@ pub trait Opcode<'a> {
     }
 
     /// Inject a f64.const instruction
-    fn f64(&mut self, val: f64) -> &mut Self {
+    fn f64_const(&mut self, val: f64) -> &mut Self {
         self.inject(Operator::F64Const {
             value: wasmparser::Ieee64::from(val),
         });

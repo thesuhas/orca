@@ -1,7 +1,7 @@
 //! Iterator to traverse a Module
 
 use crate::ir::module::Module;
-use crate::ir::types::{InstrumentType, InstrumentationMode, Location};
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::module_subiterator::ModuleSubIterator;
@@ -64,7 +64,7 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
     ///     } = module_it.curr_loc()
     ///     {
     ///         if *module_it.curr_op().unwrap() == interested {
-    ///             module_it.before().i32(1);
+    ///             module_it.before().i32_const(1);
     ///         }
     ///         if module_it.next().is_none() {
     ///             break;
@@ -94,50 +94,20 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
 impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     /// Marks the current location as InstrumentBefore
     fn before(&mut self) -> &mut Self {
-        if let Location::Module {
-            func_idx,
-            instr_idx,
-        } = self.curr_loc()
-        {
-            self.module.code_sections[func_idx].instructions[instr_idx]
-                .1
-                .set_curr(InstrumentationMode::Before);
-            self
-        } else {
-            panic!("Should have gotten Module Location!")
-        }
+        self.set_instrument_type(InstrumentationMode::Before);
+        self
     }
 
     /// Marks the current location as InstrumentAfter
     fn after(&mut self) -> &mut Self {
-        if let Location::Module {
-            func_idx,
-            instr_idx,
-        } = self.curr_loc()
-        {
-            self.module.code_sections[func_idx].instructions[instr_idx]
-                .1
-                .set_curr(InstrumentationMode::After);
-            self
-        } else {
-            panic!("Should have gotten Module Location!")
-        }
+        self.set_instrument_type(InstrumentationMode::After);
+        self
     }
 
     /// Marks the current location as InstrumentAlternate
     fn alternate(&mut self) -> &mut Self {
-        if let Location::Module {
-            func_idx,
-            instr_idx,
-        } = self.curr_loc()
-        {
-            self.module.code_sections[func_idx].instructions[instr_idx]
-                .1
-                .set_curr(InstrumentationMode::Alternate);
-            self
-        } else {
-            panic!("Should have gotten Module Location!")
-        }
+        self.set_instrument_type(InstrumentationMode::Alternate);
+        self
     }
 
     /// Resets the Module Iterator
@@ -200,6 +170,34 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
                 .get_instr(idx)
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
+
+    fn set_instrument_type(&mut self, mode: InstrumentationMode) {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = self.curr_loc()
+        {
+            if self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
+                == InstrumentType::NotInstrumented
+            {
+                self.module.code_sections[func_idx].instructions[instr_idx].1 =
+                    Instrument::Instrumented {
+                        before: vec![],
+                        after: vec![],
+                        alternate: vec![],
+                        current: mode,
+                    }
+            } else {
+                self.module.code_sections[func_idx].instructions[instr_idx]
+                    .1
+                    .set_curr(mode);
+            }
+        } else {
+            panic!("Should have gotten module location!")
         }
     }
 }
