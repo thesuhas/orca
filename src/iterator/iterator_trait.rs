@@ -28,7 +28,7 @@ pub trait Iterator<'a> {
     fn curr_loc(&self) -> Location;
 
     /// Get the InstrumentType of the current location
-    fn curr_instrument_type(&self) -> &InstrumentType;
+    fn curr_instrument_type(&self) -> InstrumentType;
 
     /// Get the current instruction
     fn curr_op(&self) -> Option<&Operator>;
