@@ -3,6 +3,7 @@ use orca::ir::module::Module;
 use orca::ir::types::{InstrumentType, Location};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
+use orca::iterator::module_iterator::ModuleIterator;
 use std::fs::File;
 use std::io::Write;
 use wasmparser::Operator;
@@ -72,34 +73,27 @@ fn test_iterator_count_mul_mod() {
     assert_eq!(count, 15);
 }
 
-fn module_to_component(module: Module) -> Component {
-    let mut component = Component::new();
-    component.add_module(module);
-    component
-}
-
+// example of a ModuleIterator
 #[test]
 fn test_blocks() {
     let file = "tests/handwritten/modules/blocks.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut component = module_to_component(module);
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module);
 
     loop {
-        let op = comp_it.curr_op();
-        if let Location::Component {
-            mod_idx,
+        let op = mod_it.curr_op();
+        if let Location::Module {
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = mod_it.curr_loc()
         {
             println!(
-                "Mod: {}, Fun: {}, {}: {:?},",
-                mod_idx, func_idx, instr_idx, op
+                "Fun: {}, {}: {:?},",
+                func_idx, instr_idx, op
             );
-            if comp_it.next().is_none() {
+            if mod_it.next().is_none() {
                 break;
             };
         } else {
