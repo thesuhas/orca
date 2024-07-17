@@ -7,6 +7,7 @@ use orca::iterator::module_iterator::ModuleIterator;
 use std::fs::File;
 use std::io::Write;
 use wasmparser::Operator;
+use orca::opcode::Opcode;
 
 #[test]
 fn test_iterator_count() {
