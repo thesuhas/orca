@@ -1,6 +1,6 @@
 use orca::ir::component::Component;
 use orca::ir::module::Module;
-use orca::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
+use orca::ir::types::{InstrumentType, Location};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
@@ -189,7 +189,7 @@ fn iterator_inject_i32_before() {
                 mod_idx, func_idx, instr_idx, op, instr_type
             );
             if *comp_it.curr_op().unwrap() == interested {
-                comp_it.before().i32(1);
+                comp_it.before().i32_const(1);
             }
             if comp_it.next().is_none() {
                 break;
@@ -263,11 +263,11 @@ fn iterate(component: &mut Component) {
             }
 
             if *comp_it.curr_op().unwrap() == after {
-                comp_it.after().i32(0);
+                comp_it.after().i32_const(0);
             }
 
             if *comp_it.curr_op().unwrap() == alternate {
-                comp_it.alternate().i32(3);
+                comp_it.alternate().i32_const(3);
             }
 
             if comp_it.next().is_none() {
