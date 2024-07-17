@@ -1,19 +1,25 @@
-;; For example, the following component:
-
-;; a.wasm
 (component
-  (import "one" (func))
-
-  (import "two" (value $v string))
-  (import "three" (instance
-    (export "four" (instance
-      (export "five" (core module
-        (import "six" "a" (func))
-        (import "six" "b" (func))
-      ))
-    ))
-  ))
-
-  (export "four" (value $v))
-  ;; ...
+  (type (;0;) (func))
+  (import "one" (func (;0;) (type 0)))
+  (import "two" (value $v (;0;) string))
+  (type (;1;)
+    (instance
+      (type (;0;)
+        (instance
+          (core type (;0;)
+            (module
+              (type (;0;) (func))
+              (import "six" "a" (func (type 0)))
+              (type (;1;) (func))
+              (import "six" "b" (func (type 1)))
+            )
+          )
+          (export (;0;) "five" (core module (type 0)))
+        )
+      )
+      (export (;0;) "four" (instance (type 0)))
+    )
+  )
+  (import "three" (instance (;0;) (type 1)))
+  (export (;1;) "four" (value $v))
 )
