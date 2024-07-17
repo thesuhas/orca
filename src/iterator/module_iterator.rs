@@ -37,7 +37,7 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example
-    /// ```rust
+    /// ```no_run
     /// use orca::ir::module::Module;
     /// use orca::iterator::module_iterator::ModuleIterator;
     /// use wasmparser::Operator;

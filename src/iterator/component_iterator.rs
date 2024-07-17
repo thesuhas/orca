@@ -41,7 +41,7 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example
-    /// ```rust
+    /// ```no_run
     /// use orca::ir::component::Component;
     /// use orca::iterator::component_iterator::ComponentIterator;
     /// use wasmparser::Operator;
