@@ -34,7 +34,47 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
 }
 
 impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
-    /// Injects an Operator into the current location
+    /// Injects an Operator at the current location
+    ///
+    /// # Example
+    /// ```rust
+    /// use orca::ir::module::Module;
+    /// use orca::iterator::module_iterator::ModuleIterator;
+    /// use wasmparser::Operator;
+    /// use orca::ir::types::{Location};
+    /// use orca::iterator::iterator_trait::Iterator;
+    /// use orca::opcode::Opcode;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// // Must use `parse_only_module` here as we are only concerned about a Module and not a module that is inside a Component
+    /// let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    /// let mut module_it = ModuleIterator::new(&mut module);
+    ///
+    /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
+    /// let interested = Operator::Call { function_index: 1 };
+    ///
+    /// loop {
+    ///     let op = module_it.curr_op();
+    ///     let instr_type = module_it.curr_instrument_type();
+    ///
+    ///     if let Location::Module {
+    ///         func_idx,
+    ///         instr_idx,
+    ///     } = module_it.curr_loc()
+    ///     {
+    ///         if *module_it.curr_op().unwrap() == interested {
+    ///             module_it.before().i32(1);
+    ///         }
+    ///         if module_it.next().is_none() {
+    ///             break;
+    ///         };
+    ///     } else {
+    ///         // Ensures we only get the location of a module while parsing a component
+    ///         panic!("Should've gotten Module Location!");
+    ///     }
+    /// }
+    /// ```
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Module {
             func_idx,

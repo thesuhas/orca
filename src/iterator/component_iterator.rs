@@ -39,6 +39,46 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
 
 impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     /// Injects an Operator at the current location
+    ///
+    /// # Example
+    /// ```rust
+    /// use orca::ir::component::Component;
+    /// use orca::iterator::component_iterator::ComponentIterator;
+    /// use wasmparser::Operator;
+    /// use orca::ir::types::{Location};
+    /// use orca::iterator::iterator_trait::Iterator;
+    /// use orca::opcode::Opcode;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// let mut component = Component::parse(&buff, false).expect("Unable to parse");
+    /// let mut comp_it = ComponentIterator::new(&mut component);
+    ///
+    /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
+    /// let interested = Operator::Call { function_index: 1 };
+    ///
+    /// loop {
+    ///     let op = comp_it.curr_op();
+    ///     let instr_type = comp_it.curr_instrument_type();
+    ///
+    ///     if let Location::Component {
+    ///         mod_idx,
+    ///         func_idx,
+    ///         instr_idx,
+    ///     } = comp_it.curr_loc()
+    ///     {
+    ///         if *comp_it.curr_op().unwrap() == interested {
+    ///             comp_it.before().i32(1);
+    ///         }
+    ///         if comp_it.next().is_none() {
+    ///             break;
+    ///         };
+    ///     } else {
+    ///         // Ensures we only get the location of a module while parsing a component
+    ///         panic!("Should've gotten Component Location!");
+    ///     }
+    /// }
+    /// ```
     fn inject(&mut self, instr: Operator<'b>) {
         if let Location::Component {
             mod_idx,
