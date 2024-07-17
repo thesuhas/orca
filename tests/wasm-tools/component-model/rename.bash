@@ -1,0 +1,1 @@
+for file in *.wast ; do mv "$file" "${file%.*}.wat" ; done
