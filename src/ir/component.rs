@@ -236,7 +236,7 @@ impl<'a> Component<'a> {
                                 enc.list(reencode.component_val_type(*l))
                             }
                             wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
-                                tup.into_iter()
+                                tup.iter()
                                     .map(|val_type| reencode.component_val_type(*val_type)),
                             ),
                             wasmparser::ComponentDefinedType::Flags(flags) => {
