@@ -490,7 +490,9 @@ pub struct Body<'a> {
     /// indices before the locals. So if a function has 2 parameters and a local
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
+    // TODO: this representation is a bit weird, why it is like this?
     pub locals: Vec<(u32, DataType)>,
+    pub num_locals: usize,
     // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, Instrument<'a>)>,
     pub num_instructions: usize,
@@ -505,6 +507,7 @@ where
     pub fn new() -> Self {
         Self {
             locals: Vec::new(),
+            num_locals: 0,
             instructions: Vec::new(),
             num_instructions: 0,
         }

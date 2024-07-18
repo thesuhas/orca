@@ -304,3 +304,45 @@ fn iterator_verify_injection() {
         Err(e) => eprintln!("Failed to write to the file: {}", e),
     }
 }
+
+// example of a adding locals via an iterator
+// TODO: no assertions for now, verify by eyeballing
+#[test]
+fn test_it_add_local() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module);
+
+    loop {
+        let op = mod_it.curr_op();
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = mod_it.curr_loc()
+        {
+            println!("Fun: {}, {}: {:?},", func_idx, instr_idx, op);
+
+            if mod_it.curr_op().unwrap() == &Operator::I32Add {
+                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
+                println!("new Local ID: {:?}", local_id);
+            }
+
+            if mod_it.curr_op().unwrap() == &(Operator::I32Const { value: 2 }) {
+                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
+                println!("new Local ID: {:?}", local_id);
+            }
+
+            if mod_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
+    }
+
+    let a = module.encode_only_module();
+    let wat = wasmprinter::print_bytes(&a).unwrap();
+    println!("{}", wat);
+}
