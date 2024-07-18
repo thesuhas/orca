@@ -164,6 +164,8 @@ impl<'a> Module<'a> {
                         .iter()
                         .map(|(idx, valtype)| (*idx, DataType::from(*valtype)))
                         .collect();
+                    // TODO: can I just iter locals once?
+                    let num_locals = locals.iter().fold(0, |acc, x| acc + x.0) as usize;
                     let instructions = body
                         .get_operators_reader()?
                         .into_iter()
@@ -194,6 +196,7 @@ impl<'a> Module<'a> {
                         .collect();
                     code_sections.push(Body {
                         locals,
+                        num_locals,
                         instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
                     });
@@ -455,6 +458,7 @@ impl<'a> Module<'a> {
             let mut code = wasm_encoder::CodeSection::new();
             for Body {
                 locals,
+                num_locals: _,
                 instructions,
                 num_instructions: _,
             } in self.code_sections.iter()
@@ -572,6 +576,37 @@ impl<'a> Module<'a> {
         let index = self.globals.len() as u32;
         self.globals.push(global);
         index
+    }
+
+    pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> u32 {
+        // get type
+        let func_ty = self.get_type(self.functions[func_idx]).unwrap();
+        // get how many params it has
+
+        let num_params = func_ty.params.len();
+        // get how many locals it has
+        let num_locals = self.code_sections[func_idx].num_locals;
+
+        // get the index of the local
+        let index = num_params + num_locals;
+        // increment the number of locals
+
+        let func_body = &mut self.code_sections[func_idx];
+        func_body.num_locals += 1;
+
+        let mut found_ty = false;
+        for x in func_body.locals.iter_mut() {
+            if x.1 == ty {
+                x.0 += 1;
+                found_ty = true;
+                break;
+            }
+        }
+        if !found_ty {
+            func_body.locals.push((1, ty));
+        }
+
+        index as u32
     }
 
     /// Add a new function to the module. Returns the index of the imported function
