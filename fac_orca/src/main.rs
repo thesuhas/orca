@@ -26,7 +26,7 @@ fn main() {
         .local_get(n)
         .local_set(i)
         // (local.set $res (i32.const 1))
-        .i32(1)
+        .i32_const(1)
         .local_set(res)
             .block(wasmparser::BlockType::Empty) // label 1
                 .loop_stmt(wasmparser::BlockType::Empty) // label 2
@@ -35,7 +35,7 @@ fn main() {
                     .call(log_func_id)
                     // (i32.eq (local.get $i) (i32.const 0))
                     .local_get(i)
-                    .i32(0)
+                    .i32_const(0)
                     .i32_eq()
                     .if_stmt(wasmparser::BlockType::Empty)
                         // (then (br to outside block @1))
@@ -48,7 +48,7 @@ fn main() {
                         .local_set(res)
                         // (local.set $i (i32.sub (local.get $i) (i32.const 1))))
                         .local_get(i)
-                        .i32(1)
+                        .i32_const(1)
                         .i32_sub()
                         .local_set(i)
                     .end()
