@@ -1,6 +1,10 @@
 //! Intermediate Representation of a wasm component.
 
 use crate::error::Error;
+use crate::ir::helpers::{
+    print_alias, print_component_export, print_component_import, print_component_type,
+    print_core_type,
+};
 use crate::ir::module::Module;
 use crate::ir::types::Global;
 use crate::ir::wrappers::{
@@ -195,12 +199,8 @@ impl<'a> Component<'a> {
                         encode_core_type_subtype(enc, subtype, &mut reencode);
                     }
                     CoreType::Module(module) => {
-                        for m in module.iter() {
-                            type_section.module(&convert_module_type_declaration(
-                                (*m).clone(),
-                                &mut reencode,
-                            ));
-                        }
+                        let enc = type_section.ty();
+                        convert_module_type_declaration(module, enc, &mut reencode);
                     }
                 }
             }
@@ -275,18 +275,13 @@ impl<'a> Component<'a> {
                                         encode_core_type_subtype(enc, sub, &mut reencode);
                                     }
                                     CoreType::Module(module) => {
-                                        for m in module.iter() {
-                                            let enc = new_comp.core_type();
-                                            enc.module(&convert_module_type_declaration(
-                                                (*m).clone(),
-                                                &mut reencode,
-                                            ));
-                                        }
+                                        let enc = new_comp.core_type();
+                                        convert_module_type_declaration(module, enc, &mut reencode);
                                     }
                                 },
                                 ComponentTypeDeclaration::Type(typ) => {
                                     let enc = new_comp.ty();
-                                    convert_component_type((*typ).clone(), enc, &mut reencode);
+                                    convert_component_type(&(*typ).clone(), enc, &mut reencode);
                                 }
                                 ComponentTypeDeclaration::Alias(a) => {
                                     new_comp.alias(process_alias(a, &mut reencode));
@@ -303,10 +298,7 @@ impl<'a> Component<'a> {
                         component_ty_section.component(&new_comp);
                     }
                     ComponentType::Instance(inst) => {
-                        for i in inst.iter() {
-                            component_ty_section
-                                .instance(&convert_instance_type((*i).clone(), &mut reencode));
-                        }
+                        component_ty_section.instance(&convert_instance_type(inst, &mut reencode));
                     }
                     ComponentType::Resource { rep, dtor } => {
                         component_ty_section.resource(reencode.val_type(*rep).unwrap(), *dtor);
@@ -333,7 +325,10 @@ impl<'a> Component<'a> {
                     exp.name.0,
                     reencode.component_export_kind(exp.kind),
                     exp.index,
-                    exp.ty.map(|ty| reencode.component_type_ref(ty)),
+                    match exp.ty {
+                        None => None,
+                        Some(ty) => Some(reencode.component_type_ref(ty)),
+                    },
                 );
             }
             component.section(&exports);
@@ -470,76 +465,50 @@ impl<'a> Component<'a> {
         }
     }
 
-    // flip the instrument type according to the instruction of interest
-    // pub fn mark_as_instrument(&mut self, interest_instr: Vec<(Operator, InstrumentType)>) {
-    //     // This function is responsible for visiting every instruction
-    //     for (mod_idx, module) in self.modules.iter_mut().enumerate() {
-    //         println!("Entered Module: {}", mod_idx);
-    //         for (func_idx, body) in module.code_sections.iter_mut().enumerate() {
-    //             println!("Entered Function: {}", func_idx);
-    //             // Each function index should match to a code section
-    //             // for (local_idx, local_ty) in body.locals.iter() {
-    //             //     println!("Local {}: {}", local_idx, local_ty);
-    //             // }
-    //             for (instr_idx, (instr, ref mut instrumented)) in
-    //                 body.instructions.iter_mut().enumerate()
-    //             {
-    //                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
-    //                 *instrumented = compare_operator_instr_ty(interest_instr.clone(), instr);
-    //             }
-    //         }
-    //     }
-    // }
+    pub fn print(&self) {
+        // Print Alias
+        if !self.alias.is_empty() {
+            eprintln!("Alias Section:");
+            for alias in self.alias.iter() {
+                print_alias(alias);
+            }
+            eprintln!();
+        }
 
-    // pub fn add_instrumentation(&mut self, code_injections: Vec<(Operator<'a>, Operator<'a>)>) {
-    //     for (_module_idx, module) in self.modules.iter_mut().enumerate() {
-    //         for (_fun_idx, body) in module.code_sections.iter_mut().enumerate() {
-    //             // Each function index should match to a code section
-    //             for (local_idx, local_ty) in body.locals.iter() {
-    //                 println!("Local {}: {}", local_idx, local_ty);
-    //             }
-    //
-    //             let mut changes = Vec::new();
-    //
-    //             for (idx, (instr, instrumented)) in body.instructions.iter_mut().enumerate() {
-    //                 if *instrumented != InstrumentType::NotInstrumented {
-    //                     match compare_operator_for_inject(code_injections.clone(), instr.clone()) {
-    //                         Some(inject) => {
-    //                             if *instrumented == InstrumentType::InstrumentAlternate {
-    //                                 // Replace the value
-    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
-    //                             } else if *instrumented == InstrumentType::InstrumentBefore {
-    //                                 *instrumented = InstrumentType::NotInstrumented;
-    //                                 changes.push((idx, inject, InstrumentType::NotInstrumented));
-    //                             } else {
-    //                                 *instrumented = InstrumentType::NotInstrumented;
-    //                                 changes.push((
-    //                                     idx + 1,
-    //                                     inject,
-    //                                     InstrumentType::NotInstrumented,
-    //                                 ));
-    //                             }
-    //                         }
-    //                         None => {
-    //                             // If nothing matches, reset instrumentation
-    //                             *instrumented = InstrumentType::NotInstrumented;
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //
-    //             // Apply changes
-    //             let mut offset = 0;
-    //             for (idx, op, instr) in changes {
-    //                 if instr == InstrumentType::InstrumentAlternate {
-    //                     body.instructions[idx + offset] = (op, instr);
-    //                 } else {
-    //                     body.instructions
-    //                         .insert(idx + offset, (op, InstrumentType::NotInstrumented));
-    //                     offset += 1;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        // Print CoreType
+        if !self.core_types.is_empty() {
+            eprintln!("Core Type Section:");
+            for cty in self.core_types.iter() {
+                print_core_type(cty);
+            }
+            eprintln!();
+        }
+
+        // Print ComponentType
+        if !self.component_types.is_empty() {
+            eprintln!("Component Type Section:");
+            for cty in self.component_types.iter() {
+                print_component_type(cty);
+            }
+            eprintln!();
+        }
+
+        // Print Imports
+        if !self.imports.is_empty() {
+            eprintln!("Imports Section:");
+            for imp in self.imports.iter() {
+                print_component_import(imp);
+            }
+            eprintln!();
+        }
+
+        // Print Exports
+        if !self.imports.is_empty() {
+            eprintln!("Exports Section:");
+            for exp in self.exports.iter() {
+                print_component_export(exp);
+            }
+            eprintln!();
+        }
+    }
 }
