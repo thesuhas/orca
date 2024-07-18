@@ -325,7 +325,10 @@ impl<'a> Component<'a> {
                     exp.name.0,
                     reencode.component_export_kind(exp.kind),
                     exp.index,
-                    exp.ty.map(|ty| reencode.component_type_ref(ty)),
+                    match exp.ty {
+                        None => None,
+                        Some(ty) => Some(reencode.component_type_ref(ty)),
+                    },
                 );
             }
             component.section(&exports);

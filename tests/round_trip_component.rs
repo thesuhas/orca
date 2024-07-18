@@ -2,6 +2,22 @@ use orca::ir::component::Component;
 use std::fs::File;
 use std::io::Write; // bring trait into scope
 
+fn write_to_file(bytes: &Vec<u8>, path: String) {
+    let mut file = match File::create(path) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to create the file: {}", e);
+            return;
+        }
+    };
+
+    // Write the string to the file
+    match file.write_all(bytes) {
+        Ok(_) => println!("Data successfully written to the file."),
+        Err(e) => eprintln!("Failed to write to the file: {}", e),
+    }
+}
+
 fn round_trip_component(testname: &str, folder: &str) {
     let filename = format!(
         "{}/tests/{}/{}.wat",
@@ -14,6 +30,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     let component = Component::parse(&buff, false).expect("Unable to parse");
     component.print();
     let result = component.encode();
+    write_to_file(&result, format!("{}_test.wasm", testname));
     let out = wasmprinter::print_bytes(result).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     if out != original {
