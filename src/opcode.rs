@@ -690,4 +690,91 @@ pub trait Opcode<'a> {
         self.inject(Operator::Drop);
         self
     }
+
+    // Linear Memory Accesss
+    // note: walrus does not specify max_align (probably it's the same as align)
+
+    /// load 1 byte and sign-extend i8 to i32
+    fn i32_load8_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Load8S { memarg });
+        self
+    }
+
+    /// load 1 byte and zero-extend i8 to i32
+    fn i32_load8_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Load8U { memarg });
+        self
+    }
+
+    /// load 2 bytes and sign-extend i16 to i32
+    fn i32_load16_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Load16S { memarg });
+        self
+    }
+
+    /// load 2 bytes and zero-extend i16 to i32
+    fn i32_load16_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Load16U { memarg });
+        self
+    }
+
+    /// load 4 bytes as i32
+    fn i32_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Load { memarg });
+        self
+    }
+
+    /// load 1 byte and sign-extend i8 to i64
+    fn i64_load8_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load8S { memarg });
+        self
+    }
+
+    /// load 1 byte and zero-extend i8 to i64
+    fn i64_load8_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load8U { memarg });
+        self
+    }
+
+    /// load 2 bytes and sign-extend i16 to i64
+    fn i64_load16_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load16S { memarg });
+        self
+    }
+
+    /// load 2 bytes and zero-extend i16 to i64
+    fn i64_load16_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load16U { memarg });
+        self
+    }
+
+    /// load 4 bytes and sign-extend i32 to i64
+    fn i64_load32_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load32S { memarg });
+        self
+    }
+
+    /// load 4 bytes and zero-extend i32 to i64
+    fn i64_load32_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load32U { memarg });
+        self
+    }
+
+    /// load 4 bytes as i64
+    fn i64_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Load { memarg });
+        self
+    }
+
+    /// load 4 bytes as f32
+    fn f32_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::F32Load { memarg });
+        self
+    }
+
+    /// load 8 bytes as f64
+    fn f64_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::F64Load { memarg });
+        self
+    }
 }
