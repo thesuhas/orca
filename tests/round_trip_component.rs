@@ -73,40 +73,11 @@ mod round_trip {
     // TODO: fix me
     // make_round_trip_tests_component!(
     //     "wasm-tools/component-model",
-    //     a,
-    //     adapt,
-    //     alias,
-    //     big,
-    //     definedtypes,
-    //     empty,
-    //     example,
-    //     export_ascription,
-    //     export_introduces_alias,
-    //     export,
-    //     func,
-    //     import_extended,
-    //     import,
-    //     imports_exports,
-    //     inline_exports,
-    //     instance_type,
-    //     instantiate,
-    //     invalid,
-    //     link,
-    //     lots_of_aliases,
-    //     lower,
-    //     memory64,
-    //     module_link,
-    //     more_flags,
-    //     multiple_returns,
-    //     naming,
-    //     nested_modules,
-    //     resources,
-    //     start,
-    //     string,
-    //     type_export_restrictions,
-    //     types,
-    //     very_nested,
-    //     virtualize,
-    //     wrong_order
+    //     a, // TODO: adds a lot of core types out of no where
+    //     big, // TODO: couldn't translate Wasm to wat: section size mismatch: unexpected data at the end of the section (at offset 0xd6)
+    //     link, // TODO: output extra name
+    //     lots_of_aliases, // TODO: smae as link
+    //     more_flags, // passes!
+    //     string // TODO: section size mismatch: unexpected data at the end of the section (at offset 0xd9)
     // );
 }
