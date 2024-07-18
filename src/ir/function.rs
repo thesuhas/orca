@@ -11,7 +11,6 @@ pub struct FunctionBuilder<'a> {
     // pub(crate) id: u32, // function index
     pub(crate) params: Vec<DataType>,
     pub(crate) results: Vec<DataType>,
-    pub(crate) num_locals: u32,
     #[allow(dead_code)]
     // TODO: how to add function name?
     // https://docs.rs/walrus/latest/walrus/struct.FunctionBuilder.html#method.name
@@ -24,7 +23,6 @@ impl<'a> FunctionBuilder<'a> {
         Self {
             params: params.to_vec(),
             results: results.to_vec(),
-            num_locals: 0,
             name: None,
             body: Body::new(),
         }
@@ -52,8 +50,8 @@ impl<'a> FunctionBuilder<'a> {
     /// add a local and return local index
     /// (note that local indices start after)
     pub fn add_local(&mut self, ty: DataType) -> u32 {
-        let index = self.params.len() as u32 + self.num_locals;
-        self.num_locals += 1;
+        let index = self.params.len() as u32 + self.body.num_locals as u32;
+        self.body.num_locals += 1;
         // if ValType exists in body.locals, increment count
         // we assume this at most get applied at one place
         let mut found_ty = false;

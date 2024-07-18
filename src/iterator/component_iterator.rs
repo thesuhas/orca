@@ -210,4 +210,18 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten component location!")
         }
     }
+
+    fn add_local(&mut self, _val_type: crate::ir::types::DataType) -> u32 {
+        let curr_loc = self.curr_loc();
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            self.comp.modules[mod_idx].add_local(func_idx, _val_type)
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
 }

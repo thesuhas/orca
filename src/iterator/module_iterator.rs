@@ -11,7 +11,7 @@ use wasmparser::Operator;
 /// Iterator for a Module.
 pub struct ModuleIterator<'a, 'b> {
     /// The Module to Iterate
-    module: &'a mut Module<'b>,
+    pub module: &'a mut Module<'b>,
     /// The SubIterator for this Module
     mod_iterator: ModuleSubIterator,
 }
@@ -198,6 +198,19 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             }
         } else {
             panic!("Should have gotten module location!")
+        }
+    }
+
+    fn add_local(&mut self, val_type: crate::ir::types::DataType) -> u32 {
+        let curr_loc = self.curr_loc();
+        if let Location::Module {
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            self.module.add_local(func_idx, val_type)
+        } else {
+            panic!("Should have gotten Module Location!")
         }
     }
 }
