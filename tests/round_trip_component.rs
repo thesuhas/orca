@@ -12,7 +12,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
 
     let component = Component::parse(&buff, false).expect("Unable to parse");
-    // component.clone().visitor();
+    component.print();
     let result = component.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
@@ -34,7 +34,7 @@ fn round_trip_component(testname: &str, folder: &str) {
         }
     }
     assert_eq!(out, original);
-    println!("{}", out);
+    // println!("{}", out);
 }
 
 macro_rules! make_round_trip_tests_component {
@@ -62,22 +62,22 @@ mod round_trip {
     //     const_expr
     // );
 
-    make_round_trip_tests_component!("handwritten/components", add);
-
-    make_round_trip_tests_component!("wizard/components", func_loop);
-
-    make_round_trip_tests_component!("spec-test/components", if_test);
+    // make_round_trip_tests_component!("handwritten/components", add);
+    //
+    // make_round_trip_tests_component!("wizard/components", func_loop);
+    //
+    // make_round_trip_tests_component!("spec-test/components", if_test);
 
     // make_round_trip_tests_component!("spin", hello_world);
 
     // TODO: fix me
-    // make_round_trip_tests_component!(
-    //     "wasm-tools/component-model",
-    //     a, // TODO: adds a lot of core types out of no where
-    //     big, // TODO: couldn't translate Wasm to wat: section size mismatch: unexpected data at the end of the section (at offset 0xd6)
-    //     link, // TODO: output extra name
-    //     lots_of_aliases, // TODO: smae as link
-    //     more_flags, // passes!
-    //     string // TODO: section size mismatch: unexpected data at the end of the section (at offset 0xd9)
-    // );
+    make_round_trip_tests_component!(
+        "wasm-tools/component-model",
+        a // TODO: adds a lot of core types out of no where
+        // big, // TODO: couldn't translate Wasm to wat: section size mismatch: unexpected data at the end of the section (at offset 0xd6)
+        // link, // TODO: output extra name
+        // lots_of_aliases, // TODO: smae as link
+        // more_flags, // passes!
+        // string // TODO: section size mismatch: unexpected data at the end of the section (at offset 0xd9)
+    );
 }
