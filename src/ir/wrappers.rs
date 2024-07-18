@@ -113,19 +113,19 @@ pub fn convert_results(
     mut enc: ComponentFuncTypeEncoder,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
-    let mut results = vec![];
     match result {
         // Modified to pass encoder into this function, need to use result for unnamed - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
         ComponentFuncResult::Unnamed(ty) => {
             enc.result(reencode.component_val_type(ty));
         }
         ComponentFuncResult::Named(b) => {
+            let mut results = vec![];
             for named in b.into_vec() {
                 results.push((named.0, reencode.component_val_type(named.1)));
             }
+            enc.results(results);
         }
     }
-    enc.results(results);
 }
 
 // Not added to wasm-tools
