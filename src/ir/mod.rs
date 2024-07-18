@@ -2,7 +2,7 @@
 
 pub mod component;
 pub mod function;
+mod helpers;
 pub mod module;
 pub mod types;
 pub mod wrappers;
-mod helpers;

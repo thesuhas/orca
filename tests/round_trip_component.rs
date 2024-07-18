@@ -73,11 +73,11 @@ mod round_trip {
     // TODO: fix me
     make_round_trip_tests_component!(
         "wasm-tools/component-model",
-        a // TODO: adds a lot of core types out of no where
-        // big, // TODO: couldn't translate Wasm to wat: section size mismatch: unexpected data at the end of the section (at offset 0xd6)
-        // link, // TODO: output extra name
-        // lots_of_aliases, // TODO: smae as link
-        // more_flags, // passes!
-        // string // TODO: section size mismatch: unexpected data at the end of the section (at offset 0xd9)
+        //a,
+        big // TODO: couldn't translate Wasm to wat: section size mismatch: unexpected data at the end of the section (at offset 0xd6)
+            // link
+            // lots_of_aliases,
+            // more_flags, // passes!
+            // string // TODO: section size mismatch: unexpected data at the end of the section (at offset 0xd9)
     );
 }

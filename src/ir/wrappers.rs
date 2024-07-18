@@ -53,19 +53,14 @@ pub fn convert_instance_type(
     let mut ity = InstanceType::new();
     for value in instance.iter() {
         match value {
-            InstanceTypeDeclaration::CoreType(core_type) => {
-                match core_type {
-                    wasmparser::CoreType::Sub(sub) => {
-                        let enc = ity.core_type();
-                        encode_core_type_subtype(enc, &sub, reencode);
-                    }
-                    wasmparser::CoreType::Module(module) => {
-                        let enc = ity.core_type();
-                        // for m in module.iter() {
-                        //     enc.module(&convert_module_type_declaration((*m).clone(), reencode));
-                        // }
-                        convert_module_type_declaration(&module, enc, reencode);
-                    }
+            InstanceTypeDeclaration::CoreType(core_type) => match core_type {
+                wasmparser::CoreType::Sub(sub) => {
+                    let enc = ity.core_type();
+                    encode_core_type_subtype(enc, &sub, reencode);
+                }
+                wasmparser::CoreType::Module(module) => {
+                    let enc = ity.core_type();
+                    convert_module_type_declaration(&module, enc, reencode);
                 }
             },
             InstanceTypeDeclaration::Type(ty) => {
@@ -225,12 +220,15 @@ pub fn convert_component_type(
                     def_enc.list(reencode.component_val_type(*l))
                 }
                 wasmparser::ComponentDefinedType::Tuple(tup) => def_enc.tuple(
-                    tup.
-                        iter()
+                    tup.iter()
                         .map(|val_type| reencode.component_val_type(*val_type)),
                 ),
-                wasmparser::ComponentDefinedType::Flags(flags) => def_enc.flags((*flags).clone().into_vec()),
-                wasmparser::ComponentDefinedType::Enum(en) => def_enc.enum_type((*en).clone().into_vec()),
+                wasmparser::ComponentDefinedType::Flags(flags) => {
+                    def_enc.flags((*flags).clone().into_vec())
+                }
+                wasmparser::ComponentDefinedType::Enum(en) => {
+                    def_enc.enum_type((*en).clone().into_vec())
+                }
                 wasmparser::ComponentDefinedType::Option(opt) => {
                     def_enc.option(reencode.component_val_type(*opt))
                 }
@@ -245,7 +243,8 @@ pub fn convert_component_type(
         ComponentType::Func(func_ty) => {
             let mut new_enc = enc.function();
             new_enc.params(
-                func_ty.clone()
+                func_ty
+                    .clone()
                     .params
                     .into_vec()
                     .into_iter()
@@ -263,13 +262,6 @@ pub fn convert_component_type(
                             encode_core_type_subtype(enc, &sub, reencode);
                         }
                         CoreType::Module(module) => {
-                            // for m in &*module {
-                            //     let enc = new_comp.core_type();
-                            //     enc.module(&convert_module_type_declaration(
-                            //         (*m).clone(),
-                            //         reencode,
-                            //     ));
-                            // }
                             let enc = new_comp.core_type();
                             convert_module_type_declaration(&module, enc, reencode);
                         }
@@ -300,13 +292,6 @@ pub fn convert_component_type(
                             encode_core_type_subtype(enc, &sub, reencode);
                         }
                         wasmparser::CoreType::Module(module) => {
-                            // for m in &*module {
-                            //     let enc = ity.core_type();
-                            //     enc.module(&convert_module_type_declaration(
-                            //         (*m).clone(),
-                            //         reencode,
-                            //     ));
-                            // }
                             let enc = ity.core_type();
                             convert_module_type_declaration(&module, enc, reencode);
                         }

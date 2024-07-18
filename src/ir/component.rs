@@ -1,6 +1,10 @@
 //! Intermediate Representation of a wasm component.
 
 use crate::error::Error;
+use crate::ir::helpers::{
+    print_alias, print_component_export, print_component_import, print_component_type,
+    print_core_type,
+};
 use crate::ir::module::Module;
 use crate::ir::types::Global;
 use crate::ir::wrappers::{
@@ -13,7 +17,6 @@ use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
     ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
 };
-use crate::ir::helpers::{print_alias, print_component_export, print_component_import, print_component_type, print_core_type};
 
 #[derive(Debug, Clone)]
 /// Intermediate Representation of a wasm component.
@@ -196,14 +199,8 @@ impl<'a> Component<'a> {
                         encode_core_type_subtype(enc, subtype, &mut reencode);
                     }
                     CoreType::Module(module) => {
-                        // for m in module.iter() {
-                        //     type_section.module(&convert_module_type_declaration(
-                        //         (*m).clone(),
-                        //         &mut reencode,
-                        //     ));
-                        // }
                         let enc = type_section.ty();
-                        convert_module_type_declaration(module,  enc, &mut reencode);
+                        convert_module_type_declaration(module, enc, &mut reencode);
                     }
                 }
             }
@@ -278,13 +275,6 @@ impl<'a> Component<'a> {
                                         encode_core_type_subtype(enc, sub, &mut reencode);
                                     }
                                     CoreType::Module(module) => {
-                                        // for m in module.iter() {
-                                        //     let enc = new_comp.core_type();
-                                        //     enc.module(&convert_module_type_declaration(
-                                        //         (*m).clone(),
-                                        //         &mut reencode,
-                                        //     ));
-                                        // }
                                         let enc = new_comp.core_type();
                                         convert_module_type_declaration(module, enc, &mut reencode);
                                     }
@@ -308,10 +298,6 @@ impl<'a> Component<'a> {
                         component_ty_section.component(&new_comp);
                     }
                     ComponentType::Instance(inst) => {
-                        // for i in inst.iter() {
-                        //     component_ty_section
-                        //         .instance(&convert_instance_type((*i).clone(), &mut reencode));
-                        // }
                         component_ty_section.instance(&convert_instance_type(inst, &mut reencode));
                     }
                     ComponentType::Resource { rep, dtor } => {
@@ -477,7 +463,6 @@ impl<'a> Component<'a> {
     }
 
     pub fn print(&self) {
-
         // Print Alias
         if !self.alias.is_empty() {
             eprintln!("Alias Section:");
