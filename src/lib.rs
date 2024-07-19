@@ -7,8 +7,12 @@
 mod error;
 pub mod ir;
 pub mod iterator;
+pub mod module_builder;
 pub mod opcode;
 pub mod subiterator;
+
+pub use crate::module_builder::ModuleBuilder;
+pub use crate::opcode::Opcode;
 
 pub use crate::ir::component::Component;
 pub use crate::ir::function::FunctionBuilder;

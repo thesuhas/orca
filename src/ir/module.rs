@@ -602,6 +602,14 @@ impl<'a> Module<'a> {
         index as u32
     }
 
+    /// Add a new Data Segment to the module.
+    /// Returns the index of the new Data Segment in the Data Section.
+    pub fn add_data(&mut self, data: DataSegment) -> u32 {
+        let index = self.data.len() as u32;
+        self.data.push(data);
+        index
+    }
+
     /// Add a new function to the module. Returns the index of the imported function
     /// Note: this as no effect on the code or function section
     // TODO: In walrus, add_import_func after adding a function has no effect
