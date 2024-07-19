@@ -9,3 +9,9 @@ pub mod ir;
 pub mod iterator;
 pub mod opcode;
 pub mod subiterator;
+
+pub use crate::ir::component::Component;
+pub use crate::ir::function::FunctionBuilder;
+pub use crate::ir::module::Module;
+pub use crate::ir::types::DataType;
+pub use crate::ir::types::Location;

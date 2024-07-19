@@ -224,4 +224,28 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten Component Location and not Module Location!")
         }
     }
+
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = loc
+        {
+            // by default, splicing a new instruction works like the `before` mode
+            // self.set_instrument_type(InstrumentationMode::Before);
+            let instr_of_loc =
+                &mut self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1;
+            *instr_of_loc = Instrument::Instrumented {
+                before: vec![],
+                after: vec![],
+                alternate: vec![],
+                current: InstrumentationMode::Before,
+            };
+
+            instr_of_loc.add_instr(instr);
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
 }

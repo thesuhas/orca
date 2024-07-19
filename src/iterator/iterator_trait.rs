@@ -41,4 +41,7 @@ pub trait Iterator<'a> {
 
     /// Adds a local in the current function and returns its index
     fn add_local(&mut self, val_type: DataType) -> u32;
+
+    /// Splice a new instruction into a specific location
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
 }

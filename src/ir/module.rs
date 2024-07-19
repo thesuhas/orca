@@ -581,17 +581,12 @@ impl<'a> Module<'a> {
     pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> u32 {
         // get type
         let func_ty = self.get_type(self.functions[func_idx]).unwrap();
-        // get how many params it has
-
         let num_params = func_ty.params.len();
-        // get how many locals it has
-        let num_locals = self.code_sections[func_idx].num_locals;
-
-        // get the index of the local
-        let index = num_params + num_locals;
-        // increment the number of locals
 
         let func_body = &mut self.code_sections[func_idx];
+        let num_locals = func_body.num_locals;
+        let index = num_params + num_locals;
+
         func_body.num_locals += 1;
 
         let mut found_ty = false;
