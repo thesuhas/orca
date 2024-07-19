@@ -228,37 +228,38 @@ impl FuncType {
 
 #[derive(Debug, Clone)]
 /// Data Segment in a wasm module.
-pub struct DataSegment<'a> {
+pub struct DataSegment {
     /// The kind of data segment.
-    pub kind: DataSegmentKind<'a>,
+    pub kind: DataSegmentKind,
     /// The data of the data segment.
-    pub data: &'a [u8],
+    pub data: Vec<u8>,
 }
 
-impl DataSegment<'_> {
+impl DataSegment {
     pub fn from_wasmparser(data: wasmparser::Data) -> Result<DataSegment> {
         Ok(DataSegment {
             kind: DataSegmentKind::from_wasmparser(data.kind)?,
-            data: data.data,
+            data: data.data.to_vec(),
         })
     }
 }
 
 /// The kind of data segment.
 #[derive(Debug, Clone)]
-pub enum DataSegmentKind<'a> {
+pub enum DataSegmentKind {
     /// The data segment is passive.
     Passive,
     /// The data segment is active.
     Active {
         /// The memory index for the data segment.
         memory_index: u32,
-        /// The initialization operator for the data segment.
-        offset_expr: ConstExpr<'a>,
+        /// The memory offset where this active data segment will be automatically
+        /// initialized.
+        offset_expr: InitExpr,
     },
 }
 
-impl DataSegmentKind<'_> {
+impl DataSegmentKind {
     pub(crate) fn from_wasmparser(kind: wasmparser::DataKind) -> Result<DataSegmentKind> {
         Ok(match kind {
             wasmparser::DataKind::Passive => DataSegmentKind::Passive,
@@ -267,7 +268,7 @@ impl DataSegmentKind<'_> {
                 offset_expr,
             } => DataSegmentKind::Active {
                 memory_index,
-                offset_expr,
+                offset_expr: InitExpr::eval(&offset_expr),
             },
         })
     }

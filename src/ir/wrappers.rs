@@ -11,7 +11,7 @@ use wasmparser::{
 // Not added to wasm-tools
 /// Convert ModuleTypeDeclaration to ModuleType
 pub fn convert_module_type_declaration(
-    module: &Box<[wasmparser::ModuleTypeDeclaration]>,
+    module: &[wasmparser::ModuleTypeDeclaration],
     enc: wasm_encoder::CoreTypeEncoder,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
@@ -20,7 +20,7 @@ pub fn convert_module_type_declaration(
         match m {
             wasmparser::ModuleTypeDeclaration::Type(sub) => {
                 let enc_mty = mty.ty();
-                encode_core_type_subtype(enc_mty, &sub, reencode);
+                encode_core_type_subtype(enc_mty, sub, reencode);
             }
             wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
                 mty.export(name, reencode.entity_type(*ty).unwrap());
@@ -47,7 +47,7 @@ pub fn convert_module_type_declaration(
 // Not added to wasm-tools
 /// Convert Instance Types
 pub fn convert_instance_type(
-    instance: &Box<[InstanceTypeDeclaration]>,
+    instance: &[InstanceTypeDeclaration],
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) -> InstanceType {
     let mut ity = InstanceType::new();
@@ -56,11 +56,11 @@ pub fn convert_instance_type(
             InstanceTypeDeclaration::CoreType(core_type) => match core_type {
                 wasmparser::CoreType::Sub(sub) => {
                     let enc = ity.core_type();
-                    encode_core_type_subtype(enc, &sub, reencode);
+                    encode_core_type_subtype(enc, sub, reencode);
                 }
                 wasmparser::CoreType::Module(module) => {
                     let enc = ity.core_type();
-                    convert_module_type_declaration(&module, enc, reencode);
+                    convert_module_type_declaration(module, enc, reencode);
                 }
             },
             InstanceTypeDeclaration::Type(ty) => {
@@ -259,19 +259,19 @@ pub fn convert_component_type(
                     ComponentTypeDeclaration::CoreType(core) => match core {
                         CoreType::Sub(sub) => {
                             let enc = new_comp.core_type();
-                            encode_core_type_subtype(enc, &sub, reencode);
+                            encode_core_type_subtype(enc, sub, reencode);
                         }
                         CoreType::Module(module) => {
                             let enc = new_comp.core_type();
-                            convert_module_type_declaration(&module, enc, reencode);
+                            convert_module_type_declaration(module, enc, reencode);
                         }
                     },
                     ComponentTypeDeclaration::Type(typ) => {
                         let enc = new_comp.ty();
-                        convert_component_type(&typ, enc, reencode);
+                        convert_component_type(typ, enc, reencode);
                     }
                     ComponentTypeDeclaration::Alias(a) => {
-                        new_comp.alias(process_alias(&a, reencode));
+                        new_comp.alias(process_alias(a, reencode));
                     }
                     ComponentTypeDeclaration::Export { name, ty } => {
                         new_comp.export(name.0, reencode.component_type_ref(*ty));
@@ -289,16 +289,16 @@ pub fn convert_component_type(
                     InstanceTypeDeclaration::CoreType(core_type) => match core_type {
                         wasmparser::CoreType::Sub(sub) => {
                             let enc = ity.core_type();
-                            encode_core_type_subtype(enc, &sub, reencode);
+                            encode_core_type_subtype(enc, sub, reencode);
                         }
                         wasmparser::CoreType::Module(module) => {
                             let enc = ity.core_type();
-                            convert_module_type_declaration(&module, enc, reencode);
+                            convert_module_type_declaration(module, enc, reencode);
                         }
                     },
                     InstanceTypeDeclaration::Type(ty) => {
                         let enc = ity.ty();
-                        convert_component_type(&ty, enc, reencode);
+                        convert_component_type(ty, enc, reencode);
                     }
                     InstanceTypeDeclaration::Alias(alias) => match alias {
                         ComponentAlias::InstanceExport {
