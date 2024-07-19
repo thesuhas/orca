@@ -5,8 +5,6 @@ use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
-use std::fs::File;
-use std::io::Write;
 use wasmparser::Operator;
 
 #[test]

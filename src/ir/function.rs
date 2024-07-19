@@ -3,11 +3,14 @@
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
 use crate::opcode::Opcode;
 use crate::ModuleBuilder;
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
+/// Build a function from scratch
+/// See example at `fac_orca/src/main.rs`
 pub struct FunctionBuilder<'a> {
     // pub(crate) id: u32, // function index
     pub(crate) params: Vec<DataType>,
@@ -82,5 +85,73 @@ impl<'a> Opcode<'a> for FunctionBuilder<'a> {
 impl ModuleBuilder for FunctionBuilder<'_> {
     fn add_local(&mut self, ty: DataType) -> u32 {
         FunctionBuilder::add_local(self, ty)
+    }
+}
+
+/// Modify a function
+/// Uses same injection logic as Iterator, which is different from
+/// FunctionBuilder since FunctionModifier does side effect to operators at encoding
+/// (it only modifies the Instrument type)
+pub struct FunctionModifier<'a, 'b> {
+    pub(crate) body: &'a mut Body<'b>,
+    pub(crate) instr_idx: Option<usize>,
+}
+
+impl<'a, 'b> FunctionModifier<'a, 'b> {
+    // by default, the instr_idx the last instruction (always Operator::End indicating end of the function)
+    // and the Instrument type is set to before
+    pub fn init(body: &'a mut Body<'b>) -> Self {
+        let instr_idx = body.instructions.len() - 1;
+        let mut func_modifier = FunctionModifier {
+            body,
+            instr_idx: None,
+        };
+        func_modifier.before_at(instr_idx);
+        func_modifier
+    }
+
+    /// adding instructions before the specified instruction
+    pub fn before_at(&mut self, idx: usize) -> &mut Self {
+        self.set_instrument_type(idx, InstrumentationMode::Before);
+        self
+    }
+
+    /// adding instructions after the specified instruction
+    pub fn after_at(&mut self, idx: usize) -> &mut Self {
+        self.set_instrument_type(idx, InstrumentationMode::After);
+        self
+    }
+
+    /// adding instructions alternate to the specified instruction
+    pub fn alternate_at(&mut self, idx: usize) -> &mut Self {
+        self.set_instrument_type(idx, InstrumentationMode::Alternate);
+        self
+    }
+
+    fn set_instrument_type(&mut self, idx: usize, mode: InstrumentationMode) {
+        {
+            self.instr_idx = Some(idx);
+            if self.body.instructions[idx].1.get_curr() == InstrumentType::NotInstrumented {
+                self.body.instructions[idx].1 = Instrument::Instrumented {
+                    before: vec![],
+                    after: vec![],
+                    alternate: vec![],
+                    current: mode,
+                }
+            } else {
+                self.body.instructions[idx].1.set_curr(mode);
+            }
+        }
+    }
+}
+
+impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {
+    // TODO: refactor the inject the function to return a Result rather than panicking?
+    fn inject(&mut self, instr: Operator<'b>) {
+        if let Some(idx) = self.instr_idx {
+            self.body.instructions[idx].1.add_instr(instr);
+        } else {
+            panic!("Instruction index not set");
+        }
     }
 }
