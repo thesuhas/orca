@@ -515,7 +515,7 @@ where
         }
     }
 
-    pub fn add_instr(&mut self, instr: Operator<'b>) {
+    pub fn push_instr(&mut self, instr: Operator<'b>) {
         self.instructions.push((instr, Instrument::NotInstrumented));
         self.num_instructions += 1;
     }
@@ -529,7 +529,7 @@ where
     }
 
     pub fn end(&mut self) {
-        self.add_instr(Operator::End);
+        self.push_instr(Operator::End);
     }
 }
 

@@ -40,6 +40,7 @@ pub trait Iterator<'a> {
     fn set_instrument_type(&mut self, ty: InstrumentationMode);
 
     /// Adds a local in the current function and returns its index
+    // TODO: should we remove this since ModuleBuilder should be handling this?
     fn add_local(&mut self, val_type: DataType) -> u32;
 
     /// Splice a new instruction into a specific location
