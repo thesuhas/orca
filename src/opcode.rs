@@ -777,4 +777,16 @@ pub trait Opcode<'a> {
         self.inject(Operator::F64Load { memarg });
         self
     }
+
+    /// Inject a global.get
+    fn global_get(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::GlobalGet { global_index: idx });
+        self
+    }
+
+    /// Inject a global.set
+    fn global_set(&mut self, idx: u32) -> &mut Self {
+        self.inject(Operator::GlobalSet { global_index: idx });
+        self
+    }
 }

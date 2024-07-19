@@ -33,6 +33,29 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
     }
 }
 
+// TODO: see TODO in whamm emit_orig
+// temporary workaround for emit_orig in whamm
+// added since we need to return an owned Operator to clone
+impl<'a, 'b> ModuleIterator<'a, 'b> {
+    pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
+        if self.mod_iterator.end() {
+            None
+        } else if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = self.mod_iterator.curr_loc()
+        {
+            Some(
+                self.module.code_sections[func_idx].instructions[instr_idx]
+                    .0
+                    .clone(),
+            )
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+}
+
 impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
     /// Injects an Operator at the current location
     ///
@@ -144,7 +167,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     }
 
     /// Returns the current instruction
-    fn curr_op(&self) -> Option<&Operator> {
+    fn curr_op(&self) -> Option<&Operator<'b>> {
         if self.mod_iterator.end() {
             None
         } else if let Location::Module {
@@ -209,6 +232,28 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         } = curr_loc
         {
             self.module.add_local(func_idx, val_type)
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = loc
+        {
+            // by default, splicing a new instruction works like the `before` mode
+            // self.set_instrument_type(InstrumentationMode::Before);
+            let instr_of_loc = &mut self.module.code_sections[func_idx].instructions[instr_idx].1;
+            *instr_of_loc = Instrument::Instrumented {
+                before: vec![],
+                after: vec![],
+                alternate: vec![],
+                current: InstrumentationMode::Before,
+            };
+
+            instr_of_loc.add_instr(instr);
         } else {
             panic!("Should have gotten Module Location!")
         }
