@@ -26,7 +26,7 @@ pub struct Module<'a> {
     /// Globals
     pub globals: Vec<Global>,
     /// Data Sections
-    pub data: Vec<DataSegment<'a>>,
+    pub data: Vec<DataSegment>,
     pub data_count_section_exists: bool,
     /// Exports
     pub exports: Vec<Export<'a>>,
@@ -535,9 +535,7 @@ impl<'a> Module<'a> {
                         offset_expr,
                     } => data.active(
                         memory_index,
-                        &reencode
-                            .const_expr(offset_expr)
-                            .expect("Data segment offset expr"),
+                        &offset_expr.to_wasmencoder_type(),
                         segment_data,
                     ),
                 };

@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 #[test]
 // build factorial from scratch

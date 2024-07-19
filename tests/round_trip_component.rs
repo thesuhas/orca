@@ -74,6 +74,8 @@ mod round_trip {
 
     make_round_trip_tests_component!("spin", hello_world);
 
+    // TODO: a lot of these can't pass roundtrip yet since we are
+    // moving sections around (we group them by section)
     make_round_trip_tests_component!(
         "wasm-tools/component-model",
         a,

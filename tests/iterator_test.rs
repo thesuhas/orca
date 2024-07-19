@@ -280,6 +280,7 @@ fn iterate(component: &mut Component) {
 }
 
 #[test]
+// TODO: no assertions for now, verify by eyeballing
 fn iterator_verify_injection() {
     let file = "tests/handwritten/components/add.wat";
 
@@ -291,18 +292,7 @@ fn iterator_verify_injection() {
     let result = component.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
 
-    let mut file = match File::create(format!("{}_test.wat", "add_test")) {
-        Ok(file) => file,
-        Err(e) => {
-            eprintln!("Failed to create the file: {}", e);
-            return;
-        }
-    };
-    // Write the string to the file
-    match file.write_all(out.as_bytes()) {
-        Ok(_) => println!("Data successfully written to the file."),
-        Err(e) => eprintln!("Failed to write to the file: {}", e),
-    }
+    println!("{}", out);
 }
 
 // example of a adding locals via an iterator
