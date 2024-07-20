@@ -13,6 +13,8 @@ use super::types::DataType;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
+/// See https://webassembly.github.io/spec/core/binary/modules.html as a reference
+/// for different sections
 pub struct Module<'a> {
     /// Types
     pub types: Vec<FuncType>,
