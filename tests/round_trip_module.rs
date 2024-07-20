@@ -42,16 +42,3 @@ mod round_trip {
         const_expr
     );
 }
-
-// #[test]
-// fn try_a(){
-//     let filename = "a.wat";
-//     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-
-//     let module = Module::parse_only_module(&buff, false).unwrap();
-//     println!("{:?}", module);
-//     let result = module.encode_only_module();
-//     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
-//     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
-//     assert_eq!(out, original);
-// }
