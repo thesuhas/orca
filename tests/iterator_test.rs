@@ -427,7 +427,12 @@ fn test_imports() {
             instr_idx,
         } = mod_it.curr_loc()
         {
-            println!("Fun: {}, {}: {:?},", num_imported_func as usize + func_idx, instr_idx, op);
+            println!(
+                "Fun: {}, {}: {:?},",
+                num_imported_func as usize + func_idx,
+                instr_idx,
+                op
+            );
         } else {
             panic!("Should've gotten Component Location!");
         }
