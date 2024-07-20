@@ -498,6 +498,7 @@ pub struct Body<'a> {
     // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, Instrument<'a>)>,
     pub num_instructions: usize,
+    pub name: Option<String>,
 }
 
 #[allow(clippy::new_without_default)]
@@ -512,10 +513,11 @@ where
             num_locals: 0,
             instructions: Vec::new(),
             num_instructions: 0,
+            name: None,
         }
     }
 
-    pub fn add_instr(&mut self, instr: Operator<'b>) {
+    pub fn push_instr(&mut self, instr: Operator<'b>) {
         self.instructions.push((instr, Instrument::NotInstrumented));
         self.num_instructions += 1;
     }
@@ -529,7 +531,7 @@ where
     }
 
     pub fn end(&mut self) {
-        self.add_instr(Operator::End);
+        self.push_instr(Operator::End);
     }
 }
 

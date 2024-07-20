@@ -199,6 +199,7 @@ impl<'a> Module<'a> {
                         num_locals,
                         instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
+                        name: None,
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -461,6 +462,7 @@ impl<'a> Module<'a> {
                 num_locals: _,
                 instructions,
                 num_instructions: _,
+                name: _,
             } in self.code_sections.iter()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
@@ -544,10 +546,23 @@ impl<'a> Module<'a> {
         }
 
         for (name, data) in self.custom_sections.iter() {
-            module.section(&wasm_encoder::CustomSection {
-                name: std::borrow::Cow::Borrowed(name),
-                data: std::borrow::Cow::Borrowed(data),
-            });
+            println!("Custom Section: {}", name);
+            if *name == "name" {
+                let mut names = wasm_encoder::NameSection::new();
+                // names.module("the module name");
+                use wasm_encoder::NameMap;
+                let mut function_names = NameMap::new();
+                for (idx, _body) in self.code_sections.iter().enumerate() {
+                    function_names.append(idx as u32, &format!("function_{}", idx));
+                }
+                names.functions(&function_names);
+                module.section(&names);
+            } else {
+                module.section(&wasm_encoder::CustomSection {
+                    name: std::borrow::Cow::Borrowed(name),
+                    data: std::borrow::Cow::Borrowed(data),
+                });
+            }
         }
 
         module
@@ -600,6 +615,14 @@ impl<'a> Module<'a> {
         }
 
         index as u32
+    }
+
+    /// Add a new Data Segment to the module.
+    /// Returns the index of the new Data Segment in the Data Section.
+    pub fn add_data(&mut self, data: DataSegment) -> u32 {
+        let index = self.data.len() as u32;
+        self.data.push(data);
+        index
     }
 
     /// Add a new function to the module. Returns the index of the imported function

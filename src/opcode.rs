@@ -1,9 +1,13 @@
-//! Trait that defines the injection behaviour for iterators.
+//! Trait that defines the injection behaviour for wasm opcodes
 
+// note: this should be implemented by FunctionBuilder, ModuleIterator, and ComponentIterator
+// note that the location of the injection is handled specific implementation
+// for iterators, we inject at the location the iterator is pointing at (curr_loc)
+// for FunctionBuilder, we inject at the end of the function
 use wasmparser::Operator;
 
 #[allow(dead_code)]
-/// Defines injection behaviour for Iterators. Takes a [wasmparser Operator](https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html) and instructions are defined [here](https://webassembly.github.io/spec/core/binary/instructions.html).
+/// Defines injection behaviour. Takes a [wasmparser Operator](https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html) and instructions are defined [here](https://webassembly.github.io/spec/core/binary/instructions.html).
 pub trait Opcode<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);

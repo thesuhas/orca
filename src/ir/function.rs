@@ -4,6 +4,7 @@ use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
 use crate::opcode::Opcode;
+use crate::ModuleBuilder;
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
@@ -71,8 +72,15 @@ impl<'a> FunctionBuilder<'a> {
 }
 
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {
-    /// Inject an operator at the current location
+    /// Inject an operator at the end of the function
+    // here the location of the injection is always at the end of the function
     fn inject(&mut self, instr: Operator<'a>) {
-        self.body.add_instr(instr)
+        self.body.push_instr(instr)
+    }
+}
+
+impl ModuleBuilder for FunctionBuilder<'_> {
+    fn add_local(&mut self, ty: DataType) -> u32 {
+        FunctionBuilder::add_local(self, ty)
     }
 }
