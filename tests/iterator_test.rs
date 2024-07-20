@@ -414,7 +414,9 @@ fn test_imports() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
     println!("{:#?}", module);
-    println!("num import functions: {}", module.num_import_func());
+
+    let num_imported_func = module.num_import_func();
+    assert_eq!(num_imported_func, 2);
 
     let mut mod_it = ModuleIterator::new(&mut module);
 
@@ -425,7 +427,7 @@ fn test_imports() {
             instr_idx,
         } = mod_it.curr_loc()
         {
-            println!("Fun: {}, {}: {:?},", func_idx, instr_idx, op);
+            println!("Fun: {}, {}: {:?},", num_imported_func as usize + func_idx, instr_idx, op);
         } else {
             panic!("Should've gotten Component Location!");
         }
