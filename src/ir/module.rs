@@ -1,6 +1,7 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
+use crate::ir::function::FunctionModifier;
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global, Instrument,
@@ -658,6 +659,15 @@ impl<'a> Module<'a> {
                 println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
             }
         }
+    }
+
+    // / get a function modifier from a function index
+    pub fn get_fn<'b>(&'b mut self, func_idx: u32) -> Option<FunctionModifier<'b, 'a>> {
+        // grab type and section and code section
+        // let ty = self.functions.get(func_idx as usize)?;
+        let body = self.code_sections.get_mut(func_idx as usize)?;
+        Some(FunctionModifier::init(body))
+        // None
     }
 
     /// create fresh module
