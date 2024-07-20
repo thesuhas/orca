@@ -628,13 +628,14 @@ impl<'a> Module<'a> {
         index
     }
 
+    /// count number of imported function
     pub fn num_import_func(&mut self) -> u32 {
         let mut count = 0;
         let a = &self.imports;
         for imp in a.iter() {
             if is_function(*imp) {
                 count += 1;
-            }     
+            }
         }
         count
     }
@@ -697,7 +698,6 @@ impl<'a> Default for Module<'a> {
     }
 }
 
-// 
 pub fn is_function(imp: Import) -> bool {
     if let wasmparser::TypeRef::Func(_) = imp.ty {
         return true;
