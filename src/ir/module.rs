@@ -13,7 +13,10 @@ use super::types::DataType;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
+/// See https://webassembly.github.io/spec/core/binary/modules.html as a reference
+/// for different sections
 pub struct Module<'a> {
+    /// Types
     pub types: Vec<FuncType>,
     /// Imports
     pub imports: Vec<Import<'a>>,
@@ -33,6 +36,7 @@ pub struct Module<'a> {
     pub exports: Vec<Export<'a>>,
     /// Index of the start function.
     pub start: Option<u32>,
+    /// Elements
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
     /// Function Bodies
     pub code_sections: Vec<Body<'a>>,
@@ -626,6 +630,18 @@ impl<'a> Module<'a> {
         index
     }
 
+    /// count number of imported function
+    pub fn num_import_func(&mut self) -> u32 {
+        let mut count = 0;
+        let a = &self.imports;
+        for imp in a.iter() {
+            if is_function(*imp) {
+                count += 1;
+            }
+        }
+        count
+    }
+
     pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
         let export = Export {
             name,
@@ -682,4 +698,11 @@ impl<'a> Default for Module<'a> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn is_function(imp: Import) -> bool {
+    if let wasmparser::TypeRef::Func(_) = imp.ty {
+        return true;
+    }
+    false
 }
