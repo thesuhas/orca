@@ -10,6 +10,7 @@ use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
+use wasm_encoder::NameMap;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
@@ -44,6 +45,7 @@ pub struct Module<'a> {
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
     /// Number of local functions (not counting imported functions)
     pub num_functions: usize,
+    pub num_imported_functions: usize,
 }
 
 impl<'a> Module<'a> {
@@ -53,7 +55,7 @@ impl<'a> Module<'a> {
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
-        // let parser = Parser::new(0);
+        let wasm_features = wasmparser::WasmFeatures::default();
         let mut imports = vec![];
         let mut types = vec![];
         let mut data = vec![];
@@ -68,13 +70,20 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
+        let mut num_imported_functions = 0;
+
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
             match payload {
                 Payload::ImportSection(import_section_reader) => {
-                    imports = import_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    // count number of imported functions
+                    for import in import_section_reader.into_iter() {
+                        let imp = import?;
+                        if is_function(imp) {
+                            num_imported_functions += 1;
+                        }
+                        imports.push(imp);
+                    }
                 }
                 Payload::TypeSection(type_section_reader) => {
                     // for rec_group in type_section_reader.into_iter() {
@@ -208,8 +217,54 @@ impl<'a> Module<'a> {
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
-                    custom_sections
-                        .push((custom_section_reader.name(), custom_section_reader.data()));
+                    match custom_section_reader.name() {
+                        "name" => {
+                            let name_section_reader =
+                                wasmparser::NameSectionReader::new(wasmparser::BinaryReader::new(
+                                    custom_section_reader.data(),
+                                    custom_section_reader.data_offset(),
+                                    wasm_features,
+                                ));
+                            for subsection in name_section_reader {
+                                #[allow(clippy::single_match)]
+                                match subsection? {
+                                    wasmparser::Name::Function(names) => {
+                                        for name in names {
+                                            let naming = name?;
+                                            let abs_idx = naming.index;
+                                            if abs_idx < num_imported_functions as u32 {
+                                                // assert!(abs_idx < functions.len() as u32);
+                                                // TODO: store import's name?
+                                                // functions[abs_idx as usize] = naming.name.to_string();
+                                            } else {
+                                                let rel_idx =
+                                                    abs_idx - num_imported_functions as u32;
+                                                // assert!(0 < rel_idx && rel_idx < code_sections.len() as u32);
+                                                code_sections[rel_idx as usize].name =
+                                                    Some(naming.name.to_string());
+                                            }
+                                        }
+                                    }
+                                    // TODO: we did not preserve other subsections here
+                                    // ALSO, https://webassembly.github.io/spec/core/appendix/custom.html#subsections
+                                    // only describes 3 subsections, but wasmparser have 12
+                                    _ => {}
+                                }
+                            }
+                            // TODO: we pushed a lot of redundant data in the name seciton (all function names will be encoded twice in the custom section now)
+                            // otherwise we might need full IR for names
+                            // Also, wasm2wat seems to be angry of us doing this duplicate encoding
+                            // giving error messages like `00000a7: error: out-of-order sub-section`
+                            // or 016f4a2: error: duplicate sub-section
+                            // however, wasm-tools seems to be happy with that
+                            custom_sections
+                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                        }
+                        _ => {
+                            custom_sections
+                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                        }
+                    }
                 }
                 Payload::Version {
                     num,
@@ -276,6 +331,7 @@ impl<'a> Module<'a> {
             data,
             custom_sections,
             num_functions: code_sections.len(),
+            num_imported_functions,
         })
     }
 
@@ -460,15 +516,22 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
+        // initialize function name seciton
+        let mut function_names = NameMap::new();
+        let imp_func_count = self.num_import_func();
+
         if !self.code_sections.is_empty() {
             let mut code = wasm_encoder::CodeSection::new();
-            for Body {
-                locals,
-                num_locals: _,
-                instructions,
-                num_instructions: _,
-                name: _,
-            } in self.code_sections.iter()
+            for (
+                rel_func_idx,
+                Body {
+                    locals,
+                    num_locals: _,
+                    instructions,
+                    num_instructions: _,
+                    name,
+                },
+            ) in self.code_sections.iter().enumerate()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
@@ -526,6 +589,9 @@ impl<'a> Module<'a> {
                         }
                     }
                 }
+                if let Some(name) = name {
+                    function_names.append(imp_func_count + rel_func_idx as u32, name);
+                }
                 code.function(&function);
             }
             module.section(&code);
@@ -551,18 +617,24 @@ impl<'a> Module<'a> {
         }
 
         for (name, data) in self.custom_sections.iter() {
-            println!("Custom Section: {}", name);
             if *name == "name" {
                 let mut names = wasm_encoder::NameSection::new();
-                // names.module("the module name");
-                use wasm_encoder::NameMap;
-                let mut function_names = NameMap::new();
-                for (idx, _body) in self.code_sections.iter().enumerate() {
-                    function_names.append(idx as u32, &format!("function_{}", idx));
-                }
+
                 names.functions(&function_names);
-                module.section(&names);
+                // append the original data in name section
+                // TODO: are these to_vec expensive? Is there a better wasy to do this?
+                let mut new_data = names.as_custom().data.to_vec();
+                let mut data_vec = data.to_vec();
+
+                // note: with this order, you can overwrite a function's name
+                data_vec.append(&mut new_data);
+
+                module.section(&wasm_encoder::CustomSection {
+                    name: std::borrow::Cow::Borrowed(name),
+                    data: std::borrow::Cow::Borrowed(&data_vec),
+                });
             } else {
+                // TODO: write a test to test other custom sections are preserved
                 module.section(&wasm_encoder::CustomSection {
                     name: std::borrow::Cow::Borrowed(name),
                     data: std::borrow::Cow::Borrowed(data),
@@ -646,7 +718,7 @@ impl<'a> Module<'a> {
     }
 
     /// count number of imported function
-    pub fn num_import_func(&mut self) -> u32 {
+    pub fn num_import_func(&self) -> u32 {
         let mut count = 0;
         let a = &self.imports;
         for imp in a.iter() {
@@ -655,6 +727,12 @@ impl<'a> Module<'a> {
             }
         }
         count
+    }
+
+    /// set_fn_name (using relative index)
+    pub fn set_fn_name(&mut self, func_idx: u32, name: &'a str) {
+        let body = &mut self.code_sections[func_idx as usize];
+        body.name = Some(name.to_owned());
     }
 
     pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
@@ -679,13 +757,26 @@ impl<'a> Module<'a> {
         }
     }
 
-    // / get a function modifier from a function index
+    /// get a function modifier from a function index
     pub fn get_fn<'b>(&'b mut self, func_idx: u32) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
         // let ty = self.functions.get(func_idx as usize)?;
         let body = self.code_sections.get_mut(func_idx as usize)?;
         Some(FunctionModifier::init(body))
         // None
+    }
+
+    /// get local function id by name
+    // Note: returned absolute id here
+    pub fn get_fid_by_name(&self, name: &str) -> Option<u32> {
+        for (idx, body) in self.code_sections.iter().enumerate() {
+            if let Some(n) = &body.name {
+                if n == name {
+                    return Some(idx as u32 + self.num_imported_functions as u32);
+                }
+            }
+        }
+        None
     }
 
     /// create fresh module
@@ -705,6 +796,7 @@ impl<'a> Module<'a> {
             data: vec![],
             custom_sections: vec![],
             num_functions: 0,
+            num_imported_functions: 0,
         }
     }
 }
