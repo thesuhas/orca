@@ -5,8 +5,6 @@ use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
-use std::fs::File;
-use std::io::Write;
 use wasmparser::Operator;
 
 #[test]
@@ -395,6 +393,46 @@ fn test_it_dup_instr() {
             let loc = mod_it.curr_loc();
             let orig = mod_it.curr_op_owned().unwrap();
             mod_it.add_instr_at(loc, orig);
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
+        if mod_it.next().is_none() {
+            break;
+        };
+    }
+
+    let a = module.encode_only_module();
+    let wat = wasmprinter::print_bytes(&a).unwrap();
+    println!("{}", wat);
+}
+
+// no asserts, eyeballing for now
+#[test]
+fn test_imports() {
+    let file = "tests/handwritten/modules/import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    println!("{:#?}", module);
+
+    let num_imported_func = module.num_import_func();
+    assert_eq!(num_imported_func, 2);
+
+    let mut mod_it = ModuleIterator::new(&mut module);
+
+    loop {
+        let op = mod_it.curr_op();
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = mod_it.curr_loc()
+        {
+            println!(
+                "Fun: {}, {}: {:?},",
+                num_imported_func as usize + func_idx,
+                instr_idx,
+                op
+            );
         } else {
             panic!("Should've gotten Component Location!");
         }
