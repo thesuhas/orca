@@ -447,3 +447,18 @@ fn test_imports() {
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
+
+#[test]
+fn test_it_add_local_diff_type() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module);
+
+    mod_it.add_local(orca::ir::types::DataType::I64);
+    mod_it.add_local(orca::ir::types::DataType::I32);
+    let a = module.encode_only_module();
+    let wat = wasmprinter::print_bytes(&a).unwrap();
+    println!("{}", wat);
+}
