@@ -413,7 +413,7 @@ fn test_imports() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    println!("{:#?}", module);
+    // println!("{:#?}", module);
 
     let num_imported_func = module.num_import_func();
     assert_eq!(num_imported_func, 2);

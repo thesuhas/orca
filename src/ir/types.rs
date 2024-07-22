@@ -484,6 +484,34 @@ pub enum Location {
     },
 }
 
+/// Represents an import in a WebAssembly module.
+#[derive(Debug, Clone)]
+pub struct Import<'a> {
+    /// The module being imported from.
+    pub module: &'a str,
+    /// The name of the imported item.
+    pub name: &'a str,
+    /// The type of the imported item.
+    pub ty: wasmparser::TypeRef,
+    /// The name (in the custom section) of the imported item.
+    pub import_name: Option<String>,
+}
+
+impl Import<'_> {
+    pub(crate) fn from_wasmparser(import: wasmparser::Import) -> Import {
+        Import {
+            module: import.module,
+            name: import.name,
+            ty: import.ty,
+            import_name: None,
+        }
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self.ty, wasmparser::TypeRef::Func(_))
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Body of a function in a wasm module
 pub struct Body<'a> {
@@ -498,6 +526,7 @@ pub struct Body<'a> {
     // accessing operators by .0 is not very clear
     pub instructions: Vec<(Operator<'a>, Instrument<'a>)>,
     pub num_instructions: usize,
+    pub name: Option<String>,
 }
 
 #[allow(clippy::new_without_default)]
@@ -512,6 +541,7 @@ where
             num_locals: 0,
             instructions: Vec::new(),
             num_instructions: 0,
+            name: None,
         }
     }
 

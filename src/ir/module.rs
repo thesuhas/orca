@@ -7,9 +7,10 @@ use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global, Instrument,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, Import, MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
+use wasm_encoder::NameMap;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module.
@@ -19,7 +20,7 @@ pub struct Module<'a> {
     /// Types
     pub types: Vec<FuncType>,
     /// Imports
-    pub imports: Vec<Import<'a>>,
+    pub imports: Vec<crate::ir::types::Import<'a>>,
     /// Mapping from function index to type index.
     /// Note that |functions| == |code_sections| == num_functions
     pub functions: Vec<u32>,
@@ -44,6 +45,12 @@ pub struct Module<'a> {
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
     /// Number of local functions (not counting imported functions)
     pub num_functions: usize,
+    pub num_imported_functions: usize,
+    /// name of module
+    pub module_name: Option<String>,
+
+    // just a placeholder for roundtrip
+    pub(crate) local_names: wasm_encoder::IndirectNameMap,
 }
 
 impl<'a> Module<'a> {
@@ -53,8 +60,8 @@ impl<'a> Module<'a> {
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
-        // let parser = Parser::new(0);
-        let mut imports = vec![];
+        let wasm_features = wasmparser::WasmFeatures::default();
+        let mut imports: Vec<crate::ir::types::Import> = vec![];
         let mut types = vec![];
         let mut data = vec![];
         let mut tables = vec![];
@@ -68,13 +75,24 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
+        let mut num_imported_functions = 0;
+
+        let mut module_name: Option<String> = None;
+        // for the other names, we directly encode it without passing them into the IR
+        let mut local_names = wasm_encoder::IndirectNameMap::new();
+
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
             match payload {
                 Payload::ImportSection(import_section_reader) => {
-                    imports = import_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    // count number of imported functions
+                    for import in import_section_reader.into_iter() {
+                        let imp = crate::ir::types::Import::from_wasmparser(import?);
+                        if imp.is_function() {
+                            num_imported_functions += 1;
+                        }
+                        imports.push(imp);
+                    }
                 }
                 Payload::TypeSection(type_section_reader) => {
                     // for rec_group in type_section_reader.into_iter() {
@@ -204,11 +222,67 @@ impl<'a> Module<'a> {
                         num_locals,
                         instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
+                        name: None,
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
-                    custom_sections
-                        .push((custom_section_reader.name(), custom_section_reader.data()));
+                    match custom_section_reader.name() {
+                        "name" => {
+                            let name_section_reader =
+                                wasmparser::NameSectionReader::new(wasmparser::BinaryReader::new(
+                                    custom_section_reader.data(),
+                                    custom_section_reader.data_offset(),
+                                    wasm_features,
+                                ));
+                            for subsection in name_section_reader {
+                                #[allow(clippy::single_match)]
+                                match subsection? {
+                                    wasmparser::Name::Function(names) => {
+                                        for name in names {
+                                            let naming = name?;
+                                            let abs_idx = naming.index;
+                                            if abs_idx < num_imported_functions as u32 {
+                                                let mut import_func_count = 0;
+                                                // TODO: this is very expensive, can we optimize this?
+                                                for import in imports.iter_mut() {
+                                                    if import.is_function() {
+                                                        if import_func_count == abs_idx {
+                                                            import.import_name =
+                                                                Some(naming.name.to_string());
+                                                            break;
+                                                        }
+                                                        import_func_count += 1;
+                                                    }
+                                                }
+                                            } else {
+                                                let rel_idx =
+                                                    abs_idx - num_imported_functions as u32;
+                                                // assert!(0 < rel_idx && rel_idx < code_sections.len() as u32);
+                                                code_sections[rel_idx as usize].name =
+                                                    Some(naming.name.to_string());
+                                            }
+                                        }
+                                    }
+                                    wasmparser::Name::Module { name, .. } => {
+                                        module_name = Some(name.to_string());
+                                    }
+                                    wasmparser::Name::Local(names) => {
+                                        local_names = indirect_namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Unknown { .. } => {}
+                                    _ => {
+                                        // we do nothing for the extended name section proposal
+                                        // https://github.com/WebAssembly/extended-name-section/blob/main/proposals/extended-name-section/Overview.md
+                                        // we could preserve them like what we did for locals
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            custom_sections
+                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                        }
+                    }
                 }
                 Payload::Version {
                     num,
@@ -275,6 +349,9 @@ impl<'a> Module<'a> {
             data,
             custom_sections,
             num_functions: code_sections.len(),
+            num_imported_functions,
+            module_name,
+            local_names,
         })
     }
 
@@ -315,9 +392,18 @@ impl<'a> Module<'a> {
             module.section(&types);
         }
 
+        // initialize function name seciton
+        let mut function_names = NameMap::new();
         if !self.imports.is_empty() {
             let mut imports = wasm_encoder::ImportSection::new();
+            let mut import_func_idx = 0;
             for import in self.imports.iter() {
+                if import.is_function() {
+                    if let Some(import_name) = &import.import_name {
+                        function_names.append(import_func_idx as u32, import_name);
+                    }
+                    import_func_idx += 1;
+                }
                 imports.import(
                     import.module,
                     import.name,
@@ -461,12 +547,16 @@ impl<'a> Module<'a> {
 
         if !self.code_sections.is_empty() {
             let mut code = wasm_encoder::CodeSection::new();
-            for Body {
-                locals,
-                num_locals: _,
-                instructions,
-                num_instructions: _,
-            } in self.code_sections.iter()
+            for (
+                rel_func_idx,
+                Body {
+                    locals,
+                    num_locals: _,
+                    instructions,
+                    num_instructions: _,
+                    name,
+                },
+            ) in self.code_sections.iter().enumerate()
             {
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
@@ -524,6 +614,12 @@ impl<'a> Module<'a> {
                         }
                     }
                 }
+                if let Some(name) = name {
+                    function_names.append(
+                        self.num_imported_functions as u32 + rel_func_idx as u32,
+                        name,
+                    );
+                }
                 code.function(&function);
             }
             module.section(&code);
@@ -548,6 +644,19 @@ impl<'a> Module<'a> {
             module.section(&data);
         }
 
+        // the name section is not stored in self.custom_sections anymore
+        let mut names = wasm_encoder::NameSection::new();
+
+        // we only encode the three name subsection in wasm spec
+        if let Some(module_name) = &self.module_name {
+            names.module(module_name);
+        }
+        names.functions(&function_names);
+        names.locals(&self.local_names);
+
+        module.section(&names);
+
+        // encode the rest of custom sections
         for (name, data) in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
                 name: std::borrow::Cow::Borrowed(name),
@@ -620,10 +729,11 @@ impl<'a> Module<'a> {
     // TODO: In walrus, add_import_func after adding a function has no effect
     pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: u32) -> u32 {
         let index = self.imports.len() as u32;
-        let import = Import {
+        let import = crate::ir::types::Import {
             module,
             name,
             ty: wasmparser::TypeRef::Func(ty_id),
+            import_name: None,
         };
         self.imports.push(import);
 
@@ -631,15 +741,14 @@ impl<'a> Module<'a> {
     }
 
     /// count number of imported function
-    pub fn num_import_func(&mut self) -> u32 {
-        let mut count = 0;
-        let a = &self.imports;
-        for imp in a.iter() {
-            if is_function(*imp) {
-                count += 1;
-            }
-        }
-        count
+    pub fn num_import_func(&self) -> u32 {
+        self.num_imported_functions as u32
+    }
+
+    /// set_fn_name (using relative index)
+    pub fn set_fn_name(&mut self, func_idx: u32, name: &'a str) {
+        let body = &mut self.code_sections[func_idx as usize];
+        body.name = Some(name.to_owned());
     }
 
     pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
@@ -664,13 +773,26 @@ impl<'a> Module<'a> {
         }
     }
 
-    // / get a function modifier from a function index
+    /// get a function modifier from a function index
     pub fn get_fn<'b>(&'b mut self, func_idx: u32) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
         // let ty = self.functions.get(func_idx as usize)?;
         let body = self.code_sections.get_mut(func_idx as usize)?;
         Some(FunctionModifier::init(body))
         // None
+    }
+
+    /// get local function id by name
+    // Note: returned absolute id here
+    pub fn get_fid_by_name(&self, name: &str) -> Option<u32> {
+        for (idx, body) in self.code_sections.iter().enumerate() {
+            if let Some(n) = &body.name {
+                if n == name {
+                    return Some(idx as u32 + self.num_imported_functions as u32);
+                }
+            }
+        }
+        None
     }
 
     /// create fresh module
@@ -690,6 +812,9 @@ impl<'a> Module<'a> {
             data: vec![],
             custom_sections: vec![],
             num_functions: 0,
+            num_imported_functions: 0,
+            module_name: None,
+            local_names: wasm_encoder::IndirectNameMap::new(),
         }
     }
 }
@@ -700,9 +825,22 @@ impl<'a> Default for Module<'a> {
     }
 }
 
-pub fn is_function(imp: Import) -> bool {
-    if let wasmparser::TypeRef::Func(_) = imp.ty {
-        return true;
+fn indirect_namemap_parser2encoder(
+    namemap: wasmparser::IndirectNameMap,
+) -> wasm_encoder::IndirectNameMap {
+    let mut names = wasm_encoder::IndirectNameMap::new();
+    for name in namemap {
+        let naming = name.unwrap();
+        names.append(naming.index, &namemap_parser2encoder(naming.names));
     }
-    false
+    names
+}
+
+fn namemap_parser2encoder(namemap: wasmparser::NameMap) -> wasm_encoder::NameMap {
+    let mut names = wasm_encoder::NameMap::new();
+    for name in namemap {
+        let naming = name.unwrap();
+        names.append(naming.index, naming.name);
+    }
+    names
 }
