@@ -699,8 +699,6 @@ impl<'a> Module<'a> {
         let num_locals = func_body.num_locals;
         let index = num_params + num_locals;
 
-        func_body.num_locals += 1;
-
         let len = func_body.locals.len();
         func_body.num_locals += 1;
         if len > 0 {
