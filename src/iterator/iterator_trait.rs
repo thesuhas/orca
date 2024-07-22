@@ -45,4 +45,16 @@ pub trait Iterator<'a> {
 
     /// Splice a new instruction into a specific location
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
+
+    /// Mark the specified location to InstrumentBefore
+    fn before_at(&mut self, loc: Location) -> &mut Self;
+
+    /// Mark the specified location to InstrumentAfter
+    fn after_at(&mut self, loc: Location) -> &mut Self;
+
+    /// Mark the specified location to InstrumentAlternate
+    fn alternate_at(&mut self, loc: Location) -> &mut Self;
+
+    /// Sets the type of Instrumentation Type of the specified location
+    fn set_instrument_type_at(&mut self, ty: InstrumentationMode, loc: Location);
 }

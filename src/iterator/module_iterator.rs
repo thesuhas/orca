@@ -199,27 +199,11 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
 
     fn set_instrument_type(&mut self, mode: InstrumentationMode) {
         if let Location::Module {
-            func_idx,
-            instr_idx,
+            func_idx: _func_idx,
+            instr_idx: _instr_idx,
         } = self.curr_loc()
         {
-            if self.module.code_sections[func_idx].instructions[instr_idx]
-                .1
-                .get_curr()
-                == InstrumentType::NotInstrumented
-            {
-                self.module.code_sections[func_idx].instructions[instr_idx].1 =
-                    Instrument::Instrumented {
-                        before: vec![],
-                        after: vec![],
-                        alternate: vec![],
-                        current: mode,
-                    }
-            } else {
-                self.module.code_sections[func_idx].instructions[instr_idx]
-                    .1
-                    .set_curr(mode);
-            }
+            self.set_instrument_type_at(mode, self.curr_loc());
         } else {
             panic!("Should have gotten module location!")
         }
@@ -244,19 +228,88 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             instr_idx,
         } = loc
         {
-            // by default, splicing a new instruction works like the `before` mode
-            // self.set_instrument_type(InstrumentationMode::Before);
+            // Only injects if it is an instrumented location
             let instr_of_loc = &mut self.module.code_sections[func_idx].instructions[instr_idx].1;
-            *instr_of_loc = Instrument::Instrumented {
-                before: vec![],
-                after: vec![],
-                alternate: vec![],
-                current: InstrumentationMode::Before,
-            };
-
-            instr_of_loc.add_instr(instr);
+            match instr_of_loc {
+                Instrument::NotInstrumented => {
+                    panic!("Can't inject to a location that is not instrumented!")
+                }
+                Instrument::Instrumented {
+                    before: _before,
+                    after: _after,
+                    alternate: _alternate,
+                    current: _current,
+                } => instr_of_loc.add_instr(instr),
+            }
         } else {
             panic!("Should have gotten Module Location!")
+        }
+    }
+
+    fn before_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx: _func_idx,
+            instr_idx: _instr_idx,
+        } = loc
+        {
+            self.set_instrument_type_at(InstrumentationMode::Before, loc);
+            self
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+
+    fn after_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx: _func_idx,
+            instr_idx: _instr_idx,
+        } = loc
+        {
+            self.set_instrument_type_at(InstrumentationMode::After, loc);
+            self
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+
+    fn alternate_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx: _func_idx,
+            instr_idx: _instr_idx,
+        } = loc
+        {
+            self.set_instrument_type_at(InstrumentationMode::Alternate, loc);
+            self
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+
+    fn set_instrument_type_at(&mut self, mode: InstrumentationMode, loc: Location) {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = loc
+        {
+            if self.module.code_sections[func_idx].instructions[instr_idx]
+                .1
+                .get_curr()
+                == InstrumentType::NotInstrumented
+            {
+                self.module.code_sections[func_idx].instructions[instr_idx].1 =
+                    Instrument::Instrumented {
+                        before: vec![],
+                        after: vec![],
+                        alternate: vec![],
+                        current: mode,
+                    }
+            } else {
+                self.module.code_sections[func_idx].instructions[instr_idx]
+                    .1
+                    .set_curr(mode);
+            }
+        } else {
+            panic!("Should have gotten module location!")
         }
     }
 }

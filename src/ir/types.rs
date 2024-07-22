@@ -471,7 +471,7 @@ impl PartialEq for InstrumentType {
 impl Eq for InstrumentType {}
 
 /// Used to represent a unique location in a wasm component or module.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Location {
     Component {
         mod_idx: usize,
