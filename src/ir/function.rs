@@ -55,11 +55,17 @@ impl<'a> FunctionBuilder<'a> {
     /// (note that local indices start after)
     pub fn add_local(&mut self, ty: DataType) -> u32 {
         let index = self.params.len() as u32 + self.body.num_locals as u32;
-        let last = self.body.locals.len() - 1;
-        self.body.num_locals += 1;
-        if self.body.locals[last].1 == ty {
-            self.body.locals[last].0 += 1;
+        let len = self.body.locals.len();
+        if len > 0 {
+            let last = len - 1;
+            self.body.num_locals += 1;
+            if self.body.locals[last].1 == ty {
+                self.body.locals[last].0 += 1;
+            } else {
+                self.body.locals.push((1, ty));
+            }
         } else {
+            // If no locals, just append
             self.body.locals.push((1, ty));
         }
         index
