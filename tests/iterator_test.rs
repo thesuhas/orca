@@ -349,6 +349,7 @@ fn test_it_instr_at() {
         func_idx: 0,
         instr_idx: 1,
     };
+    mod_it.before_at(loc.clone());
     mod_it.add_instr_at(loc, Operator::Unreachable);
     loop {
         let op = mod_it.curr_op();
@@ -392,6 +393,7 @@ fn test_it_dup_instr() {
 
             let loc = mod_it.curr_loc();
             let orig = mod_it.curr_op_owned().unwrap();
+            mod_it.before();
             mod_it.add_instr_at(loc, orig);
         } else {
             panic!("Should've gotten Component Location!");
