@@ -56,9 +56,9 @@ impl<'a> FunctionBuilder<'a> {
     pub fn add_local(&mut self, ty: DataType) -> u32 {
         let index = self.params.len() as u32 + self.body.num_locals as u32;
         let len = self.body.locals.len();
+        self.body.num_locals += 1;
         if len > 0 {
             let last = len - 1;
-            self.body.num_locals += 1;
             if self.body.locals[last].1 == ty {
                 self.body.locals[last].0 += 1;
             } else {

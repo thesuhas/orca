@@ -701,15 +701,17 @@ impl<'a> Module<'a> {
 
         func_body.num_locals += 1;
 
-        let mut found_ty = false;
-        for x in func_body.locals.iter_mut() {
-            if x.1 == ty {
-                x.0 += 1;
-                found_ty = true;
-                break;
+        let len = func_body.locals.len();
+        func_body.num_locals += 1;
+        if len > 0 {
+            let last = len - 1;
+            if func_body.locals[last].1 == ty {
+                func_body.locals[last].0 += 1;
+            } else {
+                func_body.locals.push((1, ty));
             }
-        }
-        if !found_ty {
+        } else {
+            // If no locals, just append
             func_body.locals.push((1, ty));
         }
 
