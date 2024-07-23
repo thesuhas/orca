@@ -1,7 +1,7 @@
 //! Iterator to traverse a Module
 
 use crate::ir::module::Module;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, LocalID, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::module_builder::ModuleBuilder;
 use crate::opcode::Opcode;
@@ -209,19 +209,6 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
-    fn add_local(&mut self, val_type: crate::ir::types::DataType) -> u32 {
-        let curr_loc = self.curr_loc();
-        if let Location::Module {
-            func_idx,
-            instr_idx: _,
-        } = curr_loc
-        {
-            self.module.add_local(func_idx, val_type)
-        } else {
-            panic!("Should have gotten Module Location!")
-        }
-    }
-
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
         if let Location::Module {
             func_idx,
@@ -315,7 +302,7 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
 }
 
 impl ModuleBuilder for ModuleIterator<'_, '_> {
-    fn add_local(&mut self, val_type: crate::ir::types::DataType) -> u32 {
+    fn add_local(&mut self, val_type: crate::ir::types::DataType) -> LocalID {
         let curr_loc = self.curr_loc();
         if let Location::Module {
             func_idx,
