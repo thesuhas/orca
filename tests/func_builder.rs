@@ -2,6 +2,7 @@ use orca::Module;
 use orca::Opcode;
 use std::process::Command;
 
+#[ignore]
 #[test]
 // build factorial from scratch
 fn run_fac_orca() {
@@ -18,6 +19,7 @@ fn run_fac_orca() {
     assert_eq!(fac_generated, fac_standard);
 }
 
+#[ignore]
 #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca() {

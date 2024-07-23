@@ -20,7 +20,7 @@ pub struct ModuleIterator<'a, 'b> {
 #[allow(dead_code)]
 impl<'a, 'b> ModuleIterator<'a, 'b> {
     /// Creates a new ModuleIterator
-    pub fn new(module: &'a mut Module<'b>) -> Self {
+    pub fn new(module: &'a mut Module<'b>, skip_funcs: Vec<usize>) -> Self {
         // Creates Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (idx, func) in module.code_sections.iter().enumerate() {
@@ -29,7 +29,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
         let num_funcs = module.num_functions;
         ModuleIterator {
             module,
-            mod_iterator: ModuleSubIterator::new(num_funcs, metadata),
+            mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs),
         }
     }
 }
@@ -73,7 +73,7 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     /// // Must use `parse_only_module` here as we are only concerned about a Module and not a module that is inside a Component
     /// let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    /// let mut module_it = ModuleIterator::new(&mut module);
+    /// let mut module_it = ModuleIterator::new(&mut module, vec![]);
     ///
     /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
     /// let interested = Operator::Call { function_index: 1 };

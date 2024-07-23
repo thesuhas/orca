@@ -19,7 +19,7 @@ pub struct ComponentIterator<'a, 'b> {
 #[allow(dead_code)]
 impl<'a, 'b> ComponentIterator<'a, 'b> {
     /// Creates a new Component Iterator
-    pub fn new(comp: &'a mut Component<'b>) -> Self {
+    pub fn new(comp: &'a mut Component<'b>, skip_funcs: HashMap<usize, Vec<usize>>) -> Self {
         // Creates Module -> Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (mod_idx, m) in comp.modules.iter().enumerate() {
@@ -32,7 +32,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         let num_modules = comp.num_modules;
         ComponentIterator {
             comp,
-            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata),
+            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata, skip_funcs),
         }
     }
 }
@@ -42,6 +42,7 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     ///
     /// # Example
     /// ```no_run
+    /// use std::collections::HashMap;
     /// use orca::ir::component::Component;
     /// use orca::iterator::component_iterator::ComponentIterator;
     /// use wasmparser::Operator;
@@ -52,7 +53,7 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     /// let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    /// let mut comp_it = ComponentIterator::new(&mut component);
+    /// let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
     ///
     /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
     /// let interested = Operator::Call { function_index: 1 };

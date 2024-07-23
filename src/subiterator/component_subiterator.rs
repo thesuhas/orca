@@ -14,6 +14,8 @@ pub struct ComponentSubIterator {
     mod_iterator: ModuleSubIterator,
     /// Metadata that maps Module Index -> Function Index -> Instruction Index
     metadata: HashMap<usize, HashMap<usize, usize>>,
+    /// Map of Module -> Functions to skip in that module. Provide an empty HashMap if no functions are to be skipped.
+    skip_funcs: HashMap<usize, Vec<usize>>,
 }
 
 impl ComponentSubIterator {
@@ -22,7 +24,9 @@ impl ComponentSubIterator {
         curr_mod: usize,
         num_mods: usize,
         metadata: HashMap<usize, HashMap<usize, usize>>,
+        skip_funcs: HashMap<usize, Vec<usize>>,
     ) -> Self {
+        // Get current skip func
         // initializes to the first module
         ComponentSubIterator {
             curr_mod,
@@ -31,7 +35,12 @@ impl ComponentSubIterator {
             mod_iterator: ModuleSubIterator::new(
                 metadata.get(&0).unwrap().keys().len(),
                 (*metadata.get(&curr_mod).unwrap()).clone(),
+                match skip_funcs.contains_key(&curr_mod) {
+                    true => skip_funcs.get(&curr_mod).unwrap().clone(),
+                    false => vec![],
+                },
             ),
+            skip_funcs,
         }
     }
 
@@ -50,6 +59,10 @@ impl ComponentSubIterator {
             self.mod_iterator = ModuleSubIterator::new(
                 self.metadata.get(&self.curr_mod).unwrap().keys().len(),
                 self.metadata.get(&self.curr_mod).unwrap().clone(),
+                match self.skip_funcs.contains_key(&self.curr_mod) {
+                    true => self.skip_funcs.get(&self.curr_mod).unwrap().clone(),
+                    false => vec![],
+                },
             );
             true
         } else {
