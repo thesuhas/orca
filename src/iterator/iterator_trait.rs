@@ -1,6 +1,6 @@
 //! Trait that needs to be satisfied by all iterators
 
-use crate::ir::types::{DataType, InstrumentType, InstrumentationMode, Location};
+use crate::ir::types::{InstrumentType, InstrumentationMode, Location};
 use wasmparser::Operator;
 
 #[allow(dead_code)]
@@ -38,10 +38,6 @@ pub trait Iterator<'a> {
 
     /// Sets the type of Instrumentation Type of the current location
     fn set_instrument_type(&mut self, ty: InstrumentationMode);
-
-    /// Adds a local in the current function and returns its index
-    // TODO: should we remove this since ModuleBuilder should be handling this?
-    fn add_local(&mut self, val_type: DataType) -> u32;
 
     /// Splice a new instruction into a specific location
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);

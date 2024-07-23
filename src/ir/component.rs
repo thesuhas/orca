@@ -6,7 +6,7 @@ use crate::ir::helpers::{
     print_core_type,
 };
 use crate::ir::module::Module;
-use crate::ir::types::Global;
+use crate::ir::types::{Global, GlobalsID};
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
@@ -73,7 +73,7 @@ impl<'a> Component<'a> {
         self.num_modules += 1;
     }
 
-    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> u32 {
+    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalsID {
         self.modules[module_idx].add_global(global)
     }
 

@@ -5,6 +5,7 @@ use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
+use orca::ModuleBuilder;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
@@ -525,4 +526,14 @@ fn test_function_skipping_component() {
 
     assert_eq!(set.len(), 1);
     assert!(set.contains(&1usize));
+}
+
+#[test]
+fn test_fn_name() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    assert_eq!("add".to_string(), module.get_fname(0usize).unwrap());
+    assert_eq!(None, module.get_fname(1usize));
 }

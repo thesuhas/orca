@@ -1,8 +1,8 @@
 //! Intermediate Representation of a fucntion
 
 use crate::ir::module::Module;
-use crate::ir::types::Body;
 use crate::ir::types::DataType;
+use crate::ir::types::{Body, FunctionID, LocalID};
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
 use crate::opcode::Opcode;
 use crate::ModuleBuilder;
@@ -34,27 +34,27 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish(mut self, module: &mut Module<'a>) -> u32 {
+    pub fn finish(mut self, module: &mut Module<'a>) -> FunctionID {
         // add End as last instruction
         self.end();
 
         let ty = module.add_type(&self.params, &self.results);
 
         // the function index is should also take account for imports
-        let id = module.functions.len() as u32 + module.imports.len() as u32;
+        let id = module.functions.len() + module.imports.len();
         module.functions.push(ty);
         module.code_sections.push(self.body);
         module.num_functions += 1;
 
         assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(module.functions.len(), module.num_functions);
-        id
+        FunctionID { id }
     }
 
     /// add a local and return local index
     /// (note that local indices start after)
-    pub fn add_local(&mut self, ty: DataType) -> u32 {
-        let index = self.params.len() as u32 + self.body.num_locals as u32;
+    pub fn add_local(&mut self, ty: DataType) -> LocalID {
+        let index = self.params.len() + self.body.num_locals;
         let len = self.body.locals.len();
         self.body.num_locals += 1;
         if len > 0 {
@@ -68,7 +68,7 @@ impl<'a> FunctionBuilder<'a> {
             // If no locals, just append
             self.body.locals.push((1, ty));
         }
-        index
+        LocalID { id: index }
     }
 }
 
@@ -81,7 +81,7 @@ impl<'a> Opcode<'a> for FunctionBuilder<'a> {
 }
 
 impl ModuleBuilder for FunctionBuilder<'_> {
-    fn add_local(&mut self, ty: DataType) -> u32 {
+    fn add_local(&mut self, ty: DataType) -> LocalID {
         FunctionBuilder::add_local(self, ty)
     }
 }
