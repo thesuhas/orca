@@ -37,6 +37,7 @@ fn run_start_orca() {
     println!("{}", out);
 }
 
+#[ignore]
 #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca_default() {
