@@ -42,7 +42,6 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     ///
     /// # Example
     /// ```no_run
-    /// use std::arch::aarch64::veor3q_s8;
     /// use std::collections::HashMap;
     /// use orca::ir::component::Component;
     /// use orca::iterator::component_iterator::ComponentIterator;
