@@ -1,7 +1,8 @@
 //! Iterator to traverse a Component
 
 use crate::ir::component::Component;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, LocalID, Location};
+use crate::ir::id::LocalID;
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;

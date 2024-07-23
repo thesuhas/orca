@@ -5,8 +5,10 @@ use crate::ir::helpers::{
     print_alias, print_component_export, print_component_import, print_component_type,
     print_core_type,
 };
+use crate::ir::id::GlobalID;
 use crate::ir::module::Module;
-use crate::ir::types::{Global, GlobalsID};
+use crate::ir::section::Section;
+use crate::ir::types::Global;
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
@@ -43,6 +45,9 @@ pub struct Component<'a> {
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
     /// Number of modules
     pub num_modules: usize,
+    /// Sections of the Component
+    pub sections: Vec<(u32, Section)>,
+    num_sections: usize,
 }
 
 impl Default for Component<'_> {
@@ -65,16 +70,41 @@ impl<'a> Component<'a> {
             canons: vec![],
             custom_sections: vec![],
             num_modules: 0,
+            sections: vec![],
+            num_sections: 0,
+        }
+    }
+
+    fn add_to_own_section(&mut self, section: Section) {
+        if self.sections[self.num_sections - 1].1 == section {
+            self.sections[self.num_sections - 1].0 += 1;
+        } else {
+            self.sections.push((1, section));
         }
     }
 
     pub fn add_module(&mut self, module: Module<'a>) {
         self.modules.push(module);
+        self.add_to_own_section(Section::Module);
         self.num_modules += 1;
     }
 
-    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalsID {
+    pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalID {
         self.modules[module_idx].add_global(global)
+    }
+
+    fn add_to_sections(
+        sections: &mut Vec<(u32, Section)>,
+        section: Section,
+        num_sections: &mut usize,
+        sections_added: u32,
+    ) {
+        if *num_sections > 0 && sections[*num_sections - 1].1 == section {
+            sections[*num_sections - 1].0 += sections_added;
+        } else {
+            sections.push((sections_added, section));
+        }
+        *num_sections += 1;
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
@@ -88,6 +118,8 @@ impl<'a> Component<'a> {
         let mut alias = vec![];
         let mut component_instance = vec![];
         let mut custom_sections = vec![];
+        let mut sections = vec![];
+        let mut num_sections: usize = 0;
 
         let parser = Parser::new(0);
         for payload in parser.parse_all(wasm) {
@@ -96,45 +128,100 @@ impl<'a> Component<'a> {
             // ComponentStartSection { .. } => { /* ... */ }
             match payload {
                 Payload::ComponentImportSection(import_section_reader) => {
-                    imports.append(
-                        &mut import_section_reader
-                            .into_iter()
-                            .collect::<Result<_, _>>()?,
+                    let temp: &mut Vec<ComponentImport> = &mut import_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    imports.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::ComponentImport,
+                        &mut num_sections,
+                        l as u32,
                     );
                 }
                 Payload::ComponentExportSection(export_section_reader) => {
-                    exports.append(
-                        &mut export_section_reader
-                            .into_iter()
-                            .collect::<Result<_, _>>()?,
+                    let temp: &mut Vec<ComponentExport> = &mut export_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    exports.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::ComponentExport,
+                        &mut num_sections,
+                        l as u32,
                     );
                 }
                 Payload::InstanceSection(instance_section_reader) => {
-                    instances.append(
-                        &mut instance_section_reader
-                            .into_iter()
-                            .collect::<Result<_, _>>()?,
+                    let temp: &mut Vec<Instance> = &mut instance_section_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    instances.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::CoreInstance,
+                        &mut num_sections,
+                        l as u32,
                     );
                 }
                 Payload::CoreTypeSection(core_type_reader) => {
-                    core_types.append(&mut core_type_reader.into_iter().collect::<Result<_, _>>()?);
+                    let temp: &mut Vec<CoreType> = &mut core_type_reader.into_iter().collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    core_types.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::CoreType,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::ComponentTypeSection(component_type_reader) => {
-                    component_types.append(
-                        &mut component_type_reader
-                            .into_iter()
-                            .collect::<Result<_, _>>()?,
+                    let temp: &mut Vec<ComponentType> = &mut component_type_reader
+                        .into_iter()
+                        .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    component_types.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::ComponentType,
+                        &mut num_sections,
+                        l as u32,
                     );
                 }
                 Payload::ComponentInstanceSection(component_instances) => {
-                    component_instance
-                        .append(&mut component_instances.into_iter().collect::<Result<_, _>>()?);
+                    let temp: &mut Vec<ComponentInstance> = &mut component_instances.into_iter().collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    component_instance.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::ComponentInstance,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::ComponentAliasSection(alias_reader) => {
-                    alias.append(&mut alias_reader.into_iter().collect::<Result<_, _>>()?);
+                    let temp: &mut Vec<ComponentAlias> = &mut alias_reader.into_iter().collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    alias.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::Alias,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::ComponentCanonicalSection(canon_reader) => {
-                    canons.append(&mut canon_reader.into_iter().collect::<Result<_, _>>()?);
+                    let temp: &mut Vec<CanonicalFunction> = &mut canon_reader.into_iter().collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    canons.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::Canon,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::ModuleSection {
                     parser,
@@ -145,14 +232,22 @@ impl<'a> Component<'a> {
                         enable_multi_memory,
                         parser,
                     )?);
+                    Self::add_to_sections(&mut sections, Section::Module, &mut num_sections, 1);
                 }
                 Payload::ComponentSection {
                     parser: _,
                     unchecked_range: _,
                 } => {}
                 Payload::CustomSection(custom_section_reader) => {
+                    // TODO: See if this is an issue
                     custom_sections
                         .push((custom_section_reader.name(), custom_section_reader.data()));
+                    Self::add_to_sections(
+                        &mut sections,
+                        Section::CustomSection,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::UnknownSection {
                     id,
@@ -174,282 +269,612 @@ impl<'a> Component<'a> {
             canons,
             custom_sections,
             num_modules: modules.len(),
+            sections,
+            num_sections,
         })
     }
 
     pub fn encode(&self) -> Vec<u8> {
         let mut component = wasm_encoder::Component::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
+        // NOTE: All of these are 1-indexed and not 0-indexed
+        let mut last_processed_module = 0;
+        let mut last_processed_core_ty = 0;
+        let mut last_processed_comp_ty = 0;
+        let mut last_processed_imp = 0;
+        let mut last_processed_exp = 0;
+        let mut last_processed_comp_inst = 0;
+        let mut last_processed_core_inst = 0;
+        let mut last_processed_alias = 0;
+        let mut last_processed_canon = 0;
+        let mut last_processed_custom_section = 0;
 
-        // Module parsing
-        if !self.modules.is_empty() {
-            // Parse each module
-            for m in self.modules.iter() {
-                component.section(&ModuleSection(&m.encode()));
-            }
-        }
-
-        // Core Types
-        if !self.core_types.is_empty() {
-            let mut type_section = wasm_encoder::CoreTypeSection::new();
-            for ty in self.core_types.iter() {
-                match ty {
-                    CoreType::Sub(subtype) => {
-                        let enc = type_section.ty();
-                        encode_core_type_subtype(enc, subtype, &mut reencode);
-                    }
-                    CoreType::Module(module) => {
-                        let enc = type_section.ty();
-                        convert_module_type_declaration(module, enc, &mut reencode);
+        for (num, section) in self.sections.iter() {
+            match section {
+                Section::Module => {
+                    assert!(*num as usize + last_processed_module as usize <= self.modules.len());
+                    for mod_idx in last_processed_module..last_processed_module + num {
+                        component.section(&ModuleSection(&self.modules[mod_idx as usize].encode()));
+                        last_processed_module += 1;
                     }
                 }
-            }
-            component.section(&type_section);
-        }
-
-        // Component Types
-        if !self.component_types.is_empty() {
-            let mut component_ty_section = wasm_encoder::ComponentTypeSection::new();
-            for ty in self.component_types.iter() {
-                match ty {
-                    ComponentType::Defined(comp_ty) => {
-                        let enc = component_ty_section.defined_type();
-                        match comp_ty {
-                            wasmparser::ComponentDefinedType::Primitive(p) => {
-                                enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
+                Section::CoreType => {
+                    assert!(
+                        *num as usize + last_processed_core_ty as usize <= self.core_types.len()
+                    );
+                    let mut type_section = wasm_encoder::CoreTypeSection::new();
+                    for cty_idx in last_processed_core_ty..last_processed_core_ty + num {
+                        match &self.core_types[cty_idx as usize] {
+                            CoreType::Sub(subtype) => {
+                                let enc = type_section.ty();
+                                encode_core_type_subtype(enc, subtype, &mut reencode);
                             }
-                            wasmparser::ComponentDefinedType::Record(records) => {
-                                enc.record(records.iter().map(|record| {
-                                    (record.0, reencode.component_val_type(record.1))
+                            CoreType::Module(module) => {
+                                let enc = type_section.ty();
+                                convert_module_type_declaration(module, enc, &mut reencode);
+                            }
+                        }
+                        last_processed_core_ty += 1;
+                    }
+                    component.section(&type_section);
+                }
+                Section::ComponentType => {
+                    assert!(
+                        *num as usize + last_processed_comp_ty as usize
+                            <= self.component_types.len()
+                    );
+                    let mut component_ty_section = wasm_encoder::ComponentTypeSection::new();
+                    for comp_ty_idx in last_processed_comp_ty..last_processed_comp_ty + num {
+                        match &self.component_types[comp_ty_idx as usize] {
+                            ComponentType::Defined(comp_ty) => {
+                                let enc = component_ty_section.defined_type();
+                                match comp_ty {
+                                    wasmparser::ComponentDefinedType::Primitive(p) => {
+                                        enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
+                                    }
+                                    wasmparser::ComponentDefinedType::Record(records) => {
+                                        enc.record(records.iter().map(|record| {
+                                            (record.0, reencode.component_val_type(record.1))
+                                        }));
+                                    }
+                                    wasmparser::ComponentDefinedType::Variant(variants) => enc
+                                        .variant(variants.iter().map(|variant| {
+                                            (
+                                                variant.name,
+                                                variant
+                                                    .ty
+                                                    .map(|ty| reencode.component_val_type(ty)),
+                                                variant.refines,
+                                            )
+                                        })),
+                                    wasmparser::ComponentDefinedType::List(l) => {
+                                        enc.list(reencode.component_val_type(*l))
+                                    }
+                                    wasmparser::ComponentDefinedType::Tuple(tup) => enc
+                                        .tuple(tup.iter().map(|val_type| {
+                                            reencode.component_val_type(*val_type)
+                                        })),
+                                    wasmparser::ComponentDefinedType::Flags(flags) => {
+                                        enc.flags(flags.clone().into_vec().into_iter())
+                                    }
+                                    wasmparser::ComponentDefinedType::Enum(en) => {
+                                        enc.enum_type(en.clone().into_vec().into_iter())
+                                    }
+                                    wasmparser::ComponentDefinedType::Option(opt) => {
+                                        enc.option(reencode.component_val_type(*opt))
+                                    }
+                                    wasmparser::ComponentDefinedType::Result { ok, err } => enc
+                                        .result(
+                                            ok.map(|val_type| {
+                                                reencode.component_val_type(val_type)
+                                            }),
+                                            err.map(|val_type| {
+                                                reencode.component_val_type(val_type)
+                                            }),
+                                        ),
+                                    wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
+                                    wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
+                                }
+                            }
+                            ComponentType::Func(func_ty) => {
+                                let mut enc = component_ty_section.function();
+                                enc.params(func_ty.params.iter().map(
+                                    |p: &(&str, wasmparser::ComponentValType)| {
+                                        (p.0, reencode.component_val_type(p.1))
+                                    },
+                                ));
+                                convert_results(func_ty.results.clone(), enc, &mut reencode);
+                            }
+                            ComponentType::Component(comp) => {
+                                let mut new_comp = wasm_encoder::ComponentType::new();
+                                for c in comp.iter() {
+                                    match c {
+                                        ComponentTypeDeclaration::CoreType(core) => match core {
+                                            CoreType::Sub(sub) => {
+                                                let enc = new_comp.core_type();
+                                                encode_core_type_subtype(enc, sub, &mut reencode);
+                                            }
+                                            CoreType::Module(module) => {
+                                                let enc = new_comp.core_type();
+                                                convert_module_type_declaration(
+                                                    module,
+                                                    enc,
+                                                    &mut reencode,
+                                                );
+                                            }
+                                        },
+                                        ComponentTypeDeclaration::Type(typ) => {
+                                            let enc = new_comp.ty();
+                                            convert_component_type(
+                                                &(*typ).clone(),
+                                                enc,
+                                                &mut reencode,
+                                            );
+                                        }
+                                        ComponentTypeDeclaration::Alias(a) => {
+                                            new_comp.alias(process_alias(a, &mut reencode));
+                                        }
+                                        ComponentTypeDeclaration::Export { name, ty } => {
+                                            new_comp
+                                                .export(name.0, reencode.component_type_ref(*ty));
+                                        }
+                                        ComponentTypeDeclaration::Import(imp) => {
+                                            new_comp.import(
+                                                imp.name.0,
+                                                reencode.component_type_ref(imp.ty),
+                                            );
+                                        }
+                                    }
+                                }
+                                component_ty_section.component(&new_comp);
+                            }
+                            ComponentType::Instance(inst) => {
+                                component_ty_section
+                                    .instance(&convert_instance_type(inst, &mut reencode));
+                            }
+                            ComponentType::Resource { rep, dtor } => {
+                                component_ty_section
+                                    .resource(reencode.val_type(*rep).unwrap(), *dtor);
+                            }
+                        }
+                        last_processed_comp_ty += 1;
+                    }
+                    component.section(&component_ty_section);
+                }
+                Section::ComponentImport => {
+                    assert!(*num as usize + last_processed_imp as usize <= self.imports.len());
+                    let mut imports = wasm_encoder::ComponentImportSection::new();
+                    for imp_idx in last_processed_imp..last_processed_imp + num {
+                        let imp = &self.imports[imp_idx as usize];
+                        imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
+                        last_processed_imp += 1;
+                    }
+                    component.section(&imports);
+                }
+                Section::ComponentExport => {
+                    assert!(*num as usize + last_processed_exp as usize <= self.exports.len());
+                    let mut exports = wasm_encoder::ComponentExportSection::new();
+                    for exp_idx in last_processed_exp..last_processed_exp + num {
+                        let exp = &self.exports[exp_idx as usize];
+                        exports.export(
+                            exp.name.0,
+                            reencode.component_export_kind(exp.kind),
+                            exp.index,
+                            exp.ty.map(|ty| reencode.component_type_ref(ty)),
+                        );
+                        last_processed_exp += 1;
+                    }
+                    component.section(&exports);
+                }
+                Section::ComponentInstance => {
+                    assert!(
+                        *num as usize + last_processed_comp_inst as usize
+                            <= self.component_instance.len()
+                    );
+                    let mut instances = wasm_encoder::ComponentInstanceSection::new();
+                    for instance_idx in last_processed_comp_inst..last_processed_comp_inst + num {
+                        let instance = &self.component_instance[instance_idx as usize];
+                        match instance {
+                            ComponentInstance::Instantiate {
+                                component_index,
+                                args,
+                            } => {
+                                instances.instantiate(
+                                    *component_index,
+                                    args.iter().map(|arg| {
+                                        (
+                                            arg.name,
+                                            reencode.component_export_kind(arg.kind),
+                                            arg.index,
+                                        )
+                                    }),
+                                );
+                            }
+                            ComponentInstance::FromExports(export) => {
+                                instances.export_items(export.iter().map(|value| {
+                                    (
+                                        value.name.0,
+                                        reencode.component_export_kind(value.kind),
+                                        value.index,
+                                    )
                                 }));
                             }
-                            wasmparser::ComponentDefinedType::Variant(variants) => {
-                                enc.variant(variants.iter().map(|variant| {
+                        }
+                        last_processed_comp_inst += 1;
+                    }
+                    component.section(&instances);
+                }
+                Section::CoreInstance => {
+                    assert!(
+                        *num as usize + last_processed_core_inst as usize <= self.instances.len()
+                    );
+                    let mut instances = wasm_encoder::InstanceSection::new();
+                    for instance_idx in last_processed_core_inst..last_processed_core_inst + num {
+                        let instance = &self.instances[instance_idx as usize];
+                        match instance {
+                            Instance::Instantiate { module_index, args } => {
+                                instances.instantiate(
+                                    *module_index,
+                                    args.iter()
+                                        .map(|arg| (arg.name, ModuleArg::Instance(arg.index))),
+                                );
+                            }
+                            Instance::FromExports(exports) => {
+                                instances.export_items(exports.iter().map(|export| {
                                     (
-                                        variant.name,
-                                        variant.ty.map(|ty| reencode.component_val_type(ty)),
-                                        variant.refines,
+                                        export.name,
+                                        wasm_encoder::ExportKind::from(export.kind),
+                                        export.index,
                                     )
-                                }))
-                            }
-                            wasmparser::ComponentDefinedType::List(l) => {
-                                enc.list(reencode.component_val_type(*l))
-                            }
-                            wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
-                                tup.iter()
-                                    .map(|val_type| reencode.component_val_type(*val_type)),
-                            ),
-                            wasmparser::ComponentDefinedType::Flags(flags) => {
-                                enc.flags(flags.clone().into_vec().into_iter())
-                            }
-                            wasmparser::ComponentDefinedType::Enum(en) => {
-                                enc.enum_type(en.clone().into_vec().into_iter())
-                            }
-                            wasmparser::ComponentDefinedType::Option(opt) => {
-                                enc.option(reencode.component_val_type(*opt))
-                            }
-                            wasmparser::ComponentDefinedType::Result { ok, err } => enc.result(
-                                ok.map(|val_type| reencode.component_val_type(val_type)),
-                                err.map(|val_type| reencode.component_val_type(val_type)),
-                            ),
-                            wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
-                            wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
-                        }
-                    }
-                    ComponentType::Func(func_ty) => {
-                        let mut enc = component_ty_section.function();
-                        enc.params(func_ty.params.iter().map(
-                            |p: &(&str, wasmparser::ComponentValType)| {
-                                (p.0, reencode.component_val_type(p.1))
-                            },
-                        ));
-                        convert_results(func_ty.results.clone(), enc, &mut reencode);
-                    }
-                    ComponentType::Component(comp) => {
-                        let mut new_comp = wasm_encoder::ComponentType::new();
-                        for c in comp.iter() {
-                            match c {
-                                ComponentTypeDeclaration::CoreType(core) => match core {
-                                    CoreType::Sub(sub) => {
-                                        let enc = new_comp.core_type();
-                                        encode_core_type_subtype(enc, sub, &mut reencode);
-                                    }
-                                    CoreType::Module(module) => {
-                                        let enc = new_comp.core_type();
-                                        convert_module_type_declaration(module, enc, &mut reencode);
-                                    }
-                                },
-                                ComponentTypeDeclaration::Type(typ) => {
-                                    let enc = new_comp.ty();
-                                    convert_component_type(&(*typ).clone(), enc, &mut reencode);
-                                }
-                                ComponentTypeDeclaration::Alias(a) => {
-                                    new_comp.alias(process_alias(a, &mut reencode));
-                                }
-                                ComponentTypeDeclaration::Export { name, ty } => {
-                                    new_comp.export(name.0, reencode.component_type_ref(*ty));
-                                }
-                                ComponentTypeDeclaration::Import(imp) => {
-                                    new_comp
-                                        .import(imp.name.0, reencode.component_type_ref(imp.ty));
-                                }
+                                }));
                             }
                         }
-                        component_ty_section.component(&new_comp);
+                        last_processed_core_inst += 1;
                     }
-                    ComponentType::Instance(inst) => {
-                        component_ty_section.instance(&convert_instance_type(inst, &mut reencode));
+                    component.section(&instances);
+                }
+                Section::Alias => {
+                    assert!(*num as usize + last_processed_alias as usize <= self.alias.len());
+                    let mut alias = ComponentAliasSection::new();
+                    for a_idx in last_processed_alias..last_processed_alias + num {
+                        let a = &self.alias[a_idx as usize];
+                        alias.alias(process_alias(a, &mut reencode));
+                        last_processed_alias += 1;
                     }
-                    ComponentType::Resource { rep, dtor } => {
-                        component_ty_section.resource(reencode.val_type(*rep).unwrap(), *dtor);
+                    component.section(&alias);
+                }
+                Section::Canon => {
+                    assert!(*num as usize + last_processed_canon as usize <= self.canons.len());
+                    let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
+                    for canon_idx in last_processed_canon..last_processed_canon + num {
+                        let canon = &self.canons[canon_idx as usize];
+                        match canon {
+                            CanonicalFunction::Lift {
+                                core_func_index,
+                                type_index,
+                                options,
+                            } => {
+                                canon_sec.lift(
+                                    *core_func_index,
+                                    *type_index,
+                                    options
+                                        .iter()
+                                        .map(|canon| reencode.canonical_option(*canon)),
+                                );
+                            }
+                            CanonicalFunction::Lower {
+                                func_index,
+                                options,
+                            } => {
+                                canon_sec.lower(
+                                    *func_index,
+                                    options
+                                        .iter()
+                                        .map(|canon| reencode.canonical_option(*canon)),
+                                );
+                            }
+                            CanonicalFunction::ResourceNew { resource } => {
+                                canon_sec.resource_new(*resource);
+                            }
+                            CanonicalFunction::ResourceDrop { resource } => {
+                                canon_sec.resource_rep(*resource);
+                            }
+                            CanonicalFunction::ResourceRep { resource } => {
+                                canon_sec.resource_rep(*resource);
+                            }
+                        }
+                        last_processed_canon += 1;
+                    }
+                    component.section(&canon_sec);
+                }
+                Section::CustomSection => {
+                    assert!(
+                        *num as usize + last_processed_custom_section as usize
+                            <= self.custom_sections.len()
+                    );
+                    for custom_sec_idx in
+                        last_processed_custom_section..last_processed_custom_section + num
+                    {
+                        let (name, data) = &self.custom_sections[custom_sec_idx as usize];
+                        component.section(&wasm_encoder::CustomSection {
+                            name: std::borrow::Cow::Borrowed(name),
+                            data: std::borrow::Cow::Borrowed(data),
+                        });
+                        last_processed_custom_section += 1;
                     }
                 }
             }
-            component.section(&component_ty_section);
         }
 
-        // Import parsing
-        if !self.imports.is_empty() {
-            let mut imports = wasm_encoder::ComponentImportSection::new();
-            for imp in self.imports.iter() {
-                imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
-            }
-            component.section(&imports);
-        }
+        // Module parsing
+        // if !self.modules.is_empty() {
+        //     // Parse each module
+        //     for m in self.modules.iter() {
+        //         component.section(&ModuleSection(&m.encode()));
+        //     }
+        // }
+
+        // Core Types
+        // if !self.core_types.is_empty() {
+        //     let mut type_section = wasm_encoder::CoreTypeSection::new();
+        //     for ty in self.core_types.iter() {
+        //         match ty {
+        //             CoreType::Sub(subtype) => {
+        //                 let enc = type_section.ty();
+        //                 encode_core_type_subtype(enc, subtype, &mut reencode);
+        //             }
+        //             CoreType::Module(module) => {
+        //                 let enc = type_section.ty();
+        //                 convert_module_type_declaration(module, enc, &mut reencode);
+        //             }
+        //         }
+        //     }
+        //     component.section(&type_section);
+        // }
+
+        // Component Types
+        // if !self.component_types.is_empty() {
+        //     let mut component_ty_section = wasm_encoder::ComponentTypeSection::new();
+        //     for ty in self.component_types.iter() {
+        //         match ty {
+        //             ComponentType::Defined(comp_ty) => {
+        //                 let enc = component_ty_section.defined_type();
+        //                 match comp_ty {
+        //                     wasmparser::ComponentDefinedType::Primitive(p) => {
+        //                         enc.primitive(wasm_encoder::PrimitiveValType::from(*p))
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Record(records) => {
+        //                         enc.record(records.iter().map(|record| {
+        //                             (record.0, reencode.component_val_type(record.1))
+        //                         }));
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Variant(variants) => {
+        //                         enc.variant(variants.iter().map(|variant| {
+        //                             (
+        //                                 variant.name,
+        //                                 variant.ty.map(|ty| reencode.component_val_type(ty)),
+        //                                 variant.refines,
+        //                             )
+        //                         }))
+        //                     }
+        //                     wasmparser::ComponentDefinedType::List(l) => {
+        //                         enc.list(reencode.component_val_type(*l))
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Tuple(tup) => enc.tuple(
+        //                         tup.iter()
+        //                             .map(|val_type| reencode.component_val_type(*val_type)),
+        //                     ),
+        //                     wasmparser::ComponentDefinedType::Flags(flags) => {
+        //                         enc.flags(flags.clone().into_vec().into_iter())
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Enum(en) => {
+        //                         enc.enum_type(en.clone().into_vec().into_iter())
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Option(opt) => {
+        //                         enc.option(reencode.component_val_type(*opt))
+        //                     }
+        //                     wasmparser::ComponentDefinedType::Result { ok, err } => enc.result(
+        //                         ok.map(|val_type| reencode.component_val_type(val_type)),
+        //                         err.map(|val_type| reencode.component_val_type(val_type)),
+        //                     ),
+        //                     wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
+        //                     wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
+        //                 }
+        //             }
+        //             ComponentType::Func(func_ty) => {
+        //                 let mut enc = component_ty_section.function();
+        //                 enc.params(func_ty.params.iter().map(
+        //                     |p: &(&str, wasmparser::ComponentValType)| {
+        //                         (p.0, reencode.component_val_type(p.1))
+        //                     },
+        //                 ));
+        //                 convert_results(func_ty.results.clone(), enc, &mut reencode);
+        //             }
+        //             ComponentType::Component(comp) => {
+        //                 let mut new_comp = wasm_encoder::ComponentType::new();
+        //                 for c in comp.iter() {
+        //                     match c {
+        //                         ComponentTypeDeclaration::CoreType(core) => match core {
+        //                             CoreType::Sub(sub) => {
+        //                                 let enc = new_comp.core_type();
+        //                                 encode_core_type_subtype(enc, sub, &mut reencode);
+        //                             }
+        //                             CoreType::Module(module) => {
+        //                                 let enc = new_comp.core_type();
+        //                                 convert_module_type_declaration(module, enc, &mut reencode);
+        //                             }
+        //                         },
+        //                         ComponentTypeDeclaration::Type(typ) => {
+        //                             let enc = new_comp.ty();
+        //                             convert_component_type(&(*typ).clone(), enc, &mut reencode);
+        //                         }
+        //                         ComponentTypeDeclaration::Alias(a) => {
+        //                             new_comp.alias(process_alias(a, &mut reencode));
+        //                         }
+        //                         ComponentTypeDeclaration::Export { name, ty } => {
+        //                             new_comp.export(name.0, reencode.component_type_ref(*ty));
+        //                         }
+        //                         ComponentTypeDeclaration::Import(imp) => {
+        //                             new_comp
+        //                                 .import(imp.name.0, reencode.component_type_ref(imp.ty));
+        //                         }
+        //                     }
+        //                 }
+        //                 component_ty_section.component(&new_comp);
+        //             }
+        //             ComponentType::Instance(inst) => {
+        //                 component_ty_section.instance(&convert_instance_type(inst, &mut reencode));
+        //             }
+        //             ComponentType::Resource { rep, dtor } => {
+        //                 component_ty_section.resource(reencode.val_type(*rep).unwrap(), *dtor);
+        //             }
+        //         }
+        //     }
+        //     component.section(&component_ty_section);
+        // }
+
+        // // Import parsing
+        // if !self.imports.is_empty() {
+        //     let mut imports = wasm_encoder::ComponentImportSection::new();
+        //     for imp in self.imports.iter() {
+        //         imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
+        //     }
+        //     component.section(&imports);
+        // }
 
         // Export parsing
-        if !self.exports.is_empty() {
-            let mut exports = wasm_encoder::ComponentExportSection::new();
-            for exp in self.exports.iter() {
-                exports.export(
-                    exp.name.0,
-                    reencode.component_export_kind(exp.kind),
-                    exp.index,
-                    exp.ty.map(|ty| reencode.component_type_ref(ty)),
-                );
-            }
-            component.section(&exports);
-        }
+        // if !self.exports.is_empty() {
+        //     let mut exports = wasm_encoder::ComponentExportSection::new();
+        //     for exp in self.exports.iter() {
+        //         exports.export(
+        //             exp.name.0,
+        //             reencode.component_export_kind(exp.kind),
+        //             exp.index,
+        //             exp.ty.map(|ty| reencode.component_type_ref(ty)),
+        //         );
+        //     }
+        //     component.section(&exports);
+        // }
 
         // Component Instance parsing
-        if !self.component_instance.is_empty() {
-            let mut instances = wasm_encoder::ComponentInstanceSection::new();
-            for instance in self.component_instance.iter() {
-                match instance {
-                    ComponentInstance::Instantiate {
-                        component_index,
-                        args,
-                    } => {
-                        instances.instantiate(
-                            *component_index,
-                            args.iter().map(|arg| {
-                                (
-                                    arg.name,
-                                    reencode.component_export_kind(arg.kind),
-                                    arg.index,
-                                )
-                            }),
-                        );
-                    }
-                    ComponentInstance::FromExports(export) => {
-                        instances.export_items(export.iter().map(|value| {
-                            (
-                                value.name.0,
-                                reencode.component_export_kind(value.kind),
-                                value.index,
-                            )
-                        }));
-                    }
-                }
-            }
-            component.section(&instances);
-        }
+        // if !self.component_instance.is_empty() {
+        //     let mut instances = wasm_encoder::ComponentInstanceSection::new();
+        //     for instance in self.component_instance.iter() {
+        //         match instance {
+        //             ComponentInstance::Instantiate {
+        //                 component_index,
+        //                 args,
+        //             } => {
+        //                 instances.instantiate(
+        //                     *component_index,
+        //                     args.iter().map(|arg| {
+        //                         (
+        //                             arg.name,
+        //                             reencode.component_export_kind(arg.kind),
+        //                             arg.index,
+        //                         )
+        //                     }),
+        //                 );
+        //             }
+        //             ComponentInstance::FromExports(export) => {
+        //                 instances.export_items(export.iter().map(|value| {
+        //                     (
+        //                         value.name.0,
+        //                         reencode.component_export_kind(value.kind),
+        //                         value.index,
+        //                     )
+        //                 }));
+        //             }
+        //         }
+        //     }
+        //     component.section(&instances);
+        // }
 
         // Core Instance Parsing
-        if !self.instances.is_empty() {
-            let mut instances = wasm_encoder::InstanceSection::new();
-            for instance in self.instances.iter() {
-                match instance {
-                    Instance::Instantiate { module_index, args } => {
-                        instances.instantiate(
-                            *module_index,
-                            args.iter()
-                                .map(|arg| (arg.name, ModuleArg::Instance(arg.index))),
-                        );
-                    }
-                    Instance::FromExports(exports) => {
-                        instances.export_items(exports.iter().map(|export| {
-                            (
-                                export.name,
-                                wasm_encoder::ExportKind::from(export.kind),
-                                export.index,
-                            )
-                        }));
-                    }
-                }
-            }
-            component.section(&instances);
-        }
+        // if !self.instances.is_empty() {
+        //     let mut instances = wasm_encoder::InstanceSection::new();
+        //     for instance in self.instances.iter() {
+        //         match instance {
+        //             Instance::Instantiate { module_index, args } => {
+        //                 instances.instantiate(
+        //                     *module_index,
+        //                     args.iter()
+        //                         .map(|arg| (arg.name, ModuleArg::Instance(arg.index))),
+        //                 );
+        //             }
+        //             Instance::FromExports(exports) => {
+        //                 instances.export_items(exports.iter().map(|export| {
+        //                     (
+        //                         export.name,
+        //                         wasm_encoder::ExportKind::from(export.kind),
+        //                         export.index,
+        //                     )
+        //                 }));
+        //             }
+        //         }
+        //     }
+        //     component.section(&instances);
+        // }
 
         // Alias parsing
-        if !self.alias.is_empty() {
-            let mut alias = ComponentAliasSection::new();
-            for a in self.alias.iter() {
-                alias.alias(process_alias(a, &mut reencode));
-            }
-            component.section(&alias);
-        }
+        // if !self.alias.is_empty() {
+        //     let mut alias = ComponentAliasSection::new();
+        //     for a in self.alias.iter() {
+        //         alias.alias(process_alias(a, &mut reencode));
+        //     }
+        //     component.section(&alias);
+        // }
 
         // Canons parsing
-        if !self.canons.is_empty() {
-            let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
-            for canon in self.canons.iter() {
-                match canon {
-                    CanonicalFunction::Lift {
-                        core_func_index,
-                        type_index,
-                        options,
-                    } => {
-                        canon_sec.lift(
-                            *core_func_index,
-                            *type_index,
-                            options
-                                .iter()
-                                .map(|canon| reencode.canonical_option(*canon)),
-                        );
-                    }
-                    CanonicalFunction::Lower {
-                        func_index,
-                        options,
-                    } => {
-                        canon_sec.lower(
-                            *func_index,
-                            options
-                                .iter()
-                                .map(|canon| reencode.canonical_option(*canon)),
-                        );
-                    }
-                    CanonicalFunction::ResourceNew { resource } => {
-                        canon_sec.resource_new(*resource);
-                    }
-                    CanonicalFunction::ResourceDrop { resource } => {
-                        canon_sec.resource_rep(*resource);
-                    }
-                    CanonicalFunction::ResourceRep { resource } => {
-                        canon_sec.resource_rep(*resource);
-                    }
-                }
-            }
-            component.section(&canon_sec);
-        }
+        // if !self.canons.is_empty() {
+        //     let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
+        //     for canon in self.canons.iter() {
+        //         match canon {
+        //             CanonicalFunction::Lift {
+        //                 core_func_index,
+        //                 type_index,
+        //                 options,
+        //             } => {
+        //                 canon_sec.lift(
+        //                     *core_func_index,
+        //                     *type_index,
+        //                     options
+        //                         .iter()
+        //                         .map(|canon| reencode.canonical_option(*canon)),
+        //                 );
+        //             }
+        //             CanonicalFunction::Lower {
+        //                 func_index,
+        //                 options,
+        //             } => {
+        //                 canon_sec.lower(
+        //                     *func_index,
+        //                     options
+        //                         .iter()
+        //                         .map(|canon| reencode.canonical_option(*canon)),
+        //                 );
+        //             }
+        //             CanonicalFunction::ResourceNew { resource } => {
+        //                 canon_sec.resource_new(*resource);
+        //             }
+        //             CanonicalFunction::ResourceDrop { resource } => {
+        //                 canon_sec.resource_rep(*resource);
+        //             }
+        //             CanonicalFunction::ResourceRep { resource } => {
+        //                 canon_sec.resource_rep(*resource);
+        //             }
+        //         }
+        //     }
+        //     component.section(&canon_sec);
+        // }
 
         // Custom sections
-        for (name, data) in self.custom_sections.iter() {
-            component.section(&wasm_encoder::CustomSection {
-                name: std::borrow::Cow::Borrowed(name),
-                data: std::borrow::Cow::Borrowed(data),
-            });
-        }
+        // for (name, data) in self.custom_sections.iter() {
+        //     component.section(&wasm_encoder::CustomSection {
+        //         name: std::borrow::Cow::Borrowed(name),
+        //         data: std::borrow::Cow::Borrowed(data),
+        //     });
+        // }
         component.finish()
     }
 

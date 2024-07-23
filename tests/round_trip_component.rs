@@ -27,7 +27,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let component = Component::parse(&buff, false).expect("Unable to parse");
-    component.print();
+    // component.print();
     // let id = component.modules[0].find_fn("_ZN4core3ptr191drop_in_place$LT$std..sync..poison..PoisonError$LT$std..sync..mutex..MutexGuard$LT$alloc..vec..Vec$LT$$LP$spin_sdk..wit..wasi..io..poll..Pollable$C$core..task..wake..Waker$RP$$GT$$GT$$GT$$GT$17h4e207d90019cfe5eE".parse().unwrap());
     let result = component.encode();
     // write_to_file(&result, format!("{}_test.wasm", testname));
@@ -40,7 +40,7 @@ fn round_trip_component(testname: &str, folder: &str) {
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
     // assert_eq!(out, original);
-    // println!("{}", out);
+    //println!("{}", out);
     // println!("{}", original);
 }
 
@@ -68,25 +68,25 @@ mod round_trip {
     //     start,
     //     const_expr
     // );
-
+    //
     // make_round_trip_tests_component!("handwritten/components", add);
-    //
+    // //
     // make_round_trip_tests_component!("wizard/components", func_loop);
-    //
+    // //
     // make_round_trip_tests_component!("spec-test/components", if_test);
 
-    make_round_trip_tests_component!("spin", hello_world);
+    // make_round_trip_tests_component!("spin", hello_world);
 
     // TODO: a lot of these can't pass roundtrip yet since we are
     // moving sections around (we group them by section)
-    // make_round_trip_tests_component!(
-    //     "wasm-tools/component-model",
-    //     a,
-    //     type_test,
-    //     big,
-    //     link,
-    //     lots_of_aliases,
-    //     more_flags,
-    //     string
-    // );
+    make_round_trip_tests_component!(
+        "wasm-tools/component-model",
+        // a,
+        // type_test,
+        //   big
+          // link,
+          // lots_of_aliases,
+          // more_flags,
+          // string
+    );
 }

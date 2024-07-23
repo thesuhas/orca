@@ -1,7 +1,8 @@
 //! Iterator to traverse a Module
 
+use crate::ir::id::LocalID;
 use crate::ir::module::Module;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, LocalID, Location};
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::module_builder::ModuleBuilder;
 use crate::opcode::Opcode;

@@ -1,8 +1,9 @@
 //! Intermediate Representation of a fucntion
 
+use crate::ir::id::{FunctionID, LocalID};
 use crate::ir::module::Module;
+use crate::ir::types::Body;
 use crate::ir::types::DataType;
-use crate::ir::types::{Body, FunctionID, LocalID};
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
 use crate::opcode::Opcode;
 use crate::ModuleBuilder;

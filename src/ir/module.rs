@@ -2,10 +2,10 @@
 
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
+use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentID, DataSegmentKind, ElementItems, ElementKind, FuncType,
-    FunctionID, Global, GlobalsID, ImportsID, Instrument, LocalID, TypeID,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global, Instrument,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
@@ -688,10 +688,10 @@ impl<'a> Module<'a> {
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.
-    pub fn add_global(&mut self, global: Global) -> GlobalsID {
+    pub fn add_global(&mut self, global: Global) -> GlobalID {
         let index = self.globals.len();
         self.globals.push(global);
-        GlobalsID { id: index }
+        GlobalID { id: index }
     }
 
     pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {

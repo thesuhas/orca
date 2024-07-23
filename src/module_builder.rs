@@ -1,6 +1,6 @@
 //! Trait that defines general injection behaviour
 
-use crate::ir::types::LocalID;
+use crate::ir::id::LocalID;
 use crate::DataType;
 
 pub trait ModuleBuilder {
