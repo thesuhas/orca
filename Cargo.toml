@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wasm-encoder = { version = "0.213.0", features = ["wasmparser"]}
-wasmparser = "0.213.0"
+wasm-encoder = { version = "0.214.0", features = ["wasmparser"]}
+wasmparser = "0.214.0"
 
 [dev-dependencies]
-wasmprinter = "0.213.0"
+wasmprinter = "0.214.0"
 wat = "1.213.0"

@@ -14,17 +14,25 @@ pub struct ModuleSubIterator {
     metadata: HashMap<usize, usize>,
     /// The function iterator used to keep track of the location in the function.
     pub(crate) func_iterator: FuncSubIterator,
+    /// Functions to skip. Provide an empty vector if no functions are to be skipped.
+    skip_funcs: Vec<usize>,
 }
 
 impl ModuleSubIterator {
     /// Creates a new ModuleSubIterator
-    pub fn new(num_funcs: usize, metadata: HashMap<usize, usize>) -> Self {
-        ModuleSubIterator {
+    pub fn new(num_funcs: usize, metadata: HashMap<usize, usize>, skip_funcs: Vec<usize>) -> Self {
+        let mut mod_it = ModuleSubIterator {
             curr_func: 0,
             num_funcs,
             metadata: metadata.clone(),
             func_iterator: FuncSubIterator::new(*metadata.get(&0).unwrap()),
+            skip_funcs,
+        };
+        // In case 0 is in skip func
+        while mod_it.skip_funcs.contains(&mod_it.curr_func) {
+            mod_it.next_function();
         }
+        mod_it
     }
 
     /// Checks if the SubIterator has finished traversing all the functions
@@ -61,6 +69,9 @@ impl ModuleSubIterator {
     /// Goes to the next function in the module
     fn next_function(&mut self) -> bool {
         self.curr_func += 1;
+        while self.curr_func < self.num_funcs && self.skip_funcs.contains(&self.curr_func) {
+            self.curr_func += 1;
+        }
         if self.curr_func < self.num_funcs {
             self.func_iterator = FuncSubIterator::new(*self.metadata.get(&self.curr_func).unwrap());
             true

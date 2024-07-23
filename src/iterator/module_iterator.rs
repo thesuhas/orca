@@ -20,7 +20,7 @@ pub struct ModuleIterator<'a, 'b> {
 #[allow(dead_code)]
 impl<'a, 'b> ModuleIterator<'a, 'b> {
     /// Creates a new ModuleIterator
-    pub fn new(module: &'a mut Module<'b>) -> Self {
+    pub fn new(module: &'a mut Module<'b>, skip_funcs: Vec<usize>) -> Self {
         // Creates Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (idx, func) in module.code_sections.iter().enumerate() {
@@ -29,7 +29,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
         let num_funcs = module.num_functions;
         ModuleIterator {
             module,
-            mod_iterator: ModuleSubIterator::new(num_funcs, metadata),
+            mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs),
         }
     }
 }

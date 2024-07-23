@@ -5,6 +5,7 @@ use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
+use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
 #[test]
@@ -14,7 +15,7 @@ fn test_iterator_count() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
 
     loop {
         let op = comp_it.curr_op();
@@ -47,7 +48,7 @@ fn test_iterator_count_mul_mod() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
 
     loop {
         let op = comp_it.curr_op();
@@ -79,7 +80,7 @@ fn test_blocks() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
         let op = mod_it.curr_op();
@@ -104,7 +105,7 @@ fn iterator_mark_as_before_test() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
 
     let interested = Operator::Call { function_index: 1 };
 
@@ -168,7 +169,7 @@ fn iterator_inject_i32_before() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component);
+    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
 
     let interested = Operator::Call { function_index: 1 };
 
@@ -236,7 +237,7 @@ fn iterator_inject_i32_before() {
 
 // you can also inline this
 fn iterate(component: &mut Component) {
-    let mut comp_it = ComponentIterator::new(component);
+    let mut comp_it = ComponentIterator::new(component, HashMap::new());
 
     let after = Operator::Call { function_index: 1 };
     let before = Operator::Drop;
@@ -301,7 +302,7 @@ fn test_it_add_local() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
         let op = mod_it.curr_op();
@@ -343,7 +344,7 @@ fn test_it_instr_at() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     let loc = Location::Module {
         func_idx: 0,
@@ -380,7 +381,7 @@ fn test_it_dup_instr() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
         let op = mod_it.curr_op();
@@ -420,7 +421,7 @@ fn test_imports() {
     let num_imported_func = module.num_import_func();
     assert_eq!(num_imported_func, 2);
 
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
         let op = mod_it.curr_op();
@@ -454,11 +455,74 @@ fn test_it_add_local_diff_type() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module);
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     mod_it.add_local(orca::ir::types::DataType::I64);
     mod_it.add_local(orca::ir::types::DataType::I32);
     let a = module.encode_only_module();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
+}
+
+#[test]
+fn test_function_skipping_module() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let functions_skip = vec![0usize];
+    let mut mod_it = ModuleIterator::new(&mut module, functions_skip);
+
+    let mut set = HashSet::new();
+
+    loop {
+        if let Location::Module {
+            func_idx,
+            instr_idx: _instr_idx,
+        } = mod_it.curr_loc()
+        {
+            set.insert(func_idx);
+        } else {
+            panic!("Should've gotten Module Location!");
+        }
+        if mod_it.next().is_none() {
+            break;
+        };
+    }
+
+    assert_eq!(set.len(), 1);
+    assert!(set.contains(&1usize));
+}
+
+#[test]
+fn test_function_skipping_component() {
+    let file = "tests/handwritten/components/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut comp = Component::parse(&buff, false).expect("Unable to parse");
+    let functions_skip = vec![0usize];
+    let mut mapping = HashMap::new();
+    mapping.insert(0usize, functions_skip);
+    let mut comp_it = ComponentIterator::new(&mut comp, mapping);
+
+    let mut set = HashSet::new();
+
+    loop {
+        if let Location::Component {
+            mod_idx: _mod_idx,
+            func_idx,
+            instr_idx: _instr_idx,
+        } = comp_it.curr_loc()
+        {
+            set.insert(func_idx);
+        } else {
+            panic!("Should've gotten Component Location!");
+        }
+        if comp_it.next().is_none() {
+            break;
+        };
+    }
+
+    assert_eq!(set.len(), 1);
+    assert!(set.contains(&1usize));
 }

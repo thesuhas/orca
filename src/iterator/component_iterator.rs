@@ -19,7 +19,7 @@ pub struct ComponentIterator<'a, 'b> {
 #[allow(dead_code)]
 impl<'a, 'b> ComponentIterator<'a, 'b> {
     /// Creates a new Component Iterator
-    pub fn new(comp: &'a mut Component<'b>) -> Self {
+    pub fn new(comp: &'a mut Component<'b>, skip_funcs: HashMap<usize, Vec<usize>>) -> Self {
         // Creates Module -> Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (mod_idx, m) in comp.modules.iter().enumerate() {
@@ -32,7 +32,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         let num_modules = comp.num_modules;
         ComponentIterator {
             comp,
-            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata),
+            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata, skip_funcs),
         }
     }
 }
