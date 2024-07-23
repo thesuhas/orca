@@ -42,6 +42,8 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     ///
     /// # Example
     /// ```no_run
+    /// use std::arch::aarch64::veor3q_s8;
+    /// use std::collections::HashMap;
     /// use orca::ir::component::Component;
     /// use orca::iterator::component_iterator::ComponentIterator;
     /// use wasmparser::Operator;
@@ -52,7 +54,7 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     /// let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    /// let mut comp_it = ComponentIterator::new(&mut component);
+    /// let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
     ///
     /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
     /// let interested = Operator::Call { function_index: 1 };
