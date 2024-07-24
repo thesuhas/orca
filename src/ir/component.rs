@@ -7,7 +7,7 @@ use crate::ir::helpers::{
 };
 use crate::ir::id::GlobalID;
 use crate::ir::module::Module;
-use crate::ir::section::Section;
+use crate::ir::section::ComponentSection;
 use crate::ir::types::Global;
 use crate::ir::wrappers::{
     convert_component_type, convert_instance_type, convert_module_type_declaration,
@@ -17,7 +17,7 @@ use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
+    ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance, Parser, Payload,
 };
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ pub struct Component<'a> {
     /// Number of modules
     pub num_modules: usize,
     /// Sections of the Component
-    pub sections: Vec<(u32, Section)>,
+    pub sections: Vec<(u32, ComponentSection)>,
     num_sections: usize,
 }
 
@@ -78,7 +78,7 @@ impl<'a> Component<'a> {
         }
     }
 
-    fn add_to_own_section(&mut self, section: Section) {
+    fn add_to_own_section(&mut self, section: ComponentSection) {
         if self.sections[self.num_sections - 1].1 == section {
             self.sections[self.num_sections - 1].0 += 1;
         } else {
@@ -88,7 +88,7 @@ impl<'a> Component<'a> {
 
     pub fn add_module(&mut self, module: Module<'a>) {
         self.modules.push(module);
-        self.add_to_own_section(Section::Module);
+        self.add_to_own_section(ComponentSection::Module);
         self.num_modules += 1;
     }
 
@@ -97,8 +97,8 @@ impl<'a> Component<'a> {
     }
 
     fn add_to_sections(
-        sections: &mut Vec<(u32, Section)>,
-        section: Section,
+        sections: &mut Vec<(u32, ComponentSection)>,
+        section: ComponentSection,
         num_sections: &mut usize,
         sections_added: u32,
     ) {
@@ -133,11 +133,18 @@ impl<'a> Component<'a> {
         let mut sections = vec![];
         let mut num_sections: usize = 0;
         let mut components: Vec<Component> = vec![];
+        let mut stack = Vec::new();
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
-            // ComponentTypeSection(_) => { /* ... */ }
-            // ComponentStartSection { .. } => { /* ... */ }
+            if let Payload::End(..) = payload {
+                if !stack.is_empty() {
+                    stack.pop();
+                }
+            }
+            if !stack.is_empty() {
+                continue;
+            }
             match payload {
                 Payload::ComponentImportSection(import_section_reader) => {
                     let temp: &mut Vec<ComponentImport> = &mut import_section_reader
@@ -147,7 +154,7 @@ impl<'a> Component<'a> {
                     imports.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::ComponentImport,
+                        ComponentSection::ComponentImport,
                         &mut num_sections,
                         l as u32,
                     );
@@ -160,7 +167,7 @@ impl<'a> Component<'a> {
                     exports.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::ComponentExport,
+                        ComponentSection::ComponentExport,
                         &mut num_sections,
                         l as u32,
                     );
@@ -173,7 +180,7 @@ impl<'a> Component<'a> {
                     instances.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::CoreInstance,
+                        ComponentSection::CoreInstance,
                         &mut num_sections,
                         l as u32,
                     );
@@ -185,7 +192,7 @@ impl<'a> Component<'a> {
                     core_types.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::CoreType,
+                        ComponentSection::CoreType,
                         &mut num_sections,
                         l as u32,
                     );
@@ -198,7 +205,7 @@ impl<'a> Component<'a> {
                     component_types.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::ComponentType,
+                        ComponentSection::ComponentType,
                         &mut num_sections,
                         l as u32,
                     );
@@ -210,7 +217,7 @@ impl<'a> Component<'a> {
                     component_instance.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::ComponentInstance,
+                        ComponentSection::ComponentInstance,
                         &mut num_sections,
                         l as u32,
                     );
@@ -222,7 +229,7 @@ impl<'a> Component<'a> {
                     alias.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::Alias,
+                        ComponentSection::Alias,
                         &mut num_sections,
                         l as u32,
                     );
@@ -234,7 +241,7 @@ impl<'a> Component<'a> {
                     canons.append(temp);
                     Self::add_to_sections(
                         &mut sections,
-                        Section::Canon,
+                        ComponentSection::Canon,
                         &mut num_sections,
                         l as u32,
                     );
@@ -248,23 +255,35 @@ impl<'a> Component<'a> {
                         enable_multi_memory,
                         parser,
                     )?);
-                    Self::add_to_sections(&mut sections, Section::Module, &mut num_sections, 1);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ComponentSection::Module,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::ComponentSection {
                     parser,
                     unchecked_range,
                 } => {
+                    // Indicating the start of a new component
+                    stack.push(Encoding::Component);
                     let cmp =
                         Component::parse_comp(&wasm[unchecked_range], enable_multi_memory, parser)?;
                     components.push(cmp.clone());
-                    Self::add_to_sections(&mut sections, Section::Component, &mut num_sections, 1);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ComponentSection::Component,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::CustomSection(custom_section_reader) => {
                     custom_sections
                         .push((custom_section_reader.name(), custom_section_reader.data()));
                     Self::add_to_sections(
                         &mut sections,
-                        Section::CustomSection,
+                        ComponentSection::CustomSection,
                         &mut num_sections,
                         1,
                     );
@@ -317,7 +336,7 @@ impl<'a> Component<'a> {
 
         for (num, section) in self.sections.iter() {
             match section {
-                Section::Component => {
+                ComponentSection::Component => {
                     assert!(
                         *num as usize + last_processed_component as usize <= self.components.len()
                     );
@@ -328,14 +347,14 @@ impl<'a> Component<'a> {
                         last_processed_component += 1;
                     }
                 }
-                Section::Module => {
+                ComponentSection::Module => {
                     assert!(*num as usize + last_processed_module as usize <= self.modules.len());
                     for mod_idx in last_processed_module..last_processed_module + num {
                         component.section(&ModuleSection(&self.modules[mod_idx as usize].encode()));
                         last_processed_module += 1;
                     }
                 }
-                Section::CoreType => {
+                ComponentSection::CoreType => {
                     assert!(
                         *num as usize + last_processed_core_ty as usize <= self.core_types.len()
                     );
@@ -355,7 +374,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&type_section);
                 }
-                Section::ComponentType => {
+                ComponentSection::ComponentType => {
                     assert!(
                         *num as usize + last_processed_comp_ty as usize
                             <= self.component_types.len()
@@ -478,7 +497,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&component_ty_section);
                 }
-                Section::ComponentImport => {
+                ComponentSection::ComponentImport => {
                     assert!(*num as usize + last_processed_imp as usize <= self.imports.len());
                     let mut imports = wasm_encoder::ComponentImportSection::new();
                     for imp_idx in last_processed_imp..last_processed_imp + num {
@@ -488,7 +507,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&imports);
                 }
-                Section::ComponentExport => {
+                ComponentSection::ComponentExport => {
                     assert!(*num as usize + last_processed_exp as usize <= self.exports.len());
                     let mut exports = wasm_encoder::ComponentExportSection::new();
                     for exp_idx in last_processed_exp..last_processed_exp + num {
@@ -503,7 +522,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&exports);
                 }
-                Section::ComponentInstance => {
+                ComponentSection::ComponentInstance => {
                     assert!(
                         *num as usize + last_processed_comp_inst as usize
                             <= self.component_instance.len()
@@ -541,7 +560,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&instances);
                 }
-                Section::CoreInstance => {
+                ComponentSection::CoreInstance => {
                     assert!(
                         *num as usize + last_processed_core_inst as usize <= self.instances.len()
                     );
@@ -570,7 +589,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&instances);
                 }
-                Section::Alias => {
+                ComponentSection::Alias => {
                     assert!(*num as usize + last_processed_alias as usize <= self.alias.len());
                     let mut alias = ComponentAliasSection::new();
                     for a_idx in last_processed_alias..last_processed_alias + num {
@@ -580,7 +599,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&alias);
                 }
-                Section::Canon => {
+                ComponentSection::Canon => {
                     assert!(*num as usize + last_processed_canon as usize <= self.canons.len());
                     let mut canon_sec = wasm_encoder::CanonicalFunctionSection::new();
                     for canon_idx in last_processed_canon..last_processed_canon + num {
@@ -624,7 +643,7 @@ impl<'a> Component<'a> {
                     }
                     component.section(&canon_sec);
                 }
-                Section::CustomSection => {
+                ComponentSection::CustomSection => {
                     assert!(
                         *num as usize + last_processed_custom_section as usize
                             <= self.custom_sections.len()

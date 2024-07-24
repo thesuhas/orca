@@ -11,6 +11,7 @@ use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
+use crate::ir::section::ModuleSection;
 use wasm_encoder::NameMap;
 
 #[derive(Clone, Debug)]
@@ -49,6 +50,9 @@ pub struct Module<'a> {
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
+    /// Sections of the Module
+    pub sections: Vec<(u32, ModuleSection)>,
+    num_sections: usize,
 
     // just a placeholder for roundtrip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -58,6 +62,20 @@ impl<'a> Module<'a> {
     pub fn parse_only_module(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
         Module::parse(wasm, enable_multi_memory, parser)
+    }
+
+    fn add_to_sections(
+        sections: &mut Vec<(u32, ModuleSection)>,
+        section: ModuleSection,
+        num_sections: &mut usize,
+        sections_added: u32,
+    ) {
+        if *num_sections > 0 && sections[*num_sections - 1].1 == section {
+            sections[*num_sections - 1].0 += sections_added;
+        } else {
+            sections.push((sections_added, section));
+            *num_sections += 1;
+        }
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
@@ -77,6 +95,8 @@ impl<'a> Module<'a> {
         let mut data_section_count = None;
         let mut custom_sections = vec![];
         let mut num_imported_functions = 0;
+        let mut num_sections: usize = 0;
+        let mut sections = vec![];
 
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
@@ -86,19 +106,26 @@ impl<'a> Module<'a> {
             let payload = payload?;
             match payload {
                 Payload::ImportSection(import_section_reader) => {
+                    let mut temp = vec![];
                     // count number of imported functions
                     for import in import_section_reader.into_iter() {
                         let imp = crate::ir::types::Import::from_wasmparser(import?);
                         if imp.is_function() {
                             num_imported_functions += 1;
                         }
-                        imports.push(imp);
+                        temp.push(imp);
                     }
+                    let l = temp.len();
+                    imports.append(&mut temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Import,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    // for rec_group in type_section_reader.into_iter() {
-                    //     types.extend(rec_group?.into_types());
-                    // }
+                    let mut temp = vec![];
                     for ty in type_section_reader.into_iter_err_on_gc_types() {
                         let fun_ty = ty?;
                         let params = fun_ty
@@ -114,63 +141,134 @@ impl<'a> Module<'a> {
                             .collect::<Vec<_>>()
                             .into_boxed_slice();
 
-                        types.push(FuncType::new(params, results));
+                        temp.push(FuncType::new(params, results));
                     }
+                    let l = temp.len();
+                    types.append(&mut temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::FuncType,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::DataSection(data_section_reader) => {
-                    data = data_section_reader
+                    let temp: &mut Vec<DataSegment> = &mut data_section_reader
                         .into_iter()
                         .map(|sec| {
                             sec.map_err(Error::from)
                                 .and_then(DataSegment::from_wasmparser)
                         })
                         .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    data.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::DataSegment,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::TableSection(table_section_reader) => {
-                    tables = table_section_reader
-                        .into_iter()
-                        .map(|t| {
-                            t.map_err(Error::from).map(|t| match t.init {
-                                wasmparser::TableInit::RefNull => (t.ty, None),
-                                wasmparser::TableInit::Expr(e) => (t.ty, Some(e)),
+                    let temp: &mut Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)> =
+                        &mut table_section_reader
+                            .into_iter()
+                            .map(|t| {
+                                t.map_err(Error::from).map(|t| match t.init {
+                                    wasmparser::TableInit::RefNull => (t.ty, None),
+                                    wasmparser::TableInit::Expr(e) => (t.ty, Some(e)),
+                                })
                             })
-                        })
-                        .collect::<Result<_, _>>()?;
+                            .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    tables.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Table,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::MemorySection(memory_section_reader) => {
-                    memories = memory_section_reader
+                    let temp: &mut Vec<MemoryType> = &mut memory_section_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    memories.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Memory,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::FunctionSection(function_section_reader) => {
                     let temp: Vec<u32> = function_section_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
-                    functions = temp.iter().map(|id| *id as TypeID).collect();
+                    let l = temp.len();
+                    functions.extend(temp.iter().map(|id| *id as TypeID));
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Function,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::GlobalSection(global_section_reader) => {
-                    globals = global_section_reader
+                    let temp: &mut Vec<Global> = &mut global_section_reader
                         .into_iter()
                         .map(|g| Global::from_wasmparser(g?))
                         .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    globals.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Global,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::ExportSection(export_section_reader) => {
-                    exports = export_section_reader
+                    let temp: &mut Vec<Export> = &mut export_section_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
+                    let l = temp.len();
+                    exports.append(temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Export,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::StartSection { func, range: _ } => {
                     if start.is_some() {
                         return Err(Error::MultipleStartSections);
                     }
                     start = Some(func as FunctionID);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Start,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::ElementSection(element_section_reader) => {
+                    let mut temp = vec![];
                     for element in element_section_reader.into_iter() {
                         let element = element?;
                         let items = ElementItems::from_wasmparser(element.items.clone())?;
-                        elements.push((ElementKind::from_wasmparser(element.kind)?, items));
+                        temp.push((ElementKind::from_wasmparser(element.kind)?, items));
                     }
+                    let l = temp.len();
+                    elements.append(&mut temp);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::Elements,
+                        &mut num_sections,
+                        l as u32,
+                    );
                 }
                 Payload::DataCountSection { count, range: _ } => {
                     data_section_count = Some(count);
@@ -226,6 +324,12 @@ impl<'a> Module<'a> {
                         num_instructions: instructions_bool.len(),
                         name: None,
                     });
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::CodeSection,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::CustomSection(custom_section_reader) => {
                     match custom_section_reader.name() {
@@ -285,6 +389,12 @@ impl<'a> Module<'a> {
                                 .push((custom_section_reader.name(), custom_section_reader.data()));
                         }
                     }
+                    Self::add_to_sections(
+                        &mut sections,
+                        ModuleSection::CustomSection,
+                        &mut num_sections,
+                        1,
+                    );
                 }
                 Payload::Version {
                     num,
@@ -353,6 +463,8 @@ impl<'a> Module<'a> {
             num_functions: code_sections.len(),
             num_imported_functions,
             module_name,
+            sections,
+            num_sections,
             local_names,
         })
     }
@@ -824,6 +936,8 @@ impl<'a> Module<'a> {
             num_functions: 0,
             num_imported_functions: 0,
             module_name: None,
+            sections: vec![],
+            num_sections: 0,
             local_names: wasm_encoder::IndirectNameMap::new(),
         }
     }

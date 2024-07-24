@@ -30,7 +30,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     // component.print();
     let result = component.encode();
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
-    let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
+    let original = wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
 
@@ -76,6 +76,7 @@ mod round_trip {
 
     // make_round_trip_tests_component!(
     //     "wasm-tools/component-model",
+    //     nested_modules_0
     // a
     //     // type_test,
     //     big
