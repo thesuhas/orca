@@ -497,8 +497,8 @@ pub struct Import<'a> {
     pub import_name: Option<String>,
 }
 
-impl Import<'_> {
-    pub(crate) fn from_wasmparser(import: wasmparser::Import) -> Import {
+impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
+    fn from(import: wasmparser::Import<'a>) -> Self {
         Import {
             module: import.module,
             name: import.name,
@@ -506,7 +506,10 @@ impl Import<'_> {
             import_name: None,
         }
     }
+}
 
+impl Import<'_> {
+    // TODO: Add documentation here
     pub fn is_function(&self) -> bool {
         matches!(self.ty, wasmparser::TypeRef::Func(_))
     }
@@ -520,7 +523,6 @@ pub struct Body<'a> {
     /// indices before the locals. So if a function has 2 parameters and a local
     /// defined here then local indices 0 and 1 will refer to the parameters and
     /// index 2 will refer to the local here.
-    // TODO: this representation is a bit weird, why it is like this?
     pub locals: Vec<(u32, DataType)>,
     pub num_locals: usize,
     // accessing operators by .0 is not very clear

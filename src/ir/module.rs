@@ -50,7 +50,7 @@ pub struct Module<'a> {
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
-    /// Sections of the Module
+    /// Sections of the Module. Represented as (#num of occurrences of a section, type of section)
     pub sections: Vec<(u32, ModuleSection)>,
     num_sections: usize,
 
@@ -59,6 +59,17 @@ pub struct Module<'a> {
 }
 
 impl<'a> Module<'a> {
+    /// Parses a `Module` from a wasm binary.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use orca::Module;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// let module = Module::parse_only_module(&buff, false).unwrap();
+    /// ```
     pub fn parse_only_module(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
         Module::parse(wasm, enable_multi_memory, parser)
@@ -78,6 +89,7 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Parses a `Module` from a wasm binary. To be used ONLY by an Orca function and not by the user.
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
         let wasm_features = wasmparser::WasmFeatures::default();
         let mut imports: Vec<crate::ir::types::Import> = vec![];
@@ -109,7 +121,7 @@ impl<'a> Module<'a> {
                     let mut temp = vec![];
                     // count number of imported functions
                     for import in import_section_reader.into_iter() {
-                        let imp = crate::ir::types::Import::from_wasmparser(import?);
+                        let imp = crate::ir::types::Import::from(import?);
                         if imp.is_function() {
                             num_imported_functions += 1;
                         }
@@ -478,10 +490,22 @@ impl<'a> Module<'a> {
     }
 
     /// Encode the module into a wasm binary.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use orca::Module;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// let module = Module::parse_only_module(&buff, false).unwrap();
+    /// let result = module.encode_only_module();
+    /// ```
     pub fn encode_only_module(&self) -> Vec<u8> {
         self.encode().finish()
     }
 
+    /// Encodes an Orca Module to a wasm_encoder Module
     pub(crate) fn encode(&self) -> wasm_encoder::Module {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
@@ -854,17 +878,18 @@ impl<'a> Module<'a> {
         index as ImportsID
     }
 
-    /// count number of imported function
+    /// Count number of imported function
     pub fn num_import_func(&self) -> u32 {
         self.num_imported_functions as u32
     }
 
-    /// set_fn_name (using relative index)
+    /// Set a function name to a function using it's relative index
     pub fn set_fn_name(&mut self, func_idx: u32, name: &'a str) {
         let body = &mut self.code_sections[func_idx as usize];
         body.name = Some(name.to_owned());
     }
 
+    /// Add an Export to a `Module`
     pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
         let export = Export {
             name,
@@ -874,20 +899,7 @@ impl<'a> Module<'a> {
         self.exports.push(export);
     }
 
-    pub fn visitor(self) {
-        for (idx, body) in self.code_sections.into_iter().enumerate() {
-            println!("Entered Function: {}", idx);
-            // Each function index should match to a code section
-            for (local_idx, local_ty) in body.locals {
-                println!("Local {}: {}", local_idx, local_ty);
-            }
-            for (instr_idx, (instr, instrumented)) in body.instructions.into_iter().enumerate() {
-                println!(" {}: {:?}, {}", instr_idx, instr, instrumented);
-            }
-        }
-    }
-
-    /// get a function modifier from a function index
+    /// Get a function modifier from a function index
     pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
         // let ty = self.functions.get(func_idx as usize)?;
@@ -896,7 +908,7 @@ impl<'a> Module<'a> {
         // None
     }
 
-    /// get local function id by name
+    /// Get Local Function ID by name
     // Note: returned absolute id here
     pub fn get_fid_by_name(&self, name: &str) -> Option<u32> {
         for (idx, body) in self.code_sections.iter().enumerate() {
@@ -909,15 +921,16 @@ impl<'a> Module<'a> {
         None
     }
 
-    pub fn get_fname(&self, id: usize) -> Option<String> {
-        if id < self.code_sections.len() {
-            self.code_sections[id].name.clone()
+    /// Get a Function name from its Function ID
+    pub fn get_fname(&self, id: FunctionID) -> Option<String> {
+        if (id as usize) < self.code_sections.len() {
+            self.code_sections[id as usize].name.clone()
         } else {
             None
         }
     }
 
-    /// create fresh module
+    /// Create an empty Module
     pub fn new() -> Self {
         Module {
             types: vec![],

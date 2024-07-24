@@ -47,7 +47,7 @@ pub struct Component<'a> {
     pub components: Vec<Component<'a>>,
     /// Number of modules
     pub num_modules: usize,
-    /// Sections of the Component
+    /// Sections of the Component. Represented as (#num of occurrences of a section, type of section)
     pub sections: Vec<(u32, ComponentSection)>,
     num_sections: usize,
 }
@@ -86,12 +86,14 @@ impl<'a> Component<'a> {
         }
     }
 
+    /// Add a Module to this Component.
     pub fn add_module(&mut self, module: Module<'a>) {
         self.modules.push(module);
         self.add_to_own_section(ComponentSection::Module);
         self.num_modules += 1;
     }
 
+    /// Add a Global to this Component.
     pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalID {
         self.modules[module_idx].add_global(global)
     }
@@ -110,6 +112,17 @@ impl<'a> Component<'a> {
         }
     }
 
+    /// Parse a `Component` from a wasm binary.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use orca::Component;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// let comp = Component::parse(&buff, false).unwrap();
+    /// ```
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
         Component::parse_comp(wasm, enable_multi_memory, parser)
@@ -314,6 +327,18 @@ impl<'a> Component<'a> {
         })
     }
 
+    /// Encode a `Component` to bytes..
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use orca::Component;
+    ///
+    /// let file = "path_to_file";
+    /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    /// let comp = Component::parse(&buff, false).unwrap();
+    /// let result = comp.encode();
+    /// ```
     pub fn encode(&self) -> Vec<u8> {
         self.encode_comp().finish()
     }
@@ -665,15 +690,7 @@ impl<'a> Component<'a> {
         component
     }
 
-    /// Print every instruction
-    pub fn visitor(&self) {
-        // This function is responsible for visiting every instruction
-        for (index, module) in self.modules.iter().enumerate() {
-            println!("Entered Module: {}", index);
-            (*module).clone().visitor();
-        }
-    }
-
+    /// Print a rudimentary textual representation of a `Component`
     pub fn print(&self) {
         // Print Alias
         if !self.alias.is_empty() {
