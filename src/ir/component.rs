@@ -14,7 +14,7 @@ use crate::ir::wrappers::{
     convert_results, encode_core_type_subtype, process_alias,
 };
 use wasm_encoder::reencode::Reencode;
-use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection};
+use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
     ComponentType, ComponentTypeDeclaration, CoreType, Instance, Parser, Payload,
@@ -43,6 +43,8 @@ pub struct Component<'a> {
     pub canons: Vec<CanonicalFunction>,
     /// Custom sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    /// Nested Components
+    pub components: Vec<Component<'a>>,
     /// Number of modules
     pub num_modules: usize,
     /// Sections of the Component
@@ -72,6 +74,7 @@ impl<'a> Component<'a> {
             num_modules: 0,
             sections: vec![],
             num_sections: 0,
+            components: vec![],
         }
     }
 
@@ -103,11 +106,20 @@ impl<'a> Component<'a> {
             sections[*num_sections - 1].0 += sections_added;
         } else {
             sections.push((sections_added, section));
+            *num_sections += 1;
         }
-        *num_sections += 1;
     }
 
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+        let parser = Parser::new(0);
+        Component::parse_comp(wasm, enable_multi_memory, parser)
+    }
+
+    fn parse_comp(
+        wasm: &'a [u8],
+        enable_multi_memory: bool,
+        parser: Parser,
+    ) -> Result<Self, Error> {
         let mut modules = vec![];
         let mut core_types = vec![];
         let mut component_types = vec![];
@@ -120,8 +132,8 @@ impl<'a> Component<'a> {
         let mut custom_sections = vec![];
         let mut sections = vec![];
         let mut num_sections: usize = 0;
+        let mut components: Vec<Component> = vec![];
 
-        let parser = Parser::new(0);
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
             // ComponentTypeSection(_) => { /* ... */ }
@@ -239,11 +251,15 @@ impl<'a> Component<'a> {
                     Self::add_to_sections(&mut sections, Section::Module, &mut num_sections, 1);
                 }
                 Payload::ComponentSection {
-                    parser: _,
-                    unchecked_range: _,
-                } => {}
+                    parser,
+                    unchecked_range,
+                } => {
+                    let cmp =
+                        Component::parse_comp(&wasm[unchecked_range], enable_multi_memory, parser)?;
+                    components.push(cmp.clone());
+                    Self::add_to_sections(&mut sections, Section::Component, &mut num_sections, 1);
+                }
                 Payload::CustomSection(custom_section_reader) => {
-                    // TODO: See if this is an issue
                     custom_sections
                         .push((custom_section_reader.name(), custom_section_reader.data()));
                     Self::add_to_sections(
@@ -275,10 +291,15 @@ impl<'a> Component<'a> {
             num_modules: modules.len(),
             sections,
             num_sections,
+            components: components.clone(),
         })
     }
 
     pub fn encode(&self) -> Vec<u8> {
+        self.encode_comp().finish()
+    }
+
+    fn encode_comp(&self) -> wasm_encoder::Component {
         let mut component = wasm_encoder::Component::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
         // NOTE: All of these are 1-indexed and not 0-indexed
@@ -292,9 +313,21 @@ impl<'a> Component<'a> {
         let mut last_processed_alias = 0;
         let mut last_processed_canon = 0;
         let mut last_processed_custom_section = 0;
+        let mut last_processed_component = 0;
 
         for (num, section) in self.sections.iter() {
             match section {
+                Section::Component => {
+                    assert!(
+                        *num as usize + last_processed_component as usize <= self.components.len()
+                    );
+                    for comp_idx in last_processed_component..last_processed_component + num {
+                        component.section(&NestedComponentSection(
+                            &self.components[comp_idx as usize].encode_comp(),
+                        ));
+                        last_processed_component += 1;
+                    }
+                }
                 Section::Module => {
                     assert!(*num as usize + last_processed_module as usize <= self.modules.len());
                     for mod_idx in last_processed_module..last_processed_module + num {
@@ -581,7 +614,7 @@ impl<'a> Component<'a> {
                                 canon_sec.resource_new(*resource);
                             }
                             CanonicalFunction::ResourceDrop { resource } => {
-                                canon_sec.resource_rep(*resource);
+                                canon_sec.resource_drop(*resource);
                             }
                             CanonicalFunction::ResourceRep { resource } => {
                                 canon_sec.resource_rep(*resource);
@@ -610,7 +643,7 @@ impl<'a> Component<'a> {
             }
         }
 
-        component.finish()
+        component
     }
 
     /// Print every instruction

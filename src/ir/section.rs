@@ -11,4 +11,5 @@ pub enum Section {
     ComponentInstance,
     Canon,
     CustomSection,
+    Component,
 }
