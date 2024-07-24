@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// Represents a Section in a Component
-pub enum Section {
+pub enum ComponentSection {
     Module,
     Alias,
     CoreType,
@@ -12,4 +12,21 @@ pub enum Section {
     Canon,
     CustomSection,
     Component,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+/// Represents a Section in a Module
+pub enum ModuleSection {
+    FuncType,
+    Import,
+    Function,
+    Table,
+    Memory,
+    Global,
+    DataSegment,
+    Export,
+    Start,
+    Elements,
+    CodeSection,
+    CustomSection,
 }

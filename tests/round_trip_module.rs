@@ -13,7 +13,7 @@ fn round_trip_module(testname: &str, folder: &str) {
     let result = module.encode_only_module();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     println!("{}", out);
-    let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
+    // let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     // assert_eq!(out, original);
 }
 
@@ -43,7 +43,7 @@ mod round_trip {
         const_expr
     );
 
-    make_round_trip_tests_module!("handwritten/modules", func1);
+    make_round_trip_tests_module!("handwritten/modules", blocks);
 }
 
 #[test]
