@@ -146,7 +146,7 @@ impl<'a> Module<'a> {
                     let temp: Vec<u32> = function_section_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
-                    functions = temp.iter().map(|id| TypeID { id: *id as usize }).collect();
+                    functions = temp.iter().map(|id| *id as TypeID).collect();
                 }
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
@@ -163,7 +163,7 @@ impl<'a> Module<'a> {
                     if start.is_some() {
                         return Err(Error::MultipleStartSections);
                     }
-                    start = Some(FunctionID { id: func as usize });
+                    start = Some(func as FunctionID);
                 }
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
@@ -418,7 +418,7 @@ impl<'a> Module<'a> {
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
             for type_index in self.functions.iter() {
-                functions.function(type_index.id as u32);
+                functions.function(*type_index);
             }
             module.section(&functions);
         }
@@ -487,9 +487,7 @@ impl<'a> Module<'a> {
         }
 
         if let Some(function_index) = self.start {
-            module.section(&wasm_encoder::StartSection {
-                function_index: function_index.id as u32,
-            });
+            module.section(&wasm_encoder::StartSection { function_index });
         }
 
         if !self.elements.is_empty() {
@@ -679,19 +677,19 @@ impl<'a> Module<'a> {
             ret.to_vec().into_boxed_slice(),
         );
         self.types.push(ty);
-        TypeID { id: index }
+        index as TypeID
     }
 
     /// Get type from index of the type section
     pub fn get_type(&self, index: TypeID) -> Option<&FuncType> {
-        self.types.get(index.id)
+        self.types.get(index as usize)
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.
     pub fn add_global(&mut self, global: Global) -> GlobalID {
         let index = self.globals.len();
         self.globals.push(global);
-        GlobalID { id: index }
+        index as GlobalID
     }
 
     pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {
@@ -717,7 +715,7 @@ impl<'a> Module<'a> {
             func_body.locals.push((1, ty));
         }
 
-        LocalID { id: index }
+        index as LocalID
     }
 
     /// Add a new Data Segment to the module.
@@ -725,7 +723,7 @@ impl<'a> Module<'a> {
     pub fn add_data(&mut self, data: DataSegment) -> DataSegmentID {
         let index = self.data.len();
         self.data.push(data);
-        DataSegmentID { id: index }
+        index as DataSegmentID
     }
 
     /// Add a new function to the module. Returns the index of the imported function
@@ -741,7 +739,7 @@ impl<'a> Module<'a> {
         };
         self.imports.push(import);
 
-        ImportsID { id: index }
+        index as ImportsID
     }
 
     /// count number of imported function
@@ -781,7 +779,7 @@ impl<'a> Module<'a> {
     pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
         // let ty = self.functions.get(func_idx as usize)?;
-        let body = self.code_sections.get_mut(func_id.id)?;
+        let body = self.code_sections.get_mut(func_id as usize)?;
         Some(FunctionModifier::init(body))
         // None
     }

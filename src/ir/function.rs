@@ -49,7 +49,7 @@ impl<'a> FunctionBuilder<'a> {
 
         assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(module.functions.len(), module.num_functions);
-        FunctionID { id }
+        id as FunctionID
     }
 
     /// add a local and return local index
@@ -69,7 +69,7 @@ impl<'a> FunctionBuilder<'a> {
             // If no locals, just append
             self.body.locals.push((1, ty));
         }
-        LocalID { id: index }
+        index as LocalID
     }
 }
 
