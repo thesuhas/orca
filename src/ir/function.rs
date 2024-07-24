@@ -1,8 +1,9 @@
 //! Intermediate Representation of a fucntion
 
+use crate::ir::id::{FunctionID, LocalID};
 use crate::ir::module::Module;
+use crate::ir::types::Body;
 use crate::ir::types::DataType;
-use crate::ir::types::{Body, FunctionID, LocalID};
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
 use crate::opcode::Opcode;
 use crate::ModuleBuilder;
@@ -48,7 +49,7 @@ impl<'a> FunctionBuilder<'a> {
 
         assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(module.functions.len(), module.num_functions);
-        FunctionID { id }
+        id as FunctionID
     }
 
     /// add a local and return local index
@@ -68,7 +69,7 @@ impl<'a> FunctionBuilder<'a> {
             // If no locals, just append
             self.body.locals.push((1, ty));
         }
-        LocalID { id: index }
+        index as LocalID
     }
 }
 
