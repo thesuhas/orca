@@ -534,6 +534,6 @@ fn test_fn_name() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
-    assert_eq!("add".to_string(), module.get_fname(0usize).unwrap());
-    assert_eq!(None, module.get_fname(1usize));
+    assert_eq!("add".to_string(), module.get_fname(0).unwrap());
+    assert_eq!(None, module.get_fname(1));
 }

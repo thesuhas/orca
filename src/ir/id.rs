@@ -1,3 +1,4 @@
+#![doc(hidden)]
 #![allow(dead_code)]
 
 /// LocalID in a function
