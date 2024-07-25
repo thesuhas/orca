@@ -439,7 +439,7 @@ impl<'a> Module<'a> {
                                 .next()
                                 .unwrap()
                                 .expect("producers field");
-                            let _value = field
+                            let value = field
                                 .values
                                 .into_iter()
                                 .collect::<Result<Vec<_>, _>>()
