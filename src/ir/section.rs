@@ -32,4 +32,5 @@ pub enum ModuleSection {
     Elements,
     CodeSection,
     CustomSection,
+    // ProducerSection
 }

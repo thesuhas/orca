@@ -56,6 +56,15 @@ pub struct Module<'a> {
 
     // just a placeholder for roundtrip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
+    pub(crate) label_names: wasm_encoder::IndirectNameMap,
+    pub(crate) type_names: wasm_encoder::NameMap,
+    pub(crate) table_names: wasm_encoder::NameMap,
+    pub(crate) memory_names: wasm_encoder::NameMap,
+    pub(crate) global_names: wasm_encoder::NameMap,
+    pub(crate) elem_names: wasm_encoder::NameMap,
+    pub(crate) data_names: wasm_encoder::NameMap,
+    pub(crate) field_names: wasm_encoder::IndirectNameMap,
+    pub(crate) tag_names: wasm_encoder::NameMap,
 }
 
 impl<'a> Module<'a> {
@@ -94,7 +103,7 @@ impl<'a> Module<'a> {
         enable_multi_memory: bool,
         parser: Parser,
     ) -> Result<Self, Error> {
-        let wasm_features = wasmparser::WasmFeatures::default();
+        // let _wasm_features = wasmparser::WasmFeatures::default();
         let mut imports: Vec<crate::ir::types::Import> = vec![];
         let mut types = vec![];
         let mut data = vec![];
@@ -116,6 +125,15 @@ impl<'a> Module<'a> {
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
         let mut local_names = wasm_encoder::IndirectNameMap::new();
+        let mut label_names = wasm_encoder::IndirectNameMap::new();
+        let mut type_names = wasm_encoder::NameMap::new();
+        let mut table_names = wasm_encoder::NameMap::new();
+        let mut memory_names = wasm_encoder::NameMap::new();
+        let mut global_names = wasm_encoder::NameMap::new();
+        let mut elem_names = wasm_encoder::NameMap::new();
+        let mut data_names = wasm_encoder::NameMap::new();
+        let mut field_names = wasm_encoder::IndirectNameMap::new();
+        let mut tag_names = wasm_encoder::NameMap::new();
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -347,14 +365,8 @@ impl<'a> Module<'a> {
                     );
                 }
                 Payload::CustomSection(custom_section_reader) => {
-                    match custom_section_reader.name() {
-                        "name" => {
-                            let name_section_reader =
-                                wasmparser::NameSectionReader::new(wasmparser::BinaryReader::new(
-                                    custom_section_reader.data(),
-                                    custom_section_reader.data_offset(),
-                                    wasm_features,
-                                ));
+                    match custom_section_reader.as_known() {
+                        wasmparser::KnownCustom::Name(name_section_reader) => {
                             for subsection in name_section_reader {
                                 #[allow(clippy::single_match)]
                                 match subsection? {
@@ -390,14 +402,50 @@ impl<'a> Module<'a> {
                                     wasmparser::Name::Local(names) => {
                                         local_names = indirect_namemap_parser2encoder(names);
                                     }
-                                    wasmparser::Name::Unknown { .. } => {}
-                                    _ => {
-                                        // we do nothing for the extended name section proposal
-                                        // https://github.com/WebAssembly/extended-name-section/blob/main/proposals/extended-name-section/Overview.md
-                                        // we could preserve them like what we did for locals
+                                    wasmparser::Name::Label(names) => {
+                                        label_names = indirect_namemap_parser2encoder(names);
                                     }
+                                    wasmparser::Name::Type(names) => {
+                                        type_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Table(names) => {
+                                        table_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Memory(names) => {
+                                        memory_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Global(names) => {
+                                        global_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Element(names) => {
+                                        elem_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Data(names) => {
+                                        data_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Field(names) => {
+                                        field_names = indirect_namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Tag(names) => {
+                                        tag_names = namemap_parser2encoder(names);
+                                    }
+                                    wasmparser::Name::Unknown { .. } => {}
                                 }
                             }
+                        }
+                        wasmparser::KnownCustom::Producers(producer_section_reader) => {
+                            let field = producer_section_reader
+                                .into_iter()
+                                .next()
+                                .unwrap()
+                                .expect("producers field");
+                            let _value = field
+                                .values
+                                .into_iter()
+                                .collect::<Result<Vec<_>, _>>()
+                                .expect("values");
+                            custom_sections
+                                .push((custom_section_reader.name(), custom_section_reader.data()));
                         }
                         _ => {
                             custom_sections
@@ -481,6 +529,15 @@ impl<'a> Module<'a> {
             sections,
             num_sections,
             local_names,
+            type_names,
+            table_names,
+            elem_names,
+            memory_names,
+            global_names,
+            data_names,
+            field_names,
+            tag_names,
+            label_names,
         })
     }
 
@@ -788,12 +845,20 @@ impl<'a> Module<'a> {
         // the name section is not stored in self.custom_sections anymore
         let mut names = wasm_encoder::NameSection::new();
 
-        // we only encode the three name subsection in wasm spec
         if let Some(module_name) = &self.module_name {
             names.module(module_name);
         }
         names.functions(&function_names);
         names.locals(&self.local_names);
+        names.labels(&self.label_names);
+        names.types(&self.type_names);
+        names.tables(&self.table_names);
+        names.memories(&self.memory_names);
+        names.globals(&self.global_names);
+        names.elements(&self.elem_names);
+        names.data(&self.data_names);
+        names.fields(&self.field_names);
+        names.tables(&self.tag_names);
 
         module.section(&names);
 
@@ -962,6 +1027,15 @@ impl<'a> Module<'a> {
             sections: vec![],
             num_sections: 0,
             local_names: wasm_encoder::IndirectNameMap::new(),
+            label_names: wasm_encoder::IndirectNameMap::new(),
+            type_names: wasm_encoder::NameMap::new(),
+            table_names: wasm_encoder::NameMap::new(),
+            elem_names: wasm_encoder::NameMap::new(),
+            memory_names: wasm_encoder::NameMap::new(),
+            global_names: wasm_encoder::NameMap::new(),
+            data_names: wasm_encoder::NameMap::new(),
+            field_names: wasm_encoder::IndirectNameMap::new(),
+            tag_names: wasm_encoder::NameMap::new(),
         }
     }
 }

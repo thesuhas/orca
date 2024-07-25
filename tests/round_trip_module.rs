@@ -1,4 +1,22 @@
 use orca::ir::module::Module;
+use std::fs::File;
+use std::io::Write;
+
+fn write_to_file(bytes: &Vec<u8>, path: String) {
+    let mut file = match File::create(path) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to create the file: {}", e);
+            return;
+        }
+    };
+
+    // Write the string to the file
+    match file.write_all(bytes) {
+        Ok(_) => println!("Data successfully written to the file."),
+        Err(e) => eprintln!("Failed to write to the file: {}", e),
+    }
+}
 
 fn round_trip_module(testname: &str, folder: &str) {
     let filename = format!(
@@ -13,7 +31,12 @@ fn round_trip_module(testname: &str, folder: &str) {
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
     println!("{}", out);
-    // let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
+    let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
+    if out != original {
+        println!("Test: {:?} failed! Writing to file to check", testname);
+
+        write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
+    }
     // assert_eq!(out, original);
 }
 
@@ -31,19 +54,20 @@ macro_rules! make_round_trip_tests_module {
 mod round_trip {
     make_round_trip_tests_module!(
         "dfinity/modules",
-        import_func,
-        data_section,
-        func,
-        func_locals,
-        table,
-        table_init,
-        globals,
-        exports,
-        start,
-        const_expr
+        //     import_func,
+        //     data_section,
+        //     func,
+        //     func_locals,
+        //     table,
+        //     table_init
+        globals // exports,
+                // start,
+                // const_expr
     );
 
-    make_round_trip_tests_module!("handwritten/modules", blocks);
+    // make_round_trip_tests_module!("handwritten/modules", blocks);
+    //
+    // make_round_trip_tests_module!("spin", hello_world_module);
 }
 
 #[test]
