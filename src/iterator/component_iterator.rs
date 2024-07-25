@@ -325,8 +325,8 @@ impl ModuleBuilder for ComponentIterator<'_, '_> {
         }
     }
 
-    fn add_global(&mut self, global: Global) -> GlobalID {
-        let curr_mod = self.curr_module() as usize;
-        self.comp.modules[curr_mod].add_global(global)
-    }
+    // fn add_global(&mut self, global: Global) -> GlobalID {
+    //     let curr_mod = self.curr_module() as usize;
+    //     self.comp.modules[curr_mod].add_global(global)
+    // }
 }

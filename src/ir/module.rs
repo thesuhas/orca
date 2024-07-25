@@ -830,6 +830,10 @@ impl<'a> Module<'a> {
         self.globals.push(global);
         index as GlobalID
     }
+    /// Remove the last global from the list. Can only remove the final Global due to indexing
+    pub fn remove_global(&mut self) {
+        self.globals.pop();
+    }
 
     pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {
         // get type

@@ -316,7 +316,7 @@ impl ModuleBuilder for ModuleIterator<'_, '_> {
         }
     }
 
-    fn add_global(&mut self, global: Global) -> GlobalID {
-        self.module.add_global(global)
-    }
+    // fn add_global(&mut self, global: Global) -> GlobalID {
+    //     self.module.add_global(global)
+    // }
 }
