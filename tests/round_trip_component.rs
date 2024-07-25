@@ -36,6 +36,7 @@ fn round_trip_component(testname: &str, folder: &str) {
 
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
+    write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     assert_eq!(out, original);
     // println!("{}", out);
     // println!("{}", original);
@@ -68,11 +69,11 @@ mod round_trip {
     //
     // make_round_trip_tests_component!("handwritten/components", add);
     //
-    make_round_trip_tests_component!("wizard/components", func_loop);
+    // make_round_trip_tests_component!("wizard/components", func_loop);
     //
     // make_round_trip_tests_component!("spec-test/components", if_test);
 
-    // make_round_trip_tests_component!("spin", hello_world);
+    make_round_trip_tests_component!("spin", hello_world);
 
     // make_round_trip_tests_component!(
     //     "wasm-tools/component-model",
