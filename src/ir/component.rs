@@ -263,7 +263,7 @@ impl<'a> Component<'a> {
                     parser,
                     unchecked_range,
                 } => {
-                    modules.push(Module::parse(
+                    modules.push(Module::parse_internal(
                         &wasm[unchecked_range],
                         enable_multi_memory,
                         parser,
@@ -375,7 +375,9 @@ impl<'a> Component<'a> {
                 ComponentSection::Module => {
                     assert!(*num as usize + last_processed_module as usize <= self.modules.len());
                     for mod_idx in last_processed_module..last_processed_module + num {
-                        component.section(&ModuleSection(&self.modules[mod_idx as usize].encode()));
+                        component.section(&ModuleSection(
+                            &self.modules[mod_idx as usize].encode_internal(),
+                        ));
                         last_processed_module += 1;
                     }
                 }

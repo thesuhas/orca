@@ -68,11 +68,11 @@ impl<'a> Module<'a> {
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    /// let module = Module::parse_only_module(&buff, false).unwrap();
+    /// let module = Module::parse(&buff, false).unwrap();
     /// ```
-    pub fn parse_only_module(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
-        Module::parse(wasm, enable_multi_memory, parser)
+        Module::parse_internal(wasm, enable_multi_memory, parser)
     }
 
     fn add_to_sections(
@@ -89,8 +89,11 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Parses a `Module` from a wasm binary. To be used ONLY by an Orca function and not by the user.
-    pub fn parse(wasm: &'a [u8], enable_multi_memory: bool, parser: Parser) -> Result<Self, Error> {
+    pub(crate) fn parse_internal(
+        wasm: &'a [u8],
+        enable_multi_memory: bool,
+        parser: Parser,
+    ) -> Result<Self, Error> {
         let wasm_features = wasmparser::WasmFeatures::default();
         let mut imports: Vec<crate::ir::types::Import> = vec![];
         let mut types = vec![];
@@ -483,7 +486,7 @@ impl<'a> Module<'a> {
 
     /// Emit the module into a wasm binary file.
     pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
-        let module = self.encode();
+        let module = self.encode_internal();
         let wasm = module.finish();
         std::fs::write(file_name, wasm)?;
         Ok(())
@@ -498,15 +501,15 @@ impl<'a> Module<'a> {
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    /// let module = Module::parse_only_module(&buff, false).unwrap();
-    /// let result = module.encode_only_module();
+    /// let module = Module::parse(&buff, false).unwrap();
+    /// let result = module.encode();
     /// ```
-    pub fn encode_only_module(&self) -> Vec<u8> {
-        self.encode().finish()
+    pub fn encode(&self) -> Vec<u8> {
+        self.encode_internal().finish()
     }
 
     /// Encodes an Orca Module to a wasm_encoder Module
-    pub(crate) fn encode(&self) -> wasm_encoder::Module {
+    pub(crate) fn encode_internal(&self) -> wasm_encoder::Module {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 

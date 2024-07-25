@@ -1,8 +1,8 @@
 //! Iterator to traverse a Module
 
-use crate::ir::id::LocalID;
+use crate::ir::id::{GlobalID, LocalID};
 use crate::ir::module::Module;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
+use crate::ir::types::{Global, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::module_builder::ModuleBuilder;
 use crate::opcode::Opcode;
@@ -73,7 +73,7 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     /// // Must use `parse_only_module` here as we are only concerned about a Module and not a module that is inside a Component
-    /// let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    /// let mut module = Module::parse(&buff, false).expect("Unable to parse");
     /// let mut module_it = ModuleIterator::new(&mut module, vec![]);
     ///
     /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
@@ -314,5 +314,9 @@ impl ModuleBuilder for ModuleIterator<'_, '_> {
         } else {
             panic!("Should have gotten Module Location!")
         }
+    }
+
+    fn add_global(&mut self, global: Global) -> GlobalID {
+        self.module.add_global(global)
     }
 }
