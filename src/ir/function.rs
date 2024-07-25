@@ -81,6 +81,12 @@ impl<'a> Opcode<'a> for FunctionBuilder<'a> {
     }
 }
 
+impl ModuleBuilder for FunctionBuilder<'_> {
+    fn add_local(&mut self, ty: DataType) -> LocalID {
+        self.add_local(ty)
+    }
+}
+
 /// Modify a function
 /// Uses same injection logic as Iterator, which is different from
 /// FunctionBuilder since FunctionModifier does side effect to operators at encoding

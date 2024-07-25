@@ -1,6 +1,7 @@
 //! Trait that needs to be satisfied by all iterators
 
-use crate::ir::types::{InstrumentType, InstrumentationMode, Location};
+use crate::ir::id::GlobalID;
+use crate::ir::types::{Global, InstrumentType, InstrumentationMode, Location};
 use wasmparser::Operator;
 
 #[allow(dead_code)]
@@ -53,4 +54,7 @@ pub trait Iterator<'a> {
 
     /// Sets the type of Instrumentation Type of the specified location
     fn set_instrument_type_at(&mut self, ty: InstrumentationMode, loc: Location);
+
+    /// Adds a global to the current module and returns the Global ID
+    fn add_global(&mut self, global: Global) -> GlobalID;
 }
