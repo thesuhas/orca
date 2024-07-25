@@ -933,6 +933,13 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Remove the last global from the list. Can only remove the final Global due to indexing
+    pub fn remove_global(&mut self) {
+        if !self.globals.is_empty() {
+            self.globals.pop();
+        }
+    }
+
     /// Create an empty Module
     pub fn new() -> Self {
         Module {

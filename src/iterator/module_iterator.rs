@@ -300,6 +300,10 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
             panic!("Should have gotten module location!")
         }
     }
+
+    fn add_global(&mut self, global: Global) -> GlobalID {
+        self.module.add_global(global)
+    }
 }
 
 impl ModuleBuilder for ModuleIterator<'_, '_> {
@@ -314,9 +318,5 @@ impl ModuleBuilder for ModuleIterator<'_, '_> {
         } else {
             panic!("Should have gotten Module Location!")
         }
-    }
-
-    fn add_global(&mut self, global: Global) -> GlobalID {
-        self.module.add_global(global)
     }
 }

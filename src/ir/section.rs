@@ -14,6 +14,7 @@ pub enum ComponentSection {
     Canon,
     CustomSection,
     Component,
+    ComponentStartSection,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

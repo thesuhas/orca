@@ -308,6 +308,11 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten component location!")
         }
     }
+
+    fn add_global(&mut self, global: Global) -> GlobalID {
+        let curr_mod = self.curr_module() as usize;
+        self.comp.modules[curr_mod].add_global(global)
+    }
 }
 
 impl ModuleBuilder for ComponentIterator<'_, '_> {
@@ -323,10 +328,5 @@ impl ModuleBuilder for ComponentIterator<'_, '_> {
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
-    }
-
-    fn add_global(&mut self, global: Global) -> GlobalID {
-        let curr_mod = self.curr_module() as usize;
-        self.comp.modules[curr_mod].add_global(global)
     }
 }

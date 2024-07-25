@@ -17,7 +17,8 @@ use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance, Parser, Payload,
+    ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance,
+    Parser, Payload,
 };
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,8 @@ pub struct Component<'a> {
     pub components: Vec<Component<'a>>,
     /// Number of modules
     pub num_modules: usize,
+    /// Component Start Section
+    pub start_section: Vec<ComponentStartFunction>,
     /// Sections of the Component. Represented as (#num of occurrences of a section, type of section)
     pub sections: Vec<(u32, ComponentSection)>,
     num_sections: usize,
@@ -72,6 +75,7 @@ impl<'a> Component<'a> {
             canons: vec![],
             custom_sections: vec![],
             num_modules: 0,
+            start_section: vec![],
             sections: vec![],
             num_sections: 0,
             components: vec![],
@@ -146,6 +150,7 @@ impl<'a> Component<'a> {
         let mut sections = vec![];
         let mut num_sections: usize = 0;
         let mut components: Vec<Component> = vec![];
+        let mut start_section = vec![];
         let mut stack = Vec::new();
 
         for payload in parser.parse_all(wasm) {
@@ -263,6 +268,8 @@ impl<'a> Component<'a> {
                     parser,
                     unchecked_range,
                 } => {
+                    // Indicating the start of a new module
+                    stack.push(Encoding::Module);
                     modules.push(Module::parse_internal(
                         &wasm[unchecked_range],
                         enable_multi_memory,
@@ -287,6 +294,15 @@ impl<'a> Component<'a> {
                     Self::add_to_sections(
                         &mut sections,
                         ComponentSection::Component,
+                        &mut num_sections,
+                        1,
+                    );
+                }
+                Payload::ComponentStartSection { start, range: _ } => {
+                    start_section.push(start);
+                    Self::add_to_sections(
+                        &mut sections,
+                        ComponentSection::ComponentStartSection,
                         &mut num_sections,
                         1,
                     );
@@ -322,6 +338,7 @@ impl<'a> Component<'a> {
             custom_sections,
             num_modules: modules.len(),
             sections,
+            start_section,
             num_sections,
             components: components.clone(),
         })
@@ -669,6 +686,17 @@ impl<'a> Component<'a> {
                         last_processed_canon += 1;
                     }
                     component.section(&canon_sec);
+                }
+                ComponentSection::ComponentStartSection => {
+                    // Should only be 1 start section
+                    assert_eq!(self.start_section.len(), 1);
+                    let start_fn = &self.start_section[0];
+                    let start_sec = wasm_encoder::ComponentStartSection {
+                        function_index: start_fn.func_index,
+                        args: start_fn.arguments.iter(),
+                        results: start_fn.results,
+                    };
+                    component.section(&start_sec);
                 }
                 ComponentSection::CustomSection => {
                     assert!(
