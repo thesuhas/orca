@@ -1,6 +1,6 @@
+use orca::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
-use orca::ir::module::Module;
 
 fn write_to_file(bytes: &Vec<u8>, path: String) {
     let mut file = match File::create(path) {
@@ -17,7 +17,6 @@ fn write_to_file(bytes: &Vec<u8>, path: String) {
         Err(e) => eprintln!("Failed to write to the file: {}", e),
     }
 }
-
 
 fn round_trip_module(testname: &str, folder: &str) {
     let filename = format!(
@@ -55,16 +54,15 @@ macro_rules! make_round_trip_tests_module {
 mod round_trip {
     make_round_trip_tests_module!(
         "dfinity/modules",
-    //     import_func,
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-        globals
-        // exports,
-        // start,
-        // const_expr
+        //     import_func,
+        //     data_section,
+        //     func,
+        //     func_locals,
+        //     table,
+        //     table_init
+        globals // exports,
+                // start,
+                // const_expr
     );
 
     // make_round_trip_tests_module!("handwritten/modules", blocks);
