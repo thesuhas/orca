@@ -72,17 +72,16 @@ mod round_trip {
     // //
     // make_round_trip_tests_component!("spec-test/components", if_test);
 
-    make_round_trip_tests_component!("spin", hello_world);
+    // make_round_trip_tests_component!("spin", hello_world);
 
-    // make_round_trip_tests_component!(
-    //     "wasm-tools/component-model",
-    //     nested_modules_0
-    // a
-    //     // type_test,
-    //     big
-    //     // link,
-    //     // lots_of_aliases,
-    //     // more_flags,
-    //     // string
-    // );
+    make_round_trip_tests_component!(
+        "wasm-tools/component-model",
+        // nested_modules_0
+        // a
+        // type_test,
+        // big
+        link // lots_of_aliases,
+             // more_flags,
+             // string
+    );
 }

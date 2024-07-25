@@ -80,7 +80,7 @@ fn test_blocks() {
     let file = "tests/handwritten/modules/blocks.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
@@ -302,7 +302,7 @@ fn test_it_add_local() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
@@ -332,7 +332,7 @@ fn test_it_add_local() {
         }
     }
 
-    let a = module.encode_only_module();
+    let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
@@ -344,7 +344,7 @@ fn test_it_instr_at() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     let loc = Location::Module {
@@ -369,7 +369,7 @@ fn test_it_instr_at() {
         };
     }
 
-    let a = module.encode_only_module();
+    let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
@@ -381,7 +381,7 @@ fn test_it_dup_instr() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     loop {
@@ -405,7 +405,7 @@ fn test_it_dup_instr() {
         };
     }
 
-    let a = module.encode_only_module();
+    let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
@@ -416,7 +416,7 @@ fn test_imports() {
     let file = "tests/handwritten/modules/import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     // println!("{:#?}", module);
 
     let num_imported_func = module.num_import_func();
@@ -445,7 +445,7 @@ fn test_imports() {
         };
     }
 
-    let a = module.encode_only_module();
+    let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
@@ -455,12 +455,12 @@ fn test_it_add_local_diff_type() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     mod_it.add_local(orca::ir::types::DataType::I64);
     mod_it.add_local(orca::ir::types::DataType::I32);
-    let a = module.encode_only_module();
+    let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     println!("{}", wat);
 }
@@ -470,7 +470,7 @@ fn test_function_skipping_module() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let functions_skip = vec![0usize];
     let mut mod_it = ModuleIterator::new(&mut module, functions_skip);
 
@@ -533,7 +533,7 @@ fn test_fn_name() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let module = Module::parse_only_module(&buff, false).expect("Unable to parse");
+    let module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!("add".to_string(), module.get_fname(0).unwrap());
     assert_eq!(None, module.get_fname(1));
 }

@@ -1,8 +1,8 @@
 //! Iterator to traverse a Component
 
 use crate::ir::component::Component;
-use crate::ir::id::LocalID;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
+use crate::ir::id::{GlobalID, LocalID, ModuleID};
+use crate::ir::types::{Global, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
@@ -35,6 +35,20 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         ComponentIterator {
             comp,
             comp_iterator: ComponentSubIterator::new(0, num_modules, metadata, skip_funcs),
+        }
+    }
+
+    /// Returns the current module the component iterator is in
+    pub fn curr_module(&self) -> ModuleID {
+        if let Location::Component {
+            mod_idx,
+            func_idx: _func_idx,
+            instr_idx: _instr_idx,
+        } = self.curr_loc()
+        {
+            mod_idx as u32
+        } else {
+            panic!("Should have gotten component location");
         }
     }
 }
@@ -309,5 +323,10 @@ impl ModuleBuilder for ComponentIterator<'_, '_> {
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
+    }
+
+    fn add_global(&mut self, global: Global) -> GlobalID {
+        let curr_mod = self.curr_module() as usize;
+        self.comp.modules[curr_mod].add_global(global)
     }
 }
