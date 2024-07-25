@@ -1,6 +1,6 @@
 use orca::ir::component::Component;
 use std::fs::File;
-use std::io::Write; // bring trait into scope
+use std::io::Write;
 
 fn write_to_file(bytes: &Vec<u8>, path: String) {
     let mut file = match File::create(path) {
@@ -76,6 +76,7 @@ mod round_trip {
 
     make_round_trip_tests_component!(
         "wasm-tools/component-model",
+        alias_3,
         nested_modules_0,
         a,
         type_test,

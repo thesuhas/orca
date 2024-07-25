@@ -62,6 +62,7 @@ impl Default for Component<'_> {
 }
 
 impl<'a> Component<'a> {
+    /// Creates a new Empty Component
     pub fn new() -> Self {
         Component {
             modules: vec![],
