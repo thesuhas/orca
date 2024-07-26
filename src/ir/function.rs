@@ -1,4 +1,4 @@
-//! Intermediate Representation of a fucntion
+//! Intermediate Representation of a function
 
 use crate::ir::id::{FunctionID, LocalID};
 use crate::ir::module::Module;
@@ -11,14 +11,14 @@ use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
 /// Build a function from scratch
-/// See example at `fac_orca/src/main.rs`
+/// See an example [here].
+///
+/// [here]: https://github.com/thesuhas/orca/blob/314af2df01203e7715aa728e7388cf39c564e9d7/fac_orca/src/main.rs#L16
 pub struct FunctionBuilder<'a> {
     // pub(crate) id: u32, // function index
     pub(crate) params: Vec<DataType>,
     pub(crate) results: Vec<DataType>,
     #[allow(dead_code)]
-    // TODO: how to add function name?
-    // https://docs.rs/walrus/latest/walrus/struct.FunctionBuilder.html#method.name
     pub(crate) name: Option<String>,
     pub body: Body<'a>,
 }
@@ -41,7 +41,7 @@ impl<'a> FunctionBuilder<'a> {
 
         let ty = module.add_type(&self.params, &self.results);
 
-        // the function index is should also take account for imports
+        // the function index should also take account for imports
         let id = module.functions.len() + module.imports.len();
         module.functions.push(ty);
         module.code_sections.push(self.body);

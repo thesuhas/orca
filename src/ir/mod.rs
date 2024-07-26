@@ -7,4 +7,4 @@ pub mod id;
 pub mod module;
 pub mod section;
 pub mod types;
-pub mod wrappers;
+pub(crate) mod wrappers;

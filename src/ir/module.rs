@@ -5,7 +5,7 @@ use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global, Instrument,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
@@ -14,9 +14,9 @@ use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
 
 #[derive(Clone, Debug)]
-/// Intermediate Representation of a wasm module.
-/// See https://webassembly.github.io/spec/core/binary/modules.html as a reference
-/// for different sections
+/// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
+///
+/// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
 pub struct Module<'a> {
     /// Types
     pub types: Vec<FuncType>,
@@ -50,7 +50,7 @@ pub struct Module<'a> {
     /// name of module
     pub module_name: Option<String>,
 
-    // just a placeholder for roundtrip
+    // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
     pub(crate) label_names: wasm_encoder::IndirectNameMap,
     pub(crate) type_names: wasm_encoder::NameMap,
@@ -85,7 +85,6 @@ impl<'a> Module<'a> {
         enable_multi_memory: bool,
         parser: Parser,
     ) -> Result<Self, Error> {
-        // let _wasm_features = wasmparser::WasmFeatures::default();
         let mut imports: Vec<crate::ir::types::Import> = vec![];
         let mut types = vec![];
         let mut data = vec![];
@@ -219,7 +218,7 @@ impl<'a> Module<'a> {
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let locals: Vec<(u32, DataType)> = locals
                         .iter()
-                        .map(|(idx, valtype)| (*idx, DataType::from(*valtype)))
+                        .map(|(idx, val_type)| (*idx, DataType::from(*val_type)))
                         .collect();
                     // TODO: can I just iter locals once?
                     let num_locals = locals.iter().fold(0, |acc, x| acc + x.0) as usize;
@@ -249,7 +248,7 @@ impl<'a> Module<'a> {
                     }
                     let instructions_bool: Vec<_> = instructions
                         .into_iter()
-                        .map(|op| (op, Instrument::NotInstrumented))
+                        .map(|op| (op, NotInstrumented))
                         .collect();
                     code_sections.push(Body {
                         locals,
@@ -477,7 +476,7 @@ impl<'a> Module<'a> {
             module.section(&types);
         }
 
-        // initialize function name seciton
+        // initialize function name section
         let mut function_names = wasm_encoder::NameMap::new();
         if !self.imports.is_empty() {
             let mut imports = wasm_encoder::ImportSection::new();
@@ -838,7 +837,7 @@ impl<'a> Module<'a> {
         self.num_imported_functions as u32
     }
 
-    /// Set a function name to a function using it's relative index
+    /// Set a function name to a function using its relative index
     pub fn set_fn_name(&mut self, func_idx: u32, name: &'a str) {
         let body = &mut self.code_sections[func_idx as usize];
         body.name = Some(name.to_owned());

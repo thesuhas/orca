@@ -7,7 +7,10 @@
 use wasmparser::Operator;
 
 #[allow(dead_code)]
-/// Defines injection behaviour. Takes a [wasmparser Operator](https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html) and instructions are defined [here](https://webassembly.github.io/spec/core/binary/instructions.html).
+/// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
+///
+/// [`wasmparser::Operator`]: https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html
+/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
 pub trait Opcode<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);
@@ -695,7 +698,7 @@ pub trait Opcode<'a> {
         self
     }
 
-    // Linear Memory Accesss
+    // Linear Memory Access
     // note: walrus does not specify max_align (probably it's the same as align)
 
     /// load 1 byte and sign-extend i8 to i32
