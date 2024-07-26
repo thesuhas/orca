@@ -12,7 +12,7 @@ use wasmparser::{
 /// Convert ModuleTypeDeclaration to ModuleType
 pub fn convert_module_type_declaration(
     module: &[wasmparser::ModuleTypeDeclaration],
-    enc: wasm_encoder::CoreTypeEncoder,
+    enc: CoreTypeEncoder,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
     let mut mty = wasm_encoder::ModuleType::new();
@@ -54,11 +54,11 @@ pub fn convert_instance_type(
     for value in instance.iter() {
         match value {
             InstanceTypeDeclaration::CoreType(core_type) => match core_type {
-                wasmparser::CoreType::Sub(sub) => {
+                CoreType::Sub(sub) => {
                     let enc = ity.core_type();
                     encode_core_type_subtype(enc, sub, reencode);
                 }
-                wasmparser::CoreType::Module(module) => {
+                CoreType::Module(module) => {
                     let enc = ity.core_type();
                     convert_module_type_declaration(module, enc, reencode);
                 }
@@ -283,59 +283,7 @@ pub fn convert_component_type(
             }
         }
         ComponentType::Instance(inst) => {
-            let mut ity = wasm_encoder::InstanceType::new();
-            for i in inst.iter() {
-                match i {
-                    InstanceTypeDeclaration::CoreType(core_type) => match core_type {
-                        wasmparser::CoreType::Sub(sub) => {
-                            let enc = ity.core_type();
-                            encode_core_type_subtype(enc, sub, reencode);
-                        }
-                        wasmparser::CoreType::Module(module) => {
-                            let enc = ity.core_type();
-                            convert_module_type_declaration(module, enc, reencode);
-                        }
-                    },
-                    InstanceTypeDeclaration::Type(ty) => {
-                        let enc = ity.ty();
-                        convert_component_type(ty, enc, reencode);
-                    }
-                    InstanceTypeDeclaration::Alias(alias) => match alias {
-                        ComponentAlias::InstanceExport {
-                            kind,
-                            instance_index,
-                            name,
-                        } => {
-                            ity.alias(Alias::InstanceExport {
-                                instance: *instance_index,
-                                kind: reencode.component_export_kind(*kind),
-                                name,
-                            });
-                        }
-                        ComponentAlias::CoreInstanceExport {
-                            kind,
-                            instance_index,
-                            name,
-                        } => {
-                            ity.alias(Alias::CoreInstanceExport {
-                                instance: *instance_index,
-                                kind: reencode.export_kind(*kind),
-                                name,
-                            });
-                        }
-                        ComponentAlias::Outer { kind, count, index } => {
-                            ity.alias(Alias::Outer {
-                                kind: reencode.component_outer_alias_kind(*kind),
-                                count: *count,
-                                index: *index,
-                            });
-                        }
-                    },
-                    InstanceTypeDeclaration::Export { name, ty } => {
-                        ity.export(name.0, reencode.component_type_ref(*ty));
-                    }
-                }
-            }
+            let ity = convert_instance_type(inst, reencode);
             enc.instance(&ity);
         }
         ComponentType::Resource { rep, dtor } => {

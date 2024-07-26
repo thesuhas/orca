@@ -24,7 +24,9 @@ impl Global {
     }
 }
 
-/// Orca's representation of ValType
+/// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
+///
+/// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DataType {
     I32,
@@ -84,7 +86,7 @@ impl From<ValType> for DataType {
             ValType::F32 => DataType::F32,
             ValType::F64 => DataType::F64,
             ValType::V128 => DataType::V128,
-            ValType::Ref(reftype) => match reftype.heap_type() {
+            ValType::Ref(ref_type) => match ref_type.heap_type() {
                 wasmparser::HeapType::Abstract { shared: _, ty } => match ty {
                     wasmparser::AbstractHeapType::Func => DataType::FuncRef,
                     wasmparser::AbstractHeapType::Extern => DataType::ExternRef,
@@ -109,7 +111,9 @@ impl From<ValType> for DataType {
     }
 }
 
-/// Converts from Orca's DataType to wasm_encoder::ValType
+/// Converts from Orca's DataType to [`wasm_encoder::ValType`].
+///
+/// [`wasm_encoder::ValType`]: https://docs.rs/wasm-encoder/0.214.0/wasm_encoder/enum.ValType.html
 impl From<&DataType> for wasm_encoder::ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
@@ -206,14 +210,18 @@ impl From<&DataType> for wasm_encoder::ValType {
     }
 }
 
-/// Converts wasmparser::ValType to wasm_encoder::ValType
+/// Converts [`wasmparser::ValType`] to [`wasm_encoder::ValType`].
+///
+/// [`wasm_encoder::ValType`]: https://docs.rs/wasm-encoder/0.214.0/wasm_encoder/enum.ValType.html
+/// [`wasmparser::ValType`]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType {
     let mut reencoder = wasm_encoder::reencode::RoundtripReencoder;
     reencoder.val_type(*val_type).unwrap()
 }
 
-/// orca's representation of function types, shortened from walrus
-/// https://docs.rs/walrus/latest/walrus/struct.Type.html
+/// Orca's representation of function types, shortened from [Walrus' Representation].
+///
+/// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Debug, Clone)]
 pub struct FuncType {
     pub params: Box<[DataType]>,
