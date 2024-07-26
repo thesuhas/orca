@@ -26,12 +26,10 @@ fn round_trip_module(testname: &str, folder: &str) {
         testname
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-
+    let original = wasmprinter::print_bytes(buff.clone()).expect("couldn't convert original Wasm to wat");
     let module = Module::parse(&buff, false).unwrap();
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
-    // println!("{}", out);
-    let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
 
