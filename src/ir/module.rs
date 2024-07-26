@@ -12,6 +12,7 @@ use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
 use crate::ir::section::ModuleSection;
+use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
 use wasm_encoder::NameMap;
 
 #[derive(Clone, Debug)]
@@ -1044,24 +1045,4 @@ impl<'a> Default for Module<'a> {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn indirect_namemap_parser2encoder(
-    namemap: wasmparser::IndirectNameMap,
-) -> wasm_encoder::IndirectNameMap {
-    let mut names = wasm_encoder::IndirectNameMap::new();
-    for name in namemap {
-        let naming = name.unwrap();
-        names.append(naming.index, &namemap_parser2encoder(naming.names));
-    }
-    names
-}
-
-fn namemap_parser2encoder(namemap: wasmparser::NameMap) -> wasm_encoder::NameMap {
-    let mut names = wasm_encoder::NameMap::new();
-    for name in namemap {
-        let naming = name.unwrap();
-        names.append(naming.index, naming.name);
-    }
-    names
 }

@@ -30,14 +30,14 @@ fn round_trip_module(testname: &str, folder: &str) {
     let module = Module::parse(&buff, false).unwrap();
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
-    println!("{}", out);
+    // println!("{}", out);
     let original = wasmprinter::print_bytes(buff).expect("couldn't convert original Wasm to wat");
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
 
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
-    // assert_eq!(out, original);
+    assert_eq!(out, original);
 }
 
 macro_rules! make_round_trip_tests_module {
@@ -54,20 +54,21 @@ macro_rules! make_round_trip_tests_module {
 mod round_trip {
     make_round_trip_tests_module!(
         "dfinity/modules",
-        //     import_func,
-        //     data_section,
-        //     func,
-        //     func_locals,
-        //     table,
-        //     table_init
-        globals // exports,
-                // start,
-                // const_expr
+        import_func,
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        globals,
+        exports,
+        start,
+        const_expr
     );
 
-    // make_round_trip_tests_module!("handwritten/modules", blocks);
-    //
-    // make_round_trip_tests_module!("spin", hello_world_module);
+    make_round_trip_tests_module!("handwritten/modules", blocks);
+
+    make_round_trip_tests_module!("spin", hello_world_module);
 }
 
 #[test]

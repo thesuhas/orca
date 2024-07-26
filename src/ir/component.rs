@@ -10,7 +10,7 @@ use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::types::Global;
 use crate::ir::wrappers::{
-    convert_component_type, convert_instance_type, convert_module_type_declaration,
+    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
 };
 use wasm_encoder::reencode::Reencode;
@@ -53,6 +53,21 @@ pub struct Component<'a> {
     /// Sections of the Component. Represented as (#num of occurrences of a section, type of section)
     pub sections: Vec<(u32, ComponentSection)>,
     num_sections: usize,
+
+    // Names
+    pub(crate) component_name: Option<String>,
+    pub(crate) core_func_names: wasm_encoder::NameMap,
+    pub(crate) global_names: wasm_encoder::NameMap,
+    pub(crate) memory_names: wasm_encoder::NameMap,
+    pub(crate) table_names: wasm_encoder::NameMap,
+    pub(crate) module_names: wasm_encoder::NameMap,
+    pub(crate) core_instances_names: wasm_encoder::NameMap,
+    pub(crate) core_type_names: wasm_encoder::NameMap,
+    pub(crate) type_names: wasm_encoder::NameMap,
+    pub(crate) instance_names: wasm_encoder::NameMap,
+    pub(crate) components_names: wasm_encoder::NameMap,
+    pub(crate) func_names: wasm_encoder::NameMap,
+    pub(crate) value_names: wasm_encoder::NameMap,
 }
 
 impl Default for Component<'_> {
@@ -80,6 +95,19 @@ impl<'a> Component<'a> {
             sections: vec![],
             num_sections: 0,
             components: vec![],
+            component_name: None,
+            core_func_names: wasm_encoder::NameMap::new(),
+            global_names: wasm_encoder::NameMap::new(),
+            memory_names: wasm_encoder::NameMap::new(),
+            table_names: wasm_encoder::NameMap::new(),
+            module_names: wasm_encoder::NameMap::new(),
+            core_instances_names: wasm_encoder::NameMap::new(),
+            core_type_names: wasm_encoder::NameMap::new(),
+            type_names: wasm_encoder::NameMap::new(),
+            instance_names: wasm_encoder::NameMap::new(),
+            components_names: wasm_encoder::NameMap::new(),
+            func_names: wasm_encoder::NameMap::new(),
+            value_names: wasm_encoder::NameMap::new(),
         }
     }
 
@@ -153,6 +181,21 @@ impl<'a> Component<'a> {
         let mut components: Vec<Component> = vec![];
         let mut start_section = vec![];
         let mut stack = Vec::new();
+
+        // Names
+        let mut component_name: Option<String> = None;
+        let mut core_func_names = wasm_encoder::NameMap::new();
+        let mut global_names = wasm_encoder::NameMap::new();
+        let mut memory_names = wasm_encoder::NameMap::new();
+        let mut table_names = wasm_encoder::NameMap::new();
+        let mut module_names = wasm_encoder::NameMap::new();
+        let mut core_instance_names = wasm_encoder::NameMap::new();
+        let mut instance_names = wasm_encoder::NameMap::new();
+        let mut components_names = wasm_encoder::NameMap::new();
+        let mut func_names = wasm_encoder::NameMap::new();
+        let mut value_names = wasm_encoder::NameMap::new();
+        let mut core_type_names = wasm_encoder::NameMap::new();
+        let mut type_names = wasm_encoder::NameMap::new();
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -309,14 +352,65 @@ impl<'a> Component<'a> {
                     );
                 }
                 Payload::CustomSection(custom_section_reader) => {
-                    custom_sections
-                        .push((custom_section_reader.name(), custom_section_reader.data()));
-                    Self::add_to_sections(
-                        &mut sections,
-                        ComponentSection::CustomSection,
-                        &mut num_sections,
-                        1,
-                    );
+                    match custom_section_reader.as_known() {
+                        wasmparser::KnownCustom::ComponentName(name_section_reader) => {
+                            for subsection in name_section_reader {
+                                #[allow(clippy::single_match)]
+                                match subsection? {
+                                    wasmparser::ComponentName::Component { name, .. } => {
+                                        component_name = Some(name.parse().unwrap())
+                                    }
+                                    wasmparser::ComponentName::CoreFuncs(names) => {
+                                        add_to_namemap(&mut core_func_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreGlobals(names) => {
+                                        add_to_namemap(&mut global_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreTables(names) => {
+                                        add_to_namemap(&mut table_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreModules(names) => {
+                                        add_to_namemap(&mut module_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreInstances(names) => {
+                                        add_to_namemap(&mut core_instance_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreTypes(names) => {
+                                        add_to_namemap(&mut core_type_names, names);
+                                    }
+                                    wasmparser::ComponentName::Types(names) => {
+                                        add_to_namemap(&mut type_names, names);
+                                    }
+                                    wasmparser::ComponentName::Instances(names) => {
+                                        add_to_namemap(&mut instance_names, names);
+                                    }
+                                    wasmparser::ComponentName::Components(names) => {
+                                        add_to_namemap(&mut components_names, names);
+                                    }
+                                    wasmparser::ComponentName::Funcs(names) => {
+                                        add_to_namemap(&mut func_names, names);
+                                    }
+                                    wasmparser::ComponentName::Values(names) => {
+                                        add_to_namemap(&mut value_names, names);
+                                    }
+                                    wasmparser::ComponentName::CoreMemories(names) => {
+                                        add_to_namemap(&mut memory_names, names);
+                                    }
+                                    wasmparser::ComponentName::Unknown { .. } => {}
+                                }
+                            }
+                        }
+                        _ => {
+                            custom_sections
+                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                            Self::add_to_sections(
+                                &mut sections,
+                                ComponentSection::CustomSection,
+                                &mut num_sections,
+                                1,
+                            );
+                        }
+                    }
                 }
                 Payload::UnknownSection {
                     id,
@@ -341,7 +435,20 @@ impl<'a> Component<'a> {
             sections,
             start_section,
             num_sections,
+            component_name,
+            core_func_names,
+            global_names,
+            memory_names,
+            table_names,
+            module_names,
+            core_instances_names: core_instance_names,
+            core_type_names,
+            type_names,
+            instance_names,
+            components_names,
+            func_names,
             components: components.clone(),
+            value_names,
         })
     }
 
@@ -717,6 +824,29 @@ impl<'a> Component<'a> {
                 }
             }
         }
+
+        // Name section
+        let mut name_sec = wasm_encoder::ComponentNameSection::new();
+
+        if let Some(comp_name) = &self.component_name {
+            name_sec.component(comp_name);
+        }
+
+        name_sec.core_funcs(&self.core_func_names);
+        name_sec.core_tables(&self.table_names);
+        name_sec.core_memories(&self.memory_names);
+        name_sec.core_globals(&self.global_names);
+        name_sec.core_tables(&self.core_type_names);
+        name_sec.core_modules(&self.module_names);
+        name_sec.core_instances(&self.core_instances_names);
+        name_sec.funcs(&self.func_names);
+        name_sec.values(&self.value_names);
+        name_sec.types(&self.type_names);
+        name_sec.components(&self.components_names);
+        name_sec.instances(&self.instance_names);
+
+        // Add the name section back to the component
+        component.section(&name_sec);
 
         component
     }
