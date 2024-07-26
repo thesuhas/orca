@@ -366,6 +366,7 @@ impl<'a> Module<'a> {
                     );
                 }
                 Payload::CustomSection(custom_section_reader) => {
+                    let name = custom_section_reader.name();
                     match custom_section_reader.as_known() {
                         wasmparser::KnownCustom::Name(name_section_reader) => {
                             for subsection in name_section_reader {
@@ -859,7 +860,7 @@ impl<'a> Module<'a> {
         names.elements(&self.elem_names);
         names.data(&self.data_names);
         names.fields(&self.field_names);
-        names.tables(&self.tag_names);
+        names.tag(&self.tag_names);
 
         module.section(&names);
 
