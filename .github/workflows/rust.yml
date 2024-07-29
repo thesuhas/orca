@@ -28,6 +28,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install wasm-tools
+      run: |
+        cargo install wasm-tools
     - name: Build
       run: |
         cargo build --verbose
