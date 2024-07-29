@@ -31,12 +31,12 @@ fn round_trip_module(testname: &str, folder: &str) {
     let module = Module::parse(&buff, false).unwrap();
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
+    assert_eq!(out, original);
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
 
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
-    assert_eq!(out, original);
 }
 
 macro_rules! make_round_trip_tests_module {
