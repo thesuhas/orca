@@ -158,13 +158,15 @@ impl<'a> Component<'a> {
     /// ```
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
-        Component::parse_comp(wasm, enable_multi_memory, parser)
+        Component::parse_comp(wasm, enable_multi_memory, parser, 0, &mut vec![])
     }
 
     fn parse_comp(
         wasm: &'a [u8],
         enable_multi_memory: bool,
         parser: Parser,
+        start: usize,
+        parent_stack: &mut Vec<Encoding>,
     ) -> Result<Self, Error> {
         let mut modules = vec![];
         let mut core_types = vec![];
@@ -180,7 +182,7 @@ impl<'a> Component<'a> {
         let mut num_sections: usize = 0;
         let mut components: Vec<Component> = vec![];
         let mut start_section = vec![];
-        let mut stack = Vec::new();
+        let mut stack = vec![];
 
         // Names
         let mut component_name: Option<String> = None;
@@ -313,9 +315,10 @@ impl<'a> Component<'a> {
                     unchecked_range,
                 } => {
                     // Indicating the start of a new module
+                    parent_stack.push(Encoding::Module);
                     stack.push(Encoding::Module);
                     modules.push(Module::parse_internal(
-                        &wasm[unchecked_range],
+                        &wasm[unchecked_range.start - start..unchecked_range.end - start],
                         enable_multi_memory,
                         parser,
                     )?);
@@ -331,9 +334,15 @@ impl<'a> Component<'a> {
                     unchecked_range,
                 } => {
                     // Indicating the start of a new component
+                    parent_stack.push(Encoding::Component);
                     stack.push(Encoding::Component);
-                    let cmp =
-                        Component::parse_comp(&wasm[unchecked_range], enable_multi_memory, parser)?;
+                    let cmp = Component::parse_comp(
+                        &wasm[unchecked_range.start - start..unchecked_range.end - start],
+                        enable_multi_memory,
+                        parser,
+                        unchecked_range.start.clone(),
+                        &mut stack,
+                    )?;
                     components.push(cmp.clone());
                     Self::add_to_sections(
                         &mut sections,
@@ -836,7 +845,7 @@ impl<'a> Component<'a> {
         name_sec.core_tables(&self.table_names);
         name_sec.core_memories(&self.memory_names);
         name_sec.core_globals(&self.global_names);
-        name_sec.core_tables(&self.core_type_names);
+        name_sec.core_types(&self.core_type_names);
         name_sec.core_modules(&self.module_names);
         name_sec.core_instances(&self.core_instances_names);
         name_sec.funcs(&self.func_names);

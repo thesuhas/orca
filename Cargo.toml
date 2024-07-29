@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 wasm-encoder = { version = "0.214.0", features = ["wasmparser"]}
 wasmparser = "0.214.0"
+tempfile = "3.10.1"
+serde_json = "1.0.121"
 
 [dev-dependencies]
 wasmprinter = "0.214.0"
-wat = "1.213.0"
+wat = "1.214.0"

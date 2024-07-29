@@ -281,6 +281,7 @@ pub fn convert_component_type(
                     }
                 }
             }
+            enc.component(&new_comp);
         }
         ComponentType::Instance(inst) => {
             let ity = convert_instance_type(inst, reencode);
