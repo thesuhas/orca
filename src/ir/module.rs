@@ -875,8 +875,10 @@ impl<'a> Module<'a> {
         None
     }
 
-    /// Get a Function name from its Function ID
-    pub fn get_fname(&self, id: FunctionID) -> Option<String> {
+    // TODO: we can actually get fname for imported functions now
+    //       we might want to change the name of this function
+    /// Get a Function name from its Local Function ID 
+    pub fn get_fname(&self, id: LocalID) -> Option<String> {
         if (id as usize) < self.code_sections.len() {
             self.code_sections[id as usize].name.clone()
         } else {
