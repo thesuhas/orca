@@ -4,6 +4,7 @@
 // note that the location of the injection is handled specific implementation
 // for iterators, we inject at the location the iterator is pointing at (curr_loc)
 // for FunctionBuilder, we inject at the end of the function
+use crate::ir::types::BlockType;
 use wasmparser::Operator;
 
 #[allow(dead_code)]
@@ -43,9 +44,9 @@ pub trait Opcode<'a> {
     }
 
     /// Inject an if statement
-    fn if_stmt(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
+    fn if_stmt(&mut self, block_type: BlockType) -> &mut Self {
         self.inject(Operator::If {
-            blockty: block_type,
+            blockty: wasmparser::BlockType::from(block_type),
         });
         self
     }
@@ -63,17 +64,17 @@ pub trait Opcode<'a> {
     }
 
     /// Inject a block statement. Indicates the start of a block
-    fn block(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
+    fn block(&mut self, block_type: BlockType) -> &mut Self {
         self.inject(Operator::Block {
-            blockty: block_type,
+            blockty: wasmparser::BlockType::from(block_type),
         });
         self
     }
 
     /// Inject a loop statement
-    fn loop_stmt(&mut self, block_type: wasmparser::BlockType) -> &mut Self {
+    fn loop_stmt(&mut self, block_type: BlockType) -> &mut Self {
         self.inject(Operator::Loop {
-            blockty: block_type,
+            blockty: wasmparser::BlockType::from(block_type),
         });
         self
     }

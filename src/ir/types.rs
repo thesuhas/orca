@@ -27,7 +27,7 @@ impl Global {
 /// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Copy)]
 pub enum DataType {
     I32,
     I64,
@@ -206,6 +206,139 @@ impl From<&DataType> for wasm_encoder::ValType {
                 nullable: false,
                 heap_type: wasm_encoder::HeapType::Concrete(*idx),
             }),
+        }
+    }
+}
+
+impl From<&DataType> for wasmparser::ValType {
+    fn from(ty: &DataType) -> Self {
+        match ty {
+            DataType::I32 => wasmparser::ValType::I32,
+            DataType::I64 => wasmparser::ValType::I64,
+            DataType::F32 => wasmparser::ValType::F32,
+            DataType::F64 => wasmparser::ValType::F64,
+            DataType::V128 => wasmparser::ValType::V128,
+            DataType::FuncRef => wasmparser::ValType::FUNCREF,
+            DataType::ExternRef => wasmparser::ValType::EXTERNREF,
+            DataType::Any => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Any,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::None => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::None,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::NoExtern => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoExtern,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::NoFunc => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoFunc,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::Eq => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Eq,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::Struct => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Struct,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::Array => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Array,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::I31 => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::I31,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::Exn => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Exn,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::NoExn => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoExn,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::Module(idx) => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Concrete {
+                        0: wasmparser::UnpackedIndex::Module(*idx),
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::RecGroup(idx) => wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Concrete {
+                        0: wasmparser::UnpackedIndex::RecGroup(*idx),
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::CoreTypeId(_idx) => panic!("Not Supported Yet!"),
         }
     }
 }
@@ -662,6 +795,38 @@ impl fmt::Display for Value {
             Value::F32(i) => i.fmt(f),
             Value::F64(i) => i.fmt(f),
             Value::V128(i) => i.fmt(f),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BlockType {
+    /// The block produces consumes nor produces any values.
+    Empty,
+    /// The block produces a singular value of the given type ([] -> \[t]).
+    Type(DataType),
+    /// The block is described by a function type.
+    ///
+    /// The index is to a function type in the types section.
+    FuncType(u32),
+}
+
+impl From<wasmparser::BlockType> for BlockType {
+    fn from(value: wasmparser::BlockType) -> Self {
+        match value {
+            wasmparser::BlockType::Empty => BlockType::Empty,
+            wasmparser::BlockType::FuncType(u) => BlockType::FuncType(u),
+            wasmparser::BlockType::Type(val) => BlockType::Type(DataType::from(val)),
+        }
+    }
+}
+
+impl From<BlockType> for wasmparser::BlockType {
+    fn from(ty: BlockType) -> Self {
+        match ty {
+            BlockType::Empty => wasmparser::BlockType::Empty,
+            BlockType::FuncType(u) => wasmparser::BlockType::FuncType(u),
+            BlockType::Type(data) => wasmparser::BlockType::Type(wasmparser::ValType::from(&data)),
         }
     }
 }

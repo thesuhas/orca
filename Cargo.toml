@@ -2,6 +2,14 @@
 name = "orca"
 version = "0.1.0"
 edition = "2021"
+authors = ["Suhas Thalanki", "Alex Bai"]
+description = "A lightweight WebAssembly Transformation Library for the Component Model"
+readme = "README.md"
+homepage = "https://github.com/thesuhas/orca"
+repository = "https://github.com/thesuhas/orca"
+license = "Apache-2.0"
+categories = ["wasm"]
+keywords = ["wasm", "WebAssembly", "instrumentation"]
 
 [dependencies]
 wasm-encoder = { version = "0.214.0", features = ["wasmparser"]}

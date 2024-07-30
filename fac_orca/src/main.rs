@@ -28,8 +28,8 @@ fn main() {
         // (local.set $res (i32.const 1))
         .i32_const(1)
         .local_set(res)
-            .block(wasmparser::BlockType::Empty) // label 1
-                .loop_stmt(wasmparser::BlockType::Empty) // label 2
+            .block(BlockType::Empty) // label 1
+                .loop_stmt(BlockType::Empty) // label 2
                     // (call $log (local.get $res))
                     .local_get(res)
                     .call(log_func_id)
@@ -37,7 +37,7 @@ fn main() {
                     .local_get(i)
                     .i32_const(0)
                     .i32_eq()
-                    .if_stmt(wasmparser::BlockType::Empty)
+                    .if_stmt(BlockType::Empty)
                         // (then (br to outside block @1))
                         .br(2)
                     .else_stmt()
