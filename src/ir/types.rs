@@ -1,6 +1,6 @@
 //! Intermediate representation of sections in a wasm module.
 use crate::error::Error;
-use crate::ir::id::TypeID;
+use crate::ir::id::{FunctionID, GlobalID, ModuleID, TypeID};
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
@@ -47,7 +47,7 @@ pub enum DataType {
     I31,
     Exn,
     NoExn,
-    Module(u32),
+    Module(ModuleID),
     RecGroup(u32),
     CoreTypeId(u32), // TODO: Look at this
 }
@@ -733,11 +733,11 @@ pub enum InitExpr {
     /// An immediate constant value
     Value(Value),
     /// A constant value referenced by the global specified
-    Global(u32),
+    Global(GlobalID),
     /// A null reference
     RefNull(RefType),
     /// A function initializer
-    RefFunc(u32),
+    RefFunc(FunctionID),
 }
 
 impl InitExpr {
@@ -828,7 +828,7 @@ pub enum BlockType {
     /// The block is described by a function type.
     ///
     /// The index is to a function type in the types section.
-    FuncType(u32),
+    FuncType(TypeID),
 }
 
 impl From<wasmparser::BlockType> for BlockType {

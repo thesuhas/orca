@@ -4,6 +4,7 @@
 // note that the location of the injection is handled specific implementation
 // for iterators, we inject at the location the iterator is pointing at (curr_loc)
 // for FunctionBuilder, we inject at the end of the function
+use crate::ir::id::{FunctionID, GlobalID, LocalID};
 use crate::ir::types::BlockType;
 use wasmparser::Operator;
 
@@ -18,7 +19,7 @@ pub trait Opcode<'a> {
 
     // Control Flow
     /// Inject a call instruction
-    fn call(&mut self, idx: u32) -> &mut Self {
+    fn call(&mut self, idx: FunctionID) -> &mut Self {
         self.inject(Operator::Call {
             function_index: idx,
         });
@@ -93,13 +94,13 @@ pub trait Opcode<'a> {
 
     // Numerics
     /// Inject a local.get
-    fn local_get(&mut self, idx: u32) -> &mut Self {
+    fn local_get(&mut self, idx: LocalID) -> &mut Self {
         self.inject(Operator::LocalGet { local_index: idx });
         self
     }
 
     /// Inject a local.set
-    fn local_set(&mut self, idx: u32) -> &mut Self {
+    fn local_set(&mut self, idx: LocalID) -> &mut Self {
         self.inject(Operator::LocalSet { local_index: idx });
         self
     }
@@ -787,13 +788,13 @@ pub trait Opcode<'a> {
     }
 
     /// Inject a global.get
-    fn global_get(&mut self, idx: u32) -> &mut Self {
+    fn global_get(&mut self, idx: GlobalID) -> &mut Self {
         self.inject(Operator::GlobalGet { global_index: idx });
         self
     }
 
     /// Inject a global.set
-    fn global_set(&mut self, idx: u32) -> &mut Self {
+    fn global_set(&mut self, idx: GlobalID) -> &mut Self {
         self.inject(Operator::GlobalSet { global_index: idx });
         self
     }

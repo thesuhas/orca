@@ -820,7 +820,7 @@ impl<'a> Module<'a> {
     /// Add a new function to the module. Returns the index of the imported function
     /// Note: this as no effect on the code or function section
     // TODO: In walrus, add_import_func after adding a function has no effect
-    pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: u32) -> ImportsID {
+    pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: TypeID) -> ImportsID {
         let index = self.imports.len();
         let import = crate::ir::types::Import {
             module,
@@ -839,7 +839,7 @@ impl<'a> Module<'a> {
     }
 
     /// Set a function name to a function using its relative index
-    pub fn set_fn_name(&mut self, func_idx: u32, name: &'a str) {
+    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: &'a str) {
         let body = &mut self.code_sections[func_idx as usize];
         body.name = Some(name.to_owned());
     }
