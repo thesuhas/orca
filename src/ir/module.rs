@@ -81,6 +81,12 @@ impl<'a> Module<'a> {
         Module::parse_internal(wasm, enable_multi_memory, parser)
     }
 
+    /// Given a `.wat` file as bytes, parse a Module
+    pub fn parse_wat(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
+        let buff = wat::parse_bytes(wasm).expect("Couldnt parse input wat");
+        Module::parse(&*buff, enable_multi_memory)
+    }
+
     pub(crate) fn parse_internal(
         wasm: &'a [u8],
         enable_multi_memory: bool,
