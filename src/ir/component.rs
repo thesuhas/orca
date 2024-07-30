@@ -13,6 +13,7 @@ use crate::ir::wrappers::{
     add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
 };
+
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
