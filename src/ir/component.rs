@@ -13,6 +13,7 @@ use crate::ir::wrappers::{
     add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
 };
+
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
@@ -159,12 +160,6 @@ impl<'a> Component<'a> {
     pub fn parse(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
         let parser = Parser::new(0);
         Component::parse_comp(wasm, enable_multi_memory, parser, 0, &mut vec![])
-    }
-
-    /// Given a `.wat` file as bytes, parse a Component
-    pub fn parse_wat(wasm: &'a [u8], enable_multi_memory: bool) -> Result<Self, Error> {
-        let buff = wat::parse_bytes(wasm).expect("Couldnt parse input wat");
-        Component::parse(&*buff, enable_multi_memory)
     }
 
     fn parse_comp(
