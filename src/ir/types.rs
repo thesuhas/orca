@@ -1,5 +1,6 @@
 //! Intermediate representation of sections in a wasm module.
 use crate::error::Error;
+use crate::ir::id::TypeID;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
@@ -610,6 +611,25 @@ impl PartialEq for InstrumentType {
 }
 
 impl Eq for InstrumentType {}
+
+/// Represents whether a function is a Local Function or an Imported Function. Also contains its type ID
+#[derive(Debug, Clone, Copy)]
+pub enum FuncKind {
+    Local(TypeID),
+    Import(TypeID),
+}
+
+impl PartialEq for FuncKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (FuncKind::Import(a), FuncKind::Import(b)) => a == b,
+            (FuncKind::Local(a), FuncKind::Local(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for FuncKind {}
 
 /// Used to represent a unique location in a wasm component or module.
 #[derive(Debug, Clone, Copy)]

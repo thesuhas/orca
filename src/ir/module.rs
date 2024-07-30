@@ -3,9 +3,10 @@
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID};
+use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
@@ -864,7 +865,7 @@ impl<'a> Module<'a> {
 
     /// Get Local Function ID by name
     // Note: returned absolute id here
-    pub fn get_fid_by_name(&self, name: &str) -> Option<u32> {
+    pub fn get_fid_by_name(&self, name: &str) -> Option<FunctionID> {
         for (idx, body) in self.code_sections.iter().enumerate() {
             if let Some(n) = &body.name {
                 if n == name {
@@ -875,8 +876,25 @@ impl<'a> Module<'a> {
         None
     }
 
+    /// Returns the kind of function, if its Local or Import and returns the TypeID
+    pub fn get_fn_kind(&self, id: FunctionID) -> Option<FuncKind> {
+        if id < self.num_imported_functions as u32 {
+            match self.imports[id as usize].ty {
+                wasmparser::TypeRef::Func(u) => Some(Import(u)),
+                _ => None,
+            }
+        } else {
+            let local_fn_id = id - self.num_imported_functions as u32;
+            if local_fn_id >= self.code_sections.len() as u32 {
+                None
+            } else {
+                Some(Local(self.functions[local_fn_id as usize]))
+            }
+        }
+    }
+
     /// Get a Function name from its Local Function ID
-    pub fn get_fname(&self, id: LocalID) -> Option<String> {
+    pub fn get_fname(&self, id: FunctionID) -> Option<String> {
         // TODO: we can actually get fname for imported functions now
         //       we might want to change the name of this function
         if (id as usize) < self.code_sections.len() {
