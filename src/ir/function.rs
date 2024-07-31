@@ -1,12 +1,12 @@
 //! Intermediate Representation of a function
 
-use crate::ir::id::{FunctionID, LocalID};
+use crate::ir::id::{FunctionID, LocalID, ModuleID};
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
 use crate::opcode::Opcode;
-use crate::ModuleBuilder;
+use crate::{Component, ModuleBuilder};
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
@@ -35,7 +35,7 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish(mut self, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, module: &mut Module<'a>) -> FunctionID {
         // add End as last instruction
         self.end();
 
@@ -49,6 +49,31 @@ impl<'a> FunctionBuilder<'a> {
 
         assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(module.functions.len(), module.num_functions);
+        id as FunctionID
+    }
+
+    /// Finish building a function (have side effect on component IR),
+    /// return function index
+    pub fn finish_component(mut self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
+        // add End as last instruction
+        self.end();
+
+        let ty = comp.modules[0].add_type(&self.params, &self.results);
+
+        // the function index should also take account for imports
+        let id = comp.modules[mod_idx as usize].functions.len() + comp.imports.len();
+        comp.modules[mod_idx as usize].functions.push(ty);
+        comp.modules[mod_idx as usize].code_sections.push(self.body);
+        comp.modules[mod_idx as usize].num_functions += 1;
+
+        assert_eq!(
+            comp.modules[mod_idx as usize].functions.len(),
+            comp.modules[mod_idx as usize].code_sections.len()
+        );
+        assert_eq!(
+            comp.modules[mod_idx as usize].functions.len(),
+            comp.modules[mod_idx as usize].num_functions
+        );
         id as FunctionID
     }
 
