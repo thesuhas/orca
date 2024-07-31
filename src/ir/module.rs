@@ -771,6 +771,17 @@ impl<'a> Module<'a> {
         index as TypeID
     }
 
+    /// Get type from local fucntion index
+    pub fn get_local_func_ty(&self, index: LocalID) -> Option<&FuncType> {
+        let idx = index as usize;
+        if idx < self.code_sections.len() {
+            self.get_type(self.functions[idx])
+        } else {
+            None
+        }
+    }
+
+    // TODO: this is easy to be confused with get_local_func_ty
     /// Get type from index of the type section
     pub fn get_type(&self, index: TypeID) -> Option<&FuncType> {
         self.types.get(index as usize)
