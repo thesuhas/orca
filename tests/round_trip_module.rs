@@ -75,7 +75,7 @@ fn set_name() {
     let filename = "tests/handwritten/modules/func1.wat";
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).unwrap();
-    module.set_fn_name(1, "test");
+    module.set_fn_name(1, "test".to_string());
     println!("{:#?}", module);
     let result = module.encode();
     //write result to file

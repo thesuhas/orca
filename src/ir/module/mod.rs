@@ -857,11 +857,15 @@ impl<'a> Module<'a> {
     /// Add a new function to the module. Returns the index of the imported function
     /// Note: this as no effect on the code or function section
     // TODO: In walrus, add_import_func after adding a function has no effect
-    pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: TypeID) -> ImportsID {
+    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
+        if !self.code_sections.is_empty() {
+            panic!("Cannot add import function after adding a local function");
+        }
+
         let index = self.imports.len();
         let import = crate::ir::types::Import {
-            module,
-            name,
+            module: module.leak(),
+            name: name.leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
         };
@@ -875,10 +879,16 @@ impl<'a> Module<'a> {
         self.num_imported_functions as u32
     }
 
-    /// Set a function name to a function using its relative index
-    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: &'a str) {
-        let body = &mut self.code_sections[func_idx as usize];
-        body.name = Some(name.to_owned());
+    /// Set a function name to a function using its absolute index
+    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: String) {
+        if func_idx < self.num_imported_functions as u32 {
+            let import = &mut self.imports[func_idx as usize];
+            import.import_name = Some(name.to_owned());
+        } else {
+            let local_fn_id = func_idx - self.num_imported_functions as u32;
+            let body = &mut self.code_sections[local_fn_id as usize];
+            body.name = Some(name.to_owned());
+        }
     }
 
     /// Get a function modifier from a function index
