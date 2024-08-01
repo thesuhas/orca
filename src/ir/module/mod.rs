@@ -3,18 +3,21 @@
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{
-    CustomSectionID, DataSegmentID, ExportsID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
+    CustomSectionID, DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
 };
+use crate::ir::module::module_exports::ModuleExports;
 use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, ExternalKind, MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
+
+pub mod module_exports;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -38,7 +41,7 @@ pub struct Module<'a> {
     pub data: Vec<DataSegment>,
     pub data_count_section_exists: bool,
     /// Exports
-    pub exports: Vec<Export<'a>>,
+    pub exports: ModuleExports<'a>,
     /// Index of the start function.
     pub start: Option<FunctionID>,
     /// Elements
@@ -407,7 +410,7 @@ impl<'a> Module<'a> {
             tables,
             memories,
             globals,
-            exports,
+            exports: ModuleExports::new(exports),
             start,
             elements,
             data_count_section_exists: data_section_count.is_some(),
@@ -773,43 +776,6 @@ impl<'a> Module<'a> {
         index as TypeID
     }
 
-    /// Get export by name and return ExportID if present
-    pub fn get_export_by_name(&self, name: String) -> Option<ExportsID> {
-        for exp in self.exports.iter() {
-            if exp.name == name {
-                return Some(exp.index);
-            }
-        }
-        None
-    }
-
-    pub fn get_export_by_id(&self, id: ExportsID) -> Option<Export> {
-        for exp in self.exports.iter() {
-            if exp.index == id {
-                return Some(exp.clone());
-            }
-        }
-        None
-    }
-
-    pub fn get_exported_func(&self, id: FunctionID) -> Option<Export> {
-        for exp in self.exports.iter() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.index == id {
-                        return Some(exp.clone());
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    pub fn delete_export(&mut self, id: ExportsID) {
-        self.exports.retain(|exp| exp.index != id)
-    }
-
     pub fn delete_function(&mut self, id: FunctionID) {
         if id < self.functions.len() as u32 {
             self.functions.remove(id as usize);
@@ -915,16 +881,6 @@ impl<'a> Module<'a> {
         body.name = Some(name.to_owned());
     }
 
-    /// Add an Export to a `Module`
-    pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
-        let export = Export {
-            name,
-            kind: wasmparser::ExternalKind::Func,
-            index: func_idx,
-        };
-        self.exports.push(export);
-    }
-
     /// Get a function modifier from a function index
     pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
@@ -991,7 +947,7 @@ impl<'a> Module<'a> {
             tables: vec![],
             memories: vec![],
             globals: vec![],
-            exports: vec![],
+            exports: ModuleExports::new(vec![]),
             start: None,
             elements: vec![],
             data_count_section_exists: false,
