@@ -2,14 +2,16 @@
 
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
-use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID};
+use crate::ir::id::{
+    CustomSectionID, DataSegmentID, ExportsID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
+};
 use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{Export, ExternalKind, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
@@ -771,6 +773,64 @@ impl<'a> Module<'a> {
         index as TypeID
     }
 
+    /// Get export by name and return ExportID if present
+    pub fn get_export_by_name(&self, name: String) -> Option<ExportsID> {
+        for exp in self.exports.iter() {
+            if exp.name == name {
+                return Some(exp.index);
+            }
+        }
+        None
+    }
+
+    pub fn get_export_by_id(&self, id: ExportsID) -> Option<Export> {
+        for exp in self.exports.iter() {
+            if exp.index == id {
+                return Some(exp.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_exported_func(&self, id: FunctionID) -> Option<Export> {
+        for exp in self.exports.iter() {
+            match exp.kind {
+                ExternalKind::Func => {
+                    if exp.index == id {
+                        return Some(exp.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    pub fn delete_export(&mut self, id: ExportsID) {
+        self.exports.retain(|exp| exp.index != id)
+    }
+
+    pub fn delete_function(&mut self, id: FunctionID) {
+        if id < self.functions.len() as u32 {
+            self.functions.remove(id as usize);
+        }
+    }
+
+    pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
+        for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
+            if **section_name == name {
+                return Some(index as CustomSectionID);
+            }
+        }
+        None
+    }
+
+    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
+        if id < self.custom_sections.len() as u32 {
+            self.custom_sections.remove(id as usize);
+        }
+    }
+
     /// Get type from local fucntion index
     pub fn get_local_func_ty(&self, index: LocalID) -> Option<&FuncType> {
         let idx = index as usize;
@@ -833,15 +893,15 @@ impl<'a> Module<'a> {
     /// Note: adding an imported function after adding a local function is not allowed
     /// because we need to update all the local function indices
     // TODO: In walrus, add_import_func after adding a function has no effect
-    pub fn add_import_func(&mut self, module: &'a str, name: &'a str, ty_id: TypeID) -> ImportsID {
+    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
         if !self.code_sections.is_empty() {
             panic!("Cannot add import function after adding a local function");
         }
 
         let index = self.imports.len();
         let import = crate::ir::types::Import {
-            module,
-            name,
+            module: module.leak(),
+            name: name.leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
         };
@@ -857,7 +917,7 @@ impl<'a> Module<'a> {
     }
 
     /// Set a function name to a function using its absolute index
-    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: &'a str) {
+    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: String) {
         if func_idx < self.num_imported_functions as u32 {
             let import = &mut self.imports[func_idx as usize];
             import.import_name = Some(name.to_owned());
@@ -869,9 +929,9 @@ impl<'a> Module<'a> {
     }
 
     /// Add an Export to a `Module`
-    pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
+    pub fn add_export_func(&mut self, name: String, func_idx: u32) {
         let export = Export {
-            name,
+            name: name.leak(),
             kind: wasmparser::ExternalKind::Func,
             index: func_idx,
         };

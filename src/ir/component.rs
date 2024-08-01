@@ -5,7 +5,7 @@ use crate::ir::helpers::{
     print_alias, print_component_export, print_component_import, print_component_type,
     print_core_type,
 };
-use crate::ir::id::GlobalID;
+use crate::ir::id::{FunctionID, GlobalID, ModuleID};
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::types::Global;
@@ -907,5 +907,33 @@ impl<'a> Component<'a> {
             }
             eprintln!();
         }
+    }
+
+    /// Emit the Component into a wasm binary file.
+    pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
+        let comp = self.encode_comp();
+        let wasm = comp.finish();
+        std::fs::write(file_name, wasm)?;
+        Ok(())
+    }
+
+    /// Get Local Function ID by name
+    // Note: returned absolute id here
+    pub fn get_fid_by_name(&self, name: &str, module_idx: ModuleID) -> Option<FunctionID> {
+        for (idx, body) in self.modules[module_idx as usize]
+            .code_sections
+            .iter()
+            .enumerate()
+        {
+            if let Some(n) = &body.name {
+                if n == name {
+                    return Some(
+                        idx as u32
+                            + self.modules[module_idx as usize].num_imported_functions as u32,
+                    );
+                }
+            }
+        }
+        None
     }
 }
