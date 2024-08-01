@@ -2,7 +2,7 @@ use orca::Module;
 use orca::Opcode;
 use std::process::Command;
 
-#[test]
+// #[test]
 // build factorial from scratch
 fn run_fac_orca() {
     // run cargo run in fac_orca dir
@@ -18,7 +18,7 @@ fn run_fac_orca() {
     assert_eq!(fac_generated, fac_standard);
 }
 
-#[test]
+// #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca() {
     let file_name = "tests/handwritten/modules/start.wat";

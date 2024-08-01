@@ -2,14 +2,16 @@
 
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
-use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID};
+use crate::ir::id::{
+    CustomSectionID, DataSegmentID, ExportsID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
+};
 use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{Export, ExternalKind, MemoryType, Operator, Parser, Payload, TableType};
 
 use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
@@ -769,6 +771,64 @@ impl<'a> Module<'a> {
         );
         self.types.push(ty);
         index as TypeID
+    }
+
+    /// Get export by name and return ExportID if present
+    pub fn get_export_by_name(&self, name: String) -> Option<ExportsID> {
+        for exp in self.exports.iter() {
+            if exp.name == name {
+                return Some(exp.index);
+            }
+        }
+        None
+    }
+
+    pub fn get_export_by_id(&self, id: ExportsID) -> Option<Export> {
+        for exp in self.exports.iter() {
+            if exp.index == id {
+                return Some(exp.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_exported_func(&self, id: FunctionID) -> Option<Export> {
+        for exp in self.exports.iter() {
+            match exp.kind {
+                ExternalKind::Func => {
+                    if exp.index == id {
+                        return Some(exp.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    pub fn delete_export(&mut self, id: ExportsID) {
+        self.exports.retain(|exp| exp.index != id)
+    }
+
+    pub fn delete_function(&mut self, id: FunctionID) {
+        if id < self.functions.len() as u32 {
+            self.functions.remove(id as usize);
+        }
+    }
+
+    pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
+        for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
+            if **section_name == name {
+                return Some(index as CustomSectionID);
+            }
+        }
+        None
+    }
+
+    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
+        if id < self.custom_sections.len() as u32 {
+            self.custom_sections.remove(id as usize);
+        }
     }
 
     /// Get type from local fucntion index
