@@ -13,7 +13,7 @@ use wasmparser::Operator;
 /// Iterator for a Component.
 pub struct ComponentIterator<'a, 'b> {
     /// The Component to iterate
-    comp: &'a mut Component<'b>,
+    pub comp: &'a mut Component<'b>,
     /// The SubIterator for this Component
     comp_iterator: ComponentSubIterator,
 }
@@ -49,6 +49,25 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             mod_idx as u32
         } else {
             panic!("Should have gotten component location");
+        }
+    }
+
+    pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
+        if self.comp_iterator.end() {
+            None
+        } else if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+        } = self.comp_iterator.curr_loc()
+        {
+            Some(
+                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
+                    .0
+                    .clone(),
+            )
+        } else {
+            panic!("Should have gotten Component Location!")
         }
     }
 }
