@@ -27,3 +27,6 @@ pub type ExportsID = u32;
 
 /// Custom Section ID
 pub type CustomSectionID = u32;
+
+/// Table ID
+pub type TableID = u32;

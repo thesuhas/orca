@@ -6,18 +6,20 @@ use crate::ir::id::{
     CustomSectionID, DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
 };
 use crate::ir::module::module_exports::ModuleExports;
+use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{MemoryType, Operator, Parser, Payload};
 
 use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
 
 pub mod module_exports;
+pub mod module_tables;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -32,7 +34,7 @@ pub struct Module<'a> {
     /// Note that |functions| == |code_sections| == num_functions
     pub functions: Vec<TypeID>,
     /// Each table has a type and optional initialization expression.
-    pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    pub tables: ModuleTables<'a>,
     /// Memories
     pub memories: Vec<MemoryType>,
     /// Globals
@@ -407,7 +409,7 @@ impl<'a> Module<'a> {
             types,
             imports,
             functions,
-            tables,
+            tables: ModuleTables::new(tables),
             memories,
             globals,
             exports: ModuleExports::new(exports),
@@ -954,7 +956,7 @@ impl<'a> Module<'a> {
             types: vec![],
             imports: vec![],
             functions: vec![],
-            tables: vec![],
+            tables: ModuleTables::new(vec![]),
             memories: vec![],
             globals: vec![],
             exports: ModuleExports::new(vec![]),
