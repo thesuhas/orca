@@ -1,6 +1,8 @@
 //! Intermediate Representation of a function
 
 use crate::ir::id::{FunctionID, LocalID, ModuleID};
+use crate::ir::module::module_functions::FuncKind::Local;
+use crate::ir::module::module_functions::{Function, LocalFunction};
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
@@ -40,10 +42,24 @@ impl<'a> FunctionBuilder<'a> {
         self.end();
 
         let ty = module.add_type(&self.params, &self.results);
+        let mut args = vec![];
+        for _ in 0..self.params.len() {
+            args.push(0 as LocalID);
+        }
 
         // the function index should also take account for imports
         let id = module.functions.len() + module.imports.len();
-        module.functions.push(ty);
+
+        let func = Function::new(
+            Local(LocalFunction::new(
+                ty,
+                id as FunctionID,
+                self.body.clone(),
+                args,
+            )),
+            self.name,
+        );
+        module.functions.push(func);
         module.code_sections.push(self.body);
         module.num_functions += 1;
 
@@ -59,10 +75,26 @@ impl<'a> FunctionBuilder<'a> {
         self.end();
 
         let ty = comp.modules[0].add_type(&self.params, &self.results);
+        let mut args = vec![];
+        for _ in 0..self.params.len() {
+            args.push(0 as LocalID);
+        }
 
         // the function index should also take account for imports
         let id = comp.modules[mod_idx as usize].functions.len() + comp.imports.len();
-        comp.modules[mod_idx as usize].functions.push(ty);
+
+        let func = Function::new(
+            Local(LocalFunction::new(
+                ty,
+                id as FunctionID,
+                self.body.clone(),
+                args,
+            )),
+            self.name,
+        );
+
+        // the function index should also take account for imports
+        comp.modules[mod_idx as usize].functions.push(func);
         comp.modules[mod_idx as usize].code_sections.push(self.body);
         comp.modules[mod_idx as usize].num_functions += 1;
 

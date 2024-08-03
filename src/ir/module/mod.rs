@@ -1,16 +1,19 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
+// use crate::ir::function::FunctionModifier;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{
     CustomSectionID, DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
 };
 use crate::ir::module::module_exports::ModuleExports;
+use crate::ir::module::module_functions::{
+    FuncKind, Function, Functions, ImportedFunction, LocalFunction,
+};
 use crate::ir::module::module_tables::ModuleTables;
-use crate::ir::types::FuncKind::{Import, Local};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
+    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
@@ -19,6 +22,7 @@ use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
 
 pub mod module_exports;
+pub mod module_functions;
 pub mod module_tables;
 
 #[derive(Clone, Debug)]
@@ -32,7 +36,7 @@ pub struct Module<'a> {
     pub imports: Vec<crate::ir::types::Import<'a>>,
     /// Mapping from function index to type index.
     /// Note that |functions| == |code_sections| == num_functions
-    pub functions: Vec<TypeID>,
+    pub functions: Functions<'a>,
     /// Each table has a type and optional initialization expression.
     pub tables: ModuleTables<'a>,
     /// Memories
@@ -94,7 +98,7 @@ impl<'a> Module<'a> {
         parser: Parser,
     ) -> Result<Self, Error> {
         let mut imports: Vec<crate::ir::types::Import> = vec![];
-        let mut types = vec![];
+        let mut types: Vec<FuncType> = vec![];
         let mut data = vec![];
         let mut tables = vec![];
         let mut memories = vec![];
@@ -405,10 +409,40 @@ impl<'a> Module<'a> {
                 });
             }
         }
+
+        // Add all the functions. First add all the imported functions as they have the first IDs
+        let mut final_funcs = vec![];
+        for (index, imp) in imports.iter().enumerate() {
+            match imp.ty {
+                wasmparser::TypeRef::Func(u) => final_funcs.push(Function::new(
+                    FuncKind::Import(ImportedFunction::new(index as ImportsID, u)),
+                    Some(imp.name.parse().unwrap()),
+                )),
+                _ => {}
+            }
+        }
+
+        // Local Functions
+        for (index, code_sec) in code_sections.iter().enumerate() {
+            let mut args = vec![];
+            for i in 0..types[functions[index] as usize].params.len() {
+                args.push(i as LocalID);
+            }
+            final_funcs.push(Function::new(
+                FuncKind::Local(LocalFunction::new(
+                    functions[index],
+                    (num_imported_functions + index) as FunctionID,
+                    (*code_sec).clone(),
+                    args,
+                )),
+                (*code_sec).clone().name,
+            ));
+        }
+
         Ok(Module {
             types,
             imports,
-            functions,
+            functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
             memories,
             globals,
@@ -507,8 +541,13 @@ impl<'a> Module<'a> {
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            for type_index in self.functions.iter() {
-                functions.function(*type_index);
+            for func in self.functions.iter() {
+                match func.kind() {
+                    FuncKind::Local(l) => {
+                        functions.function(l.ty_id);
+                    }
+                    _ => {}
+                }
             }
             module.section(&functions);
         }
@@ -778,10 +817,14 @@ impl<'a> Module<'a> {
         index as TypeID
     }
 
-    pub fn delete_function(&mut self, id: FunctionID) {
-        if id < self.functions.len() as u32 {
-            self.functions.remove(id as usize);
-        }
+    // TODO: Move this to module_function.rs
+    /// Get a function modifier from a function index
+    pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
+        // grab type and section and code section
+        // let ty = self.functions.get(func_idx as usize)?;
+        let body = self.code_sections.get_mut(func_id as usize)?;
+        Some(FunctionModifier::init(body))
+        // None
     }
 
     pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
@@ -803,7 +846,7 @@ impl<'a> Module<'a> {
     pub fn get_local_func_ty(&self, index: LocalID) -> Option<&FuncType> {
         let idx = index as usize;
         if idx < self.code_sections.len() {
-            self.get_type(self.functions[idx])
+            self.get_type(self.functions.get_type_id(idx as FunctionID))
         } else {
             None
         }
@@ -824,7 +867,9 @@ impl<'a> Module<'a> {
 
     pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {
         // get type
-        let func_ty = self.get_type(self.functions[func_idx]).unwrap();
+        let func_ty = self
+            .get_type(self.functions.get_type_id(func_idx as FunctionID))
+            .unwrap();
         let num_params = func_ty.params.len();
 
         let func_body = &mut self.code_sections[func_idx];
@@ -893,14 +938,14 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Get a function modifier from a function index
-    pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
-        // grab type and section and code section
-        // let ty = self.functions.get(func_idx as usize)?;
-        let body = self.code_sections.get_mut(func_id as usize)?;
-        Some(FunctionModifier::init(body))
-        // None
-    }
+    // /// Get a function modifier from a function index
+    // pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
+    //     // grab type and section and code section
+    //     // let ty = self.functions.get(func_idx as usize)?;
+    //     let body = self.code_sections.get_mut(func_id as usize)?;
+    //     Some(FunctionModifier::init(body))
+    //     // None
+    // }
 
     /// Get Local Function ID by name
     // Note: returned absolute id here
@@ -913,23 +958,6 @@ impl<'a> Module<'a> {
             }
         }
         None
-    }
-
-    /// Returns the kind of function, if its Local or Import and returns the TypeID
-    pub fn get_fn_kind(&self, id: FunctionID) -> Option<FuncKind> {
-        if id < self.num_imported_functions as u32 {
-            match self.imports[id as usize].ty {
-                wasmparser::TypeRef::Func(u) => Some(Import(u)),
-                _ => None,
-            }
-        } else {
-            let local_fn_id = id - self.num_imported_functions as u32;
-            if local_fn_id >= self.code_sections.len() as u32 {
-                None
-            } else {
-                Some(Local(self.functions[local_fn_id as usize]))
-            }
-        }
     }
 
     /// Get a Function name from its Local Function ID
@@ -955,7 +983,7 @@ impl<'a> Module<'a> {
         Module {
             types: vec![],
             imports: vec![],
-            functions: vec![],
+            functions: Functions::new(vec![]),
             tables: ModuleTables::new(vec![]),
             memories: vec![],
             globals: vec![],

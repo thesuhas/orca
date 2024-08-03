@@ -18,7 +18,7 @@ fn run_fac_orca() {
     assert_eq!(fac_generated, fac_standard);
 }
 
-// #[test]
+#[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca() {
     let file_name = "tests/handwritten/modules/start.wat";
