@@ -14,9 +14,8 @@ use std::collections::HashMap;
 use wasmparser::Operator;
 
 /// Iterator for a Module.
+// 'b should outlive 'a
 pub struct ModuleIterator<'a, 'b>
-where
-    'a: 'b,
 {
     /// The Module to Iterate
     pub module: &'a mut Module<'b>,
@@ -26,8 +25,6 @@ where
 
 #[allow(dead_code)]
 impl<'a, 'b> ModuleIterator<'a, 'b>
-where
-    'a: 'b,
 {
     /// Creates a new ModuleIterator
     pub fn new(module: &'a mut Module<'b>, skip_funcs: Vec<usize>) -> Self {

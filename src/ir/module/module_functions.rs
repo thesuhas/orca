@@ -208,7 +208,7 @@ impl<'a> Functions<'a> {
         None
     }
 
-    pub(crate) fn add_local(&'a mut self, func_idx: FunctionID, ty: DataType) -> LocalID {
+    pub(crate) fn add_local(&mut self, func_idx: FunctionID, ty: DataType) -> LocalID {
         let func_body = &mut self.functions[func_idx as usize];
         match func_body.kind {
             FuncKind::Import(_) => panic!("Imported function"),
