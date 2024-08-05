@@ -14,6 +14,7 @@ use crate::ir::wrappers::{
     convert_results, encode_core_type_subtype, process_alias,
 };
 
+use crate::ir::module::module_functions::FuncKind;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
@@ -920,18 +921,21 @@ impl<'a> Component<'a> {
     /// Get Local Function ID by name
     // Note: returned absolute id here
     pub fn get_fid_by_name(&self, name: &str, module_idx: ModuleID) -> Option<FunctionID> {
-        for (idx, body) in self.modules[module_idx as usize]
-            .code_sections
+        for (idx, func) in self.modules[module_idx as usize]
+            .functions
             .iter()
             .enumerate()
         {
-            if let Some(n) = &body.name {
-                if n == name {
-                    return Some(
-                        idx as u32
-                            + self.modules[module_idx as usize].num_imported_functions as u32,
-                    );
-                }
+            match &func.kind {
+                FuncKind::Local(l) => match &l.body.name {
+                    Some(n) => {
+                        if n == name {
+                            return Some(idx as FunctionID);
+                        }
+                    }
+                    None => {}
+                },
+                _ => {}
             }
         }
         None

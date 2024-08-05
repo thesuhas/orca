@@ -1,5 +1,7 @@
+use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::types::Body;
+use crate::DataType;
 
 /// Represents whether a function is a Local Function or an Imported Function. Also contains its type ID
 #[derive(Debug, Clone)]
@@ -77,7 +79,7 @@ impl ImportedFunction {
 
 #[derive(Clone, Debug)]
 pub struct Function<'a> {
-    kind: FuncKind<'a>,
+    pub(crate) kind: FuncKind<'a>,
     name: Option<String>,
 }
 
@@ -95,6 +97,20 @@ impl<'a> Function<'a> {
 
     pub fn kind(&self) -> &FuncKind<'a> {
         &self.kind
+    }
+
+    pub fn unwrap_local(&'a self) -> &LocalFunction<'a> {
+        match &self.kind {
+            FuncKind::Local(l) => l,
+            FuncKind::Import(_) => panic!("Imported Function!"),
+        }
+    }
+
+    pub fn unwrap_local_mut(&mut self) -> &mut LocalFunction<'a> {
+        match &mut self.kind {
+            FuncKind::Local(ref mut l) => l,
+            FuncKind::Import(_) => panic!("Imported Function!"),
+        }
     }
 }
 
@@ -145,7 +161,88 @@ impl<'a> Functions<'a> {
         &self.functions[function_id as usize]
     }
 
+    pub fn get_mut(&mut self, function_id: FunctionID) -> &mut Function<'a> {
+        &mut self.functions[function_id as usize]
+    }
+
     pub fn get_kind(&self, function_id: FunctionID) -> &FuncKind<'a> {
         &self.functions[function_id as usize].kind
+    }
+
+    /// Get a function modifier from a function index
+    pub fn get_fn_modifier<'b>(
+        &'b mut self,
+        func_id: FunctionID,
+    ) -> Option<FunctionModifier<'b, 'a>> {
+        // grab type and section and code section
+        // let ty = self.functions.get(func_idx as usize)?;
+        return match &mut self.functions.get_mut(func_id as usize)?.kind {
+            FuncKind::Local(ref mut l) => Some(FunctionModifier::init(&mut l.body)),
+            _ => None,
+        };
+        // None
+    }
+
+    pub fn unwrap_local(&'a mut self, function_id: FunctionID) -> &mut LocalFunction<'a> {
+        match &mut self.functions[function_id as usize].kind {
+            FuncKind::Local(ref mut l) => l,
+            FuncKind::Import(_) => panic!("Imported Function!"),
+        }
+    }
+
+    /// Get local Function ID by name
+    pub fn get_local_fid_by_name(&self, name: &str) -> Option<FunctionID> {
+        for (idx, func) in self.functions.iter().enumerate() {
+            match &func.kind {
+                FuncKind::Local(l) => match &l.body.name {
+                    Some(n) => {
+                        if n == name {
+                            return Some(idx as FunctionID);
+                        }
+                    }
+                    None => {}
+                },
+                _ => {}
+            }
+        }
+        None
+    }
+
+    pub(crate) fn add_local(&'a mut self, func_idx: FunctionID, ty: DataType) -> LocalID {
+        let func_body = &mut self.functions[func_idx as usize];
+        match func_body.kind {
+            FuncKind::Import(_) => panic!("Imported function"),
+            FuncKind::Local(_) => {}
+        }
+
+        let func = &mut func_body.unwrap_local_mut();
+
+        let num_params = func.args.len();
+
+        let num_locals = func.body.num_locals;
+        let index = num_params + num_locals;
+
+        let len = func.body.locals.len();
+        func.body.num_locals += 1;
+        if len > 0 {
+            let last = len - 1;
+            if func.body.locals[last].1 == ty {
+                func.body.locals[last].0 += 1;
+            } else {
+                func.body.locals.push((1, ty));
+            }
+        } else {
+            // If no locals, just append
+            func.body.locals.push((1, ty));
+        }
+
+        index as LocalID
+    }
+
+    pub fn set_local_fn_name(&mut self, func_idx: FunctionID, name: String) {
+        match &mut self.functions[func_idx as usize].kind {
+            FuncKind::Import(_) => panic!("is an imported function!"),
+            FuncKind::Local(ref mut l) => l.body.name = Some(name),
+        }
     }
 }

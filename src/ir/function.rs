@@ -60,10 +60,10 @@ impl<'a> FunctionBuilder<'a> {
             self.name,
         );
         module.functions.push(func);
-        module.code_sections.push(self.body);
+        // module.code_sections.push(self.body);
         module.num_functions += 1;
 
-        assert_eq!(module.functions.len(), module.code_sections.len());
+        // assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(module.functions.len(), module.num_functions);
         id as FunctionID
     }
@@ -95,13 +95,13 @@ impl<'a> FunctionBuilder<'a> {
 
         // the function index should also take account for imports
         comp.modules[mod_idx as usize].functions.push(func);
-        comp.modules[mod_idx as usize].code_sections.push(self.body);
+        // comp.modules[mod_idx as usize].code_sections.push(self.body);
         comp.modules[mod_idx as usize].num_functions += 1;
 
-        assert_eq!(
-            comp.modules[mod_idx as usize].functions.len(),
-            comp.modules[mod_idx as usize].code_sections.len()
-        );
+        // assert_eq!(
+        //     comp.modules[mod_idx as usize].functions.len(),
+        //     comp.modules[mod_idx as usize].code_sections.len()
+        // );
         assert_eq!(
             comp.modules[mod_idx as usize].functions.len(),
             comp.modules[mod_idx as usize].num_functions

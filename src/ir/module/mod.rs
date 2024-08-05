@@ -1,8 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
-// use crate::ir::function::FunctionModifier;
-use crate::ir::function::FunctionModifier;
 use crate::ir::id::{
     CustomSectionID, DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
 };
@@ -53,7 +51,7 @@ pub struct Module<'a> {
     /// Elements
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
     /// Function Bodies
-    pub code_sections: Vec<Body<'a>>,
+    // pub code_sections: Vec<Body<'a>>,
     /// Custom Sections
     pub custom_sections: Vec<(&'a str, &'a [u8])>,
     /// Number of local functions (not counting imported functions)
@@ -450,7 +448,7 @@ impl<'a> Module<'a> {
             start,
             elements,
             data_count_section_exists: data_section_count.is_some(),
-            code_sections: code_sections.clone(),
+            // code_sections: code_sections.clone(),
             data,
             custom_sections,
             num_functions: code_sections.len(),
@@ -486,7 +484,7 @@ impl<'a> Module<'a> {
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    /// let module = Module::parse(&buff, false).unwrap();
+    /// let mut module = Module::parse(&buff, false).unwrap();
     /// let result = module.encode();
     /// ```
     pub fn encode(&self) -> Vec<u8> {
@@ -676,19 +674,25 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
-        if !self.code_sections.is_empty() {
+        if !self.num_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
-            for (
-                rel_func_idx,
-                Body {
+            for rel_func_idx in self.num_imported_functions..self.functions.len() {
+                match &self.functions.get_kind(rel_func_idx as FunctionID) {
+                    FuncKind::Import(_) => continue,
+                    _ => {}
+                }
+                let Body {
                     locals,
                     num_locals: _,
                     instructions,
                     num_instructions: _,
                     name,
-                },
-            ) in self.code_sections.iter().enumerate()
-            {
+                } = &self
+                    .functions
+                    .get(rel_func_idx as FunctionID)
+                    .unwrap_local()
+                    .body;
+
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
                     converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
@@ -699,7 +703,7 @@ impl<'a> Module<'a> {
                         NotInstrumented => {
                             function.instruction(
                                 &reencode
-                                    .instruction((*op).clone())
+                                    .instruction(op.clone())
                                     .expect("Unable to convert Instruction"),
                             );
                         }
@@ -730,7 +734,7 @@ impl<'a> Module<'a> {
                             } else {
                                 function.instruction(
                                     &reencode
-                                        .instruction((*op).clone())
+                                        .instruction(op.clone())
                                         .expect("Unable to convert Instruction"),
                                 );
                             }
@@ -746,10 +750,7 @@ impl<'a> Module<'a> {
                     }
                 }
                 if let Some(name) = name {
-                    function_names.append(
-                        self.num_imported_functions as u32 + rel_func_idx as u32,
-                        name,
-                    );
+                    function_names.append(rel_func_idx as u32, name.as_str());
                 }
                 code.function(&function);
             }
@@ -817,16 +818,6 @@ impl<'a> Module<'a> {
         index as TypeID
     }
 
-    // TODO: Move this to module_function.rs
-    /// Get a function modifier from a function index
-    pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
-        // grab type and section and code section
-        // let ty = self.functions.get(func_idx as usize)?;
-        let body = self.code_sections.get_mut(func_id as usize)?;
-        Some(FunctionModifier::init(body))
-        // None
-    }
-
     pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
         for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
             if **section_name == name {
@@ -839,16 +830,6 @@ impl<'a> Module<'a> {
     pub fn delete_custom_section(&mut self, id: CustomSectionID) {
         if id < self.custom_sections.len() as u32 {
             self.custom_sections.remove(id as usize);
-        }
-    }
-
-    /// Get type from local fucntion index
-    pub fn get_local_func_ty(&self, index: LocalID) -> Option<&FuncType> {
-        let idx = index as usize;
-        if idx < self.code_sections.len() {
-            self.get_type(self.functions.get_type_id(idx as FunctionID))
-        } else {
-            None
         }
     }
 
@@ -865,34 +846,6 @@ impl<'a> Module<'a> {
         index as GlobalID
     }
 
-    pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {
-        // get type
-        let func_ty = self
-            .get_type(self.functions.get_type_id(func_idx as FunctionID))
-            .unwrap();
-        let num_params = func_ty.params.len();
-
-        let func_body = &mut self.code_sections[func_idx];
-        let num_locals = func_body.num_locals;
-        let index = num_params + num_locals;
-
-        let len = func_body.locals.len();
-        func_body.num_locals += 1;
-        if len > 0 {
-            let last = len - 1;
-            if func_body.locals[last].1 == ty {
-                func_body.locals[last].0 += 1;
-            } else {
-                func_body.locals.push((1, ty));
-            }
-        } else {
-            // If no locals, just append
-            func_body.locals.push((1, ty));
-        }
-
-        index as LocalID
-    }
-
     /// Add a new Data Segment to the module.
     /// Returns the index of the new Data Segment in the Data Section.
     pub fn add_data(&mut self, data: DataSegment) -> DataSegmentID {
@@ -905,7 +858,7 @@ impl<'a> Module<'a> {
     /// Note: this as no effect on the code or function section
     // TODO: In walrus, add_import_func after adding a function has no effect
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        if !self.code_sections.is_empty() {
+        if self.num_functions > 0 {
             panic!("Cannot add import function after adding a local function");
         }
 
@@ -932,13 +885,11 @@ impl<'a> Module<'a> {
             let import = &mut self.imports[func_idx as usize];
             import.import_name = Some(name.to_owned());
         } else {
-            let local_fn_id = func_idx - self.num_imported_functions as u32;
-            let body = &mut self.code_sections[local_fn_id as usize];
-            body.name = Some(name.to_owned());
+            self.functions.set_local_fn_name(func_idx, name);
         }
     }
 
-    // /// Get a function modifier from a function index
+    // // /// Get a function modifier from a function index
     // pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
     //     // grab type and section and code section
     //     // let ty = self.functions.get(func_idx as usize)?;
@@ -946,30 +897,6 @@ impl<'a> Module<'a> {
     //     Some(FunctionModifier::init(body))
     //     // None
     // }
-
-    /// Get Local Function ID by name
-    // Note: returned absolute id here
-    pub fn get_fid_by_name(&self, name: &str) -> Option<FunctionID> {
-        for (idx, body) in self.code_sections.iter().enumerate() {
-            if let Some(n) = &body.name {
-                if n == name {
-                    return Some(idx as u32 + self.num_imported_functions as u32);
-                }
-            }
-        }
-        None
-    }
-
-    /// Get a Function name from its Local Function ID
-    pub fn get_fname(&self, id: FunctionID) -> Option<String> {
-        // TODO: we can actually get fname for imported functions now
-        //       we might want to change the name of this function
-        if (id as usize) < self.code_sections.len() {
-            self.code_sections[id as usize].name.clone()
-        } else {
-            None
-        }
-    }
 
     /// Remove the last global from the list. Can only remove the final Global due to indexing
     pub fn remove_global(&mut self) {
@@ -991,7 +918,6 @@ impl<'a> Module<'a> {
             start: None,
             elements: vec![],
             data_count_section_exists: false,
-            code_sections: vec![],
             data: vec![],
             custom_sections: vec![],
             num_functions: 0,
