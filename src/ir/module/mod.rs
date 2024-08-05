@@ -9,10 +9,9 @@ use crate::ir::module::module_functions::{
     FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
 use crate::ir::module::module_tables::ModuleTables;
+use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
-use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncType, Global,
-};
+use crate::ir::types::{Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
 
@@ -22,6 +21,7 @@ use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encode
 pub mod module_exports;
 pub mod module_functions;
 pub mod module_tables;
+mod module_types;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -29,7 +29,7 @@ pub mod module_tables;
 /// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
 pub struct Module<'a> {
     /// Types
-    pub types: Vec<FuncType>,
+    pub types: ModuleTypes,
     /// Imports
     pub imports: Vec<crate::ir::types::Import<'a>>,
     /// Mapping from function index to type index.
@@ -438,7 +438,7 @@ impl<'a> Module<'a> {
         }
 
         Ok(Module {
-            types,
+            types: ModuleTypes::new(types),
             imports,
             functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
@@ -807,17 +807,6 @@ impl<'a> Module<'a> {
         module
     }
 
-    /// Add a new type to the module, returns the index of the new type.
-    pub fn add_type(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
-        let index = self.types.len();
-        let ty = FuncType::new(
-            param.to_vec().into_boxed_slice(),
-            ret.to_vec().into_boxed_slice(),
-        );
-        self.types.push(ty);
-        index as TypeID
-    }
-
     pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
         for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
             if **section_name == name {
@@ -831,12 +820,6 @@ impl<'a> Module<'a> {
         if id < self.custom_sections.len() as u32 {
             self.custom_sections.remove(id as usize);
         }
-    }
-
-    // TODO: this is easy to be confused with get_local_func_ty
-    /// Get type from index of the type section
-    pub fn get_type(&self, index: TypeID) -> Option<&FuncType> {
-        self.types.get(index as usize)
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.
@@ -908,7 +891,7 @@ impl<'a> Module<'a> {
     /// Create an empty Module
     pub fn new() -> Self {
         Module {
-            types: vec![],
+            types: ModuleTypes::new(vec![]),
             imports: vec![],
             functions: Functions::new(vec![]),
             tables: ModuleTables::new(vec![]),

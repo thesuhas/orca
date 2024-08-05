@@ -41,7 +41,7 @@ impl<'a> FunctionBuilder<'a> {
         // add End as last instruction
         self.end();
 
-        let ty = module.add_type(&self.params, &self.results);
+        let ty = module.types.add(&self.params, &self.results);
         let mut args = vec![];
         for _ in 0..self.params.len() {
             args.push(0 as LocalID);
@@ -74,7 +74,7 @@ impl<'a> FunctionBuilder<'a> {
         // add End as last instruction
         self.end();
 
-        let ty = comp.modules[0].add_type(&self.params, &self.results);
+        let ty = comp.modules[0].types.add(&self.params, &self.results);
         let mut args = vec![];
         for _ in 0..self.params.len() {
             args.push(0 as LocalID);

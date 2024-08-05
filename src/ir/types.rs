@@ -353,21 +353,6 @@ pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType 
     reencoder.val_type(*val_type).unwrap()
 }
 
-/// Orca's representation of function types, shortened from [Walrus' Representation].
-///
-/// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-#[derive(Debug, Clone)]
-pub struct FuncType {
-    pub params: Box<[DataType]>,
-    pub results: Box<[DataType]>,
-}
-
-impl FuncType {
-    pub fn new(params: Box<[DataType]>, results: Box<[DataType]>) -> Self {
-        Self { params, results }
-    }
-}
-
 #[derive(Debug, Clone)]
 /// Data Segment in a wasm module.
 pub struct DataSegment {
