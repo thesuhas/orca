@@ -2,8 +2,8 @@ use orca::Module;
 use orca::Opcode;
 use std::process::Command;
 
-// #[test]
 // build factorial from scratch
+#[test]
 fn run_fac_orca() {
     // run cargo run in fac_orca dir
     let a = Command::new("cargo")
@@ -18,8 +18,8 @@ fn run_fac_orca() {
     assert_eq!(fac_generated, fac_standard);
 }
 
-// #[test]
 // test start function instrumentation with FunctionModifier
+#[test]
 fn run_start_orca() {
     let file_name = "tests/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
@@ -35,9 +35,8 @@ fn run_start_orca() {
     println!("{}", out);
 }
 
-#[ignore]
-#[test]
 // test start function instrumentation with FunctionModifier
+#[test]
 fn run_start_orca_default() {
     let file_name = "tests/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
