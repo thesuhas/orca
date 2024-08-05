@@ -117,11 +117,17 @@ impl<'a> Function<'a> {
 #[derive(Clone, Debug)]
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
+    num_import_fns: usize,
+    num_local_fns: usize,
 }
 
 impl<'a> Functions<'a> {
-    pub fn new(functions: Vec<Function<'a>>) -> Self {
-        Functions { functions }
+    pub fn new(functions: Vec<Function<'a>>, num_import_fns: usize, num_local_fns: usize) -> Self {
+        Functions {
+            functions,
+            num_import_fns,
+            num_local_fns,
+        }
     }
 
     pub fn get_fn_by_id(&self, function_id: FunctionID) -> Option<Function> {
@@ -206,6 +212,23 @@ impl<'a> Functions<'a> {
             }
         }
         None
+    }
+
+    pub fn add_import_func(
+        &mut self,
+        imp_id: ImportsID,
+        ty_id: TypeID,
+        name: Option<String>,
+    ) -> FunctionID {
+        if self.num_local_fns > 0 {
+            panic!("Cannot add an imported function after local functions!")
+        }
+
+        self.functions.push(Function::new(
+            FuncKind::Import(ImportedFunction::new(imp_id, ty_id)),
+            name,
+        ));
+        (self.functions.len() - 1) as FunctionID
     }
 
     pub(crate) fn add_local(&mut self, func_idx: FunctionID, ty: DataType) -> LocalID {

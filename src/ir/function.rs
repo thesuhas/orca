@@ -128,6 +128,10 @@ impl<'a> FunctionBuilder<'a> {
         }
         index as LocalID
     }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = Some(name)
+    }
 }
 
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {

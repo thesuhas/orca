@@ -21,7 +21,7 @@ use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encode
 pub mod module_exports;
 pub mod module_functions;
 pub mod module_tables;
-mod module_types;
+pub mod module_types;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -419,7 +419,6 @@ impl<'a> Module<'a> {
                 _ => {}
             }
         }
-
         // Local Functions
         for (index, code_sec) in code_sections.iter().enumerate() {
             let mut args = vec![];
@@ -440,7 +439,7 @@ impl<'a> Module<'a> {
         Ok(Module {
             types: ModuleTypes::new(types),
             imports,
-            functions: Functions::new(final_funcs),
+            functions: Functions::new(final_funcs, num_imported_functions, code_sections.len()),
             tables: ModuleTables::new(tables),
             memories,
             globals,
@@ -848,11 +847,14 @@ impl<'a> Module<'a> {
         let index = self.imports.len();
         let import = crate::ir::types::Import {
             module: module.leak(),
-            name: name.leak(),
+            name: name.clone().leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
         };
         self.imports.push(import);
+        // Add to function as well as it has imported functions
+        self.functions
+            .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
 
         index as ImportsID
     }
@@ -893,7 +895,7 @@ impl<'a> Module<'a> {
         Module {
             types: ModuleTypes::new(vec![]),
             imports: vec![],
-            functions: Functions::new(vec![]),
+            functions: Functions::new(vec![], 0, 0),
             tables: ModuleTables::new(vec![]),
             memories: vec![],
             globals: vec![],
