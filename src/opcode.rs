@@ -105,6 +105,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn local_tee(&mut self, idx: LocalID) -> &mut Self {
+        self.inject(Operator::LocalTee { local_index: idx });
+        self
+    }
+
     // Integers
     /// Inject an i32.const instruction
     fn i32_const(&mut self, value: i32) -> &mut Self {
@@ -265,6 +270,11 @@ pub trait Opcode<'a> {
     /// Inject an i32.gtes instruction
     fn i32_gte_signed(&mut self) -> &mut Self {
         self.inject(Operator::I32GeS);
+        self
+    }
+
+    fn i32_wrap_i64(&mut self) -> &mut Self {
+        self.inject(Operator::I32WrapI64);
         self
     }
 
@@ -430,6 +440,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn i64_extend_i32u(&mut self) -> &mut Self {
+        self.inject(Operator::I64ExtendI32U);
+        self
+    }
+
     // Floating point
     /// Inject a f32.const instruction
     fn f32_const(&mut self, val: f32) -> &mut Self {
@@ -538,6 +553,16 @@ pub trait Opcode<'a> {
     /// Inject a f32.le instruction
     fn f32_le(&mut self) -> &mut Self {
         self.inject(Operator::F32Le);
+        self
+    }
+
+    fn f32_convert_i32s(&mut self) -> &mut Self {
+        self.inject(Operator::F32ConvertI32S);
+        self
+    }
+
+    fn f32_demote_f64(&mut self) -> &mut Self {
+        self.inject(Operator::F32DemoteF64);
         self
     }
 
@@ -651,6 +676,16 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn f64_reinterpret_i64(&mut self) -> &mut Self {
+        self.inject(Operator::F64ReinterpretI64);
+        self
+    }
+
+    fn f64_promote_f32(&mut self) -> &mut Self {
+        self.inject(Operator::F64PromoteF32);
+        self
+    }
+
     // Memory Instructions
     /// Inject a memory.init instruction
     fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
@@ -733,6 +768,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn i32_store(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I32Store { memarg });
+        self
+    }
+
     /// load 1 byte and sign-extend i8 to i64
     fn i64_load8_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
         self.inject(Operator::I64Load8S { memarg });
@@ -775,15 +815,30 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn i64_store(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::I64Store { memarg });
+        self
+    }
+
     /// load 4 bytes as f32
     fn f32_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
         self.inject(Operator::F32Load { memarg });
         self
     }
 
+    fn f32_store(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::F32Store { memarg });
+        self
+    }
+
     /// load 8 bytes as f64
     fn f64_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
         self.inject(Operator::F64Load { memarg });
+        self
+    }
+
+    fn f64_store(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+        self.inject(Operator::F64Store { memarg });
         self
     }
 
