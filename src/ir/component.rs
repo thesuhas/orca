@@ -341,7 +341,7 @@ impl<'a> Component<'a> {
                         &wasm[unchecked_range.start - start..unchecked_range.end - start],
                         enable_multi_memory,
                         parser,
-                        unchecked_range.start.clone(),
+                        unchecked_range.start,
                         &mut stack,
                     )?;
                     components.push(cmp.clone());

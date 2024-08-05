@@ -890,6 +890,8 @@ impl<'a> Module<'a> {
 
     /// Add a new function to the module. Returns the index of the imported function
     /// Note: this as no effect on the code or function section
+    /// Note: adding an imported function after adding a local function is not allowed
+    /// because we need to update all the local function indices
     // TODO: In walrus, add_import_func after adding a function has no effect
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
         if !self.code_sections.is_empty() {
@@ -904,6 +906,7 @@ impl<'a> Module<'a> {
             import_name: None,
         };
         self.imports.push(import);
+        self.num_imported_functions += 1;
 
         index as ImportsID
     }

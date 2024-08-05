@@ -324,9 +324,7 @@ impl From<&DataType> for wasmparser::ValType {
             DataType::Module(idx) => wasmparser::ValType::Ref(
                 wasmparser::RefType::new(
                     false,
-                    wasmparser::HeapType::Concrete {
-                        0: wasmparser::UnpackedIndex::Module(*idx),
-                    },
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(*idx)),
                 )
                 .unwrap(),
             ),
