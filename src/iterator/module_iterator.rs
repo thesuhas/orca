@@ -7,7 +7,6 @@ use crate::ir::types::{
     DataType, Global, Instrument, InstrumentType, InstrumentationMode, Location,
 };
 use crate::iterator::iterator_trait::Iterator;
-use crate::module_builder::ModuleBuilder;
 use crate::opcode::Opcode;
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
@@ -15,8 +14,7 @@ use wasmparser::Operator;
 
 /// Iterator for a Module.
 // 'b should outlive 'a
-pub struct ModuleIterator<'a, 'b>
-{
+pub struct ModuleIterator<'a, 'b> {
     /// The Module to Iterate
     pub module: &'a mut Module<'b>,
     /// The SubIterator for this Module
@@ -24,8 +22,7 @@ pub struct ModuleIterator<'a, 'b>
 }
 
 #[allow(dead_code)]
-impl<'a, 'b> ModuleIterator<'a, 'b>
-{
+impl<'a, 'b> ModuleIterator<'a, 'b> {
     /// Creates a new ModuleIterator
     pub fn new(module: &'a mut Module<'b>, skip_funcs: Vec<usize>) -> Self {
         // Creates Function -> Number of Instructions

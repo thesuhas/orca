@@ -9,16 +9,24 @@ use crate::ir::types::{
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
-use crate::ModuleBuilder;
 use std::collections::HashMap;
 use wasmparser::Operator;
 
 /// Iterator for a Component.
-pub struct ComponentIterator<'a, 'b: 'a> {
+pub struct ComponentIterator<'a, 'b> {
     /// The Component to iterate
     pub comp: &'a mut Component<'b>,
     /// The SubIterator for this Component
     comp_iterator: ComponentSubIterator,
+}
+
+fn print_metadata(metadata: &HashMap<usize, HashMap<usize, usize>>) {
+    for c in metadata.keys() {
+        println!("Module: {:?}", c);
+        for (m, i) in metadata.get(c).unwrap().iter() {
+            println!("Function: {:?} Instr: {:?}", m, i);
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -39,6 +47,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             }
             metadata.insert(mod_idx, mod_metadata);
         }
+        print_metadata(&metadata);
         let num_modules = comp.num_modules;
         ComponentIterator {
             comp,
@@ -79,6 +88,24 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             }
         } else {
             panic!("Should have gotten Component Location!")
+        }
+    }
+
+    pub fn add_local(&mut self, val_type: DataType) -> LocalID {
+        let curr_loc = self.curr_loc();
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            {
+                self.comp.modules[mod_idx]
+                    .functions
+                    .add_local(func_idx as FunctionID, val_type)
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 }

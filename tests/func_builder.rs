@@ -26,7 +26,7 @@ fn run_start_orca() {
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");
 
     let start_fun_id = module.start.unwrap();
-    let mut function_builder = module.get_fn(start_fun_id).unwrap();
+    let mut function_builder = module.functions.get_fn_modifier(start_fun_id).unwrap();
 
     function_builder.before_at(0).i32_const(1);
 
@@ -44,7 +44,7 @@ fn run_start_orca_default() {
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");
 
     let start_fun_id = module.start.unwrap();
-    let mut function_builder = module.get_fn(start_fun_id).unwrap();
+    let mut function_builder = module.functions.get_fn_modifier(start_fun_id).unwrap();
 
     function_builder.i32_const(1);
 

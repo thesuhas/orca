@@ -245,4 +245,8 @@ impl<'a> Functions<'a> {
             FuncKind::Local(ref mut l) => l.body.name = Some(name),
         }
     }
+
+    pub fn get_name(&self, function_id: FunctionID) -> Option<String> {
+        self.functions[function_id as usize].name.clone()
+    }
 }

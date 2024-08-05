@@ -55,10 +55,12 @@ impl ComponentSubIterator {
     fn next_module(&mut self) -> bool {
         self.curr_mod += 1;
         if self.curr_mod < self.num_mods {
+            let num_funcs = self.metadata.get(&self.curr_mod).unwrap().keys().len();
+            let met = self.metadata.get(&self.curr_mod).unwrap().clone();
             // If we're defining a new module, we have to reset function
             self.mod_iterator = ModuleSubIterator::new(
-                self.metadata.get(&self.curr_mod).unwrap().keys().len(),
-                self.metadata.get(&self.curr_mod).unwrap().clone(),
+                num_funcs,
+                met,
                 match self.skip_funcs.contains_key(&self.curr_mod) {
                     true => self.skip_funcs.get(&self.curr_mod).unwrap().clone(),
                     false => vec![],

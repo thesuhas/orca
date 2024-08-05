@@ -5,7 +5,6 @@ use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::Iterator;
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
-use orca::ModuleBuilder;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
@@ -348,7 +347,7 @@ fn test_it_instr_at() {
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
 
     let loc = Location::Module {
-        func_idx: 0,
+        func_idx: 1,
         instr_idx: 1,
     };
     mod_it.before_at(loc.clone());
@@ -528,12 +527,12 @@ fn test_function_skipping_component() {
     assert!(set.contains(&1usize));
 }
 
-// #[test]
-// fn test_fn_name() {
-//     let file = "tests/handwritten/modules/add.wat";
-//
-//     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-//     let module = Module::parse(&buff, false).expect("Unable to parse");
-//     assert_eq!("add".to_string(), module.get_fname(0).unwrap());
-//     assert_eq!(None, module.get_fname(1));
-// }
+#[test]
+fn test_fn_name() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let module = Module::parse(&buff, false).expect("Unable to parse");
+    assert_eq!("add".to_string(), module.functions.get_name(1).unwrap());
+    assert_eq!(None, module.functions.get_name(2));
+}
