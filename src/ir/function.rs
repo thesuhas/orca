@@ -149,7 +149,7 @@ impl ModuleBuilder for FunctionBuilder<'_> {
 /// FunctionBuilder since FunctionModifier does side effect to operators at encoding
 /// (it only modifies the Instrument type)
 pub struct FunctionModifier<'a, 'b> {
-    pub(crate) body: &'a mut Body<'b>,
+    pub body: &'a mut Body<'b>,
     pub(crate) instr_idx: Option<usize>,
 }
 
@@ -181,6 +181,17 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
     /// adding instructions alternate to the specified instruction
     pub fn alternate_at(&mut self, idx: usize) -> &mut Self {
         self.set_instrument_type(idx, InstrumentationMode::Alternate);
+        self
+    }
+
+    pub fn inject_at(
+        &mut self,
+        idx: usize,
+        mode: InstrumentationMode,
+        instr: Operator,
+    ) -> &mut Self {
+        self.set_instrument_type(idx, mode);
+        self.body.instructions[idx].1.add_instr(instr);
         self
     }
 
