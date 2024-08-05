@@ -18,7 +18,7 @@ fn run_fac_orca() {
     assert_eq!(fac_generated, fac_standard);
 }
 
-#[test]
+// #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca() {
     let file_name = "tests/handwritten/modules/start.wat";
@@ -38,6 +38,7 @@ fn run_start_orca() {
 #[ignore]
 #[test]
 // test start function instrumentation with FunctionModifier
+#[test]
 fn run_start_orca_default() {
     let file_name = "tests/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");

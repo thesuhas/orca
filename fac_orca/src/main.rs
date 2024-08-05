@@ -11,7 +11,7 @@ use orca::opcode::Opcode;
 fn main() {
     let mut module = Module::new();
     let log_type_id = module.add_type(&[DataType::I32], &[]);
-    let log_func_id = module.add_import_func("env", "log", log_type_id);
+    let log_func_id = module.add_import_func("env".to_string(), "log".to_string(), log_type_id);
 
     let mut factorial = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
 
@@ -57,11 +57,10 @@ fn main() {
             .end()
         .local_get(res);
 
-    // let factorial = factorial.finish(vec![n], &mut module.funcs);
-    let fact_id = factorial.finish(&mut module);
+    let fact_id = factorial.finish_module(&mut module);
 
     // Export the `factorial` function.
-    module.add_export_func("factorial", fact_id);
+    module.add_export_func("factorial".to_string(), fact_id);
 
     module.emit_wasm("target/out.wasm").unwrap();
 
