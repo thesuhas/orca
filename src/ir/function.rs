@@ -188,7 +188,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         &mut self,
         idx: usize,
         mode: InstrumentationMode,
-        instr: Operator,
+        instr: Operator<'b>,
     ) -> &mut Self {
         self.set_instrument_type(idx, mode);
         self.body.instructions[idx].1.add_instr(instr);
