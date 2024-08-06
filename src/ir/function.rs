@@ -1,6 +1,6 @@
 //! Intermediate Representation of a function
 
-use crate::ir::id::{FunctionID, LocalID, ModuleID};
+use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::FuncKind::Local;
 use crate::ir::module::module_functions::{Function, LocalFunction};
 use crate::ir::module::Module;
@@ -47,8 +47,7 @@ impl<'a> FunctionBuilder<'a> {
             args.push(0 as LocalID);
         }
 
-        // the function index should also take account for imports
-        let id = module.functions.len() + module.imports.len();
+        let id = module.functions.len();
 
         let func = Function::new(
             Local(LocalFunction::new(
@@ -80,8 +79,7 @@ impl<'a> FunctionBuilder<'a> {
             args.push(0 as LocalID);
         }
 
-        // the function index should also take account for imports
-        let id = comp.modules[mod_idx as usize].functions.len() + comp.imports.len();
+        let id = comp.modules[mod_idx as usize].functions.len();
 
         let func = Function::new(
             Local(LocalFunction::new(
@@ -131,6 +129,15 @@ impl<'a> FunctionBuilder<'a> {
 
     pub fn set_name(&mut self, name: String) {
         self.name = Some(name)
+    }
+
+    pub fn local_func(
+        &self,
+        args: Vec<LocalID>,
+        function_id: FunctionID,
+        ty: TypeID,
+    ) -> LocalFunction {
+        LocalFunction::new(ty, function_id, self.body.clone(), args)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::ir::id::{FunctionID, ImportsID};
+use crate::ir::id::{ExportsID, FunctionID, ImportsID};
 use wasmparser::TypeRef;
 
 // TODO: Need to handle the relationship between Functions and Imports
@@ -63,6 +63,23 @@ impl<'a> ModuleImports<'a> {
         self.imports.push(import)
     }
 
+    pub fn delete(&mut self, imports_id: ImportsID) {
+        self.imports.remove(imports_id as usize);
+    }
+
+    pub fn find(&self, module: String, name: Option<String>) -> Option<ExportsID> {
+        for (id, imp) in self.imports.iter().enumerate() {
+            match imp.ty {
+                _ => {
+                    if imp.module == module.as_str() && imp.import_name == name {
+                        return Some(id as ExportsID);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn get_func(&self, module: String, name: Option<String>) -> Option<FunctionID> {
         for imp in self.imports.iter() {
             match imp.ty {
@@ -75,5 +92,9 @@ impl<'a> ModuleImports<'a> {
             }
         }
         None
+    }
+
+    pub fn get(&self, id: ImportsID) -> &Import {
+        &self.imports[id as usize]
     }
 }

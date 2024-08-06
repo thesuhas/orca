@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::ir::id::GlobalID;
-use crate::InitExpr;
+use crate::{DataType, InitExpr};
 use wasmparser::GlobalType;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -39,6 +39,26 @@ impl ModuleGlobals {
         if !self.globals.is_empty() {
             self.globals.pop();
         }
+    }
+
+    pub fn create(
+        &mut self,
+        init_expr: InitExpr,
+        content_ty: DataType,
+        mutable: bool,
+        shared: bool,
+    ) -> GlobalID {
+        let new = Global {
+            ty: GlobalType {
+                mutable,
+                content_type: wasmparser::ValType::from(&content_ty),
+                shared,
+            },
+            init_expr,
+        };
+        let index = self.globals.len();
+        self.globals.push(new);
+        index as GlobalID
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.

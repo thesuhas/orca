@@ -46,12 +46,12 @@ impl<'a> ModuleExports<'a> {
         None
     }
 
-    pub fn get_func_by_id(&self, id: FunctionID) -> Option<Export> {
+    pub fn get_func_by_id(&self, id: FunctionID) -> Option<ExportsID> {
         for exp in self.exports.iter() {
             match exp.kind {
                 ExternalKind::Func => {
                     if exp.index == id {
-                        return Some(exp.clone());
+                        return Some(exp.index);
                     }
                 }
                 _ => {}

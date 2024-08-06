@@ -95,6 +95,10 @@ impl<'a> Function<'a> {
         }
     }
 
+    pub fn set_kind(&mut self, kind: FuncKind<'a>) {
+        self.kind = kind
+    }
+
     pub fn kind(&self) -> &FuncKind<'a> {
         &self.kind
     }
