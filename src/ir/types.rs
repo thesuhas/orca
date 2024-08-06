@@ -431,7 +431,7 @@ impl ElementKind<'_> {
 #[derive(Debug, Clone)]
 /// Type of element
 pub enum ElementItems<'a> {
-    Functions(Vec<u32>),
+    Functions(Vec<FunctionID>),
     ConstExprs {
         ty: RefType,
         exprs: Vec<ConstExpr<'a>>,
@@ -609,37 +609,6 @@ pub enum Location {
         func_idx: usize,
         instr_idx: usize,
     },
-}
-
-/// Represents an import in a WebAssembly module.
-#[derive(Debug, Clone)]
-pub struct Import<'a> {
-    /// The module being imported from.
-    pub module: &'a str,
-    /// The name of the imported item.
-    pub name: &'a str,
-    /// The type of the imported item.
-    pub ty: wasmparser::TypeRef,
-    /// The name (in the custom section) of the imported item.
-    pub import_name: Option<String>,
-}
-
-impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
-    fn from(import: wasmparser::Import<'a>) -> Self {
-        Import {
-            module: import.module,
-            name: import.name,
-            ty: import.ty,
-            import_name: None,
-        }
-    }
-}
-
-impl Import<'_> {
-    // TODO: Add documentation here
-    pub fn is_function(&self) -> bool {
-        matches!(self.ty, wasmparser::TypeRef::Func(_))
-    }
 }
 
 #[derive(Debug, Clone)]

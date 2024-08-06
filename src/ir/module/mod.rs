@@ -8,6 +8,7 @@ use crate::ir::module::module_exports::ModuleExports;
 use crate::ir::module::module_functions::{
     FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
+use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
@@ -20,6 +21,7 @@ use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encode
 
 pub mod module_exports;
 pub mod module_functions;
+pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
 
@@ -31,7 +33,7 @@ pub struct Module<'a> {
     /// Types
     pub types: ModuleTypes,
     /// Imports
-    pub imports: Vec<crate::ir::types::Import<'a>>,
+    pub imports: ModuleImports<'a>,
     /// Mapping from function index to type index.
     /// Note that |functions| == |code_sections| == num_functions
     pub functions: Functions<'a>,
@@ -95,7 +97,7 @@ impl<'a> Module<'a> {
         enable_multi_memory: bool,
         parser: Parser,
     ) -> Result<Self, Error> {
-        let mut imports: Vec<crate::ir::types::Import> = vec![];
+        let mut imports: Vec<Import> = vec![];
         let mut types: Vec<FuncType> = vec![];
         let mut data = vec![];
         let mut tables = vec![];
@@ -131,7 +133,7 @@ impl<'a> Module<'a> {
                     let mut temp = vec![];
                     // count number of imported functions
                     for import in import_section_reader.into_iter() {
-                        let imp = crate::ir::types::Import::from(import?);
+                        let imp = Import::from(import?);
                         if imp.is_function() {
                             num_imported_functions += 1;
                         }
@@ -438,7 +440,7 @@ impl<'a> Module<'a> {
 
         Ok(Module {
             types: ModuleTypes::new(types),
-            imports,
+            imports: ModuleImports::new(imports),
             functions: Functions::new(final_funcs, num_imported_functions, code_sections.len()),
             tables: ModuleTables::new(tables),
             memories,
@@ -845,13 +847,13 @@ impl<'a> Module<'a> {
         }
 
         let index = self.imports.len();
-        let import = crate::ir::types::Import {
+        let import = Import {
             module: module.leak(),
             name: name.clone().leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
         };
-        self.imports.push(import);
+        self.imports.add(import);
         // Add to function as well as it has imported functions
         self.functions
             .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
@@ -867,8 +869,7 @@ impl<'a> Module<'a> {
     /// Set a function name to a function using its absolute index
     pub fn set_fn_name(&mut self, func_idx: FunctionID, name: String) {
         if func_idx < self.num_imported_functions as u32 {
-            let import = &mut self.imports[func_idx as usize];
-            import.import_name = Some(name.to_owned());
+            self.imports.set_name(name, func_idx);
         } else {
             self.functions.set_local_fn_name(func_idx, name);
         }
@@ -894,7 +895,7 @@ impl<'a> Module<'a> {
     pub fn new() -> Self {
         Module {
             types: ModuleTypes::new(vec![]),
-            imports: vec![],
+            imports: ModuleImports::new(vec![]),
             functions: Functions::new(vec![], 0, 0),
             tables: ModuleTables::new(vec![]),
             memories: vec![],

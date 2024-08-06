@@ -41,4 +41,11 @@ impl<'a> ModuleTables<'a> {
         }
         None
     }
+
+    pub fn get_mut(&mut self, table_id: TableID) -> &mut TableType {
+        if table_id < self.tables.len() as u32 {
+            return &mut self.tables[table_id as usize].0;
+        }
+        panic!("Invalid Table ID")
+    }
 }
