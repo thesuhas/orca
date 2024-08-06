@@ -2,10 +2,9 @@
 
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
 use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
-use crate::ir::types::{
-    DataType, Global, Instrument, InstrumentType, InstrumentationMode, Location,
-};
+use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::module_subiterator::ModuleSubIterator;
@@ -328,6 +327,6 @@ impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn add_global(&mut self, global: Global) -> GlobalID {
-        self.module.add_global(global)
+        self.module.globals.add(global)
     }
 }

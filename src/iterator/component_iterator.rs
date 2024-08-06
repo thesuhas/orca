@@ -3,12 +3,12 @@
 use crate::ir::component::Component;
 use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
 use crate::ir::module::module_functions::FuncKind;
-use crate::ir::types::{
-    DataType, Global, Instrument, InstrumentType, InstrumentationMode, Location,
-};
+use crate::ir::module::module_globals::Global;
+use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
+use crate::ModuleBuilder;
 use std::collections::HashMap;
 use wasmparser::Operator;
 
@@ -404,27 +404,26 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
 
     fn add_global(&mut self, global: Global) -> GlobalID {
         let curr_mod = self.curr_module() as usize;
-        self.comp.modules[curr_mod].add_global(global)
+        self.comp.modules[curr_mod].globals.add(global)
     }
 }
 
-// impl ModuleBuilder for ComponentIterator<'_, '_>
-// {
-//     fn add_local(& mut self, val_type: DataType) -> LocalID {
-//         let curr_loc = self.curr_loc();
-//         if let Location::Component {
-//             mod_idx,
-//             func_idx,
-//             instr_idx: _,
-//         } = curr_loc
-//         {
-//             {
-//                 self.comp.modules[mod_idx]
-//                     .functions
-//                     .add_local(func_idx as FunctionID, val_type)
-//             }
-//         } else {
-//             panic!("Should have gotten Component Location and not Module Location!")
-//         }
-//     }
-// }
+impl ModuleBuilder for ComponentIterator<'_, '_> {
+    fn add_local(&mut self, val_type: DataType) -> LocalID {
+        let curr_loc = self.curr_loc();
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            {
+                self.comp.modules[mod_idx]
+                    .functions
+                    .add_local(func_idx as FunctionID, val_type)
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
+}

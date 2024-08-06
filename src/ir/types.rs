@@ -6,24 +6,9 @@ use std::fmt::{self};
 use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
-use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
+use wasmparser::{ConstExpr, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, Clone)]
-/// Globals in a wasm module.
-pub struct Global {
-    pub ty: GlobalType,
-    pub init_expr: InitExpr,
-}
-
-impl Global {
-    pub(crate) fn from_wasmparser(global: wasmparser::Global) -> Result<Global> {
-        let ty = global.ty;
-        let init_expr = InitExpr::eval(&global.init_expr);
-        Ok(Global { ty, init_expr })
-    }
-}
 
 /// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///

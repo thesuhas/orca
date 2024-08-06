@@ -8,13 +8,13 @@ use crate::ir::helpers::{
 use crate::ir::id::{FunctionID, GlobalID, ModuleID};
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
-use crate::ir::types::Global;
 use crate::ir::wrappers::{
     add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
 };
 
 use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_globals::Global;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
@@ -130,7 +130,7 @@ impl<'a> Component<'a> {
 
     /// Add a Global to this Component.
     pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalID {
-        self.modules[module_idx].add_global(global)
+        self.modules[module_idx].globals.add(global)
     }
 
     fn add_to_sections(

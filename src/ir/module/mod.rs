@@ -1,18 +1,17 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
-use crate::ir::id::{
-    CustomSectionID, DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
-};
+use crate::ir::id::{CustomSectionID, DataSegmentID, FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::module::module_exports::ModuleExports;
 use crate::ir::module::module_functions::{
     FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
+use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
-use crate::ir::types::{Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, Global};
+use crate::ir::types::{Body, DataSegment, DataSegmentKind, ElementItems, ElementKind};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
 
@@ -21,6 +20,7 @@ use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encode
 
 pub mod module_exports;
 pub mod module_functions;
+pub mod module_globals;
 pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
@@ -42,7 +42,7 @@ pub struct Module<'a> {
     /// Memories
     pub memories: Vec<MemoryType>,
     /// Globals
-    pub globals: Vec<Global>,
+    pub globals: ModuleGlobals,
     /// Data Sections
     pub data: Vec<DataSegment>,
     pub data_count_section_exists: bool,
@@ -444,7 +444,7 @@ impl<'a> Module<'a> {
             functions: Functions::new(final_funcs, num_imported_functions, code_sections.len()),
             tables: ModuleTables::new(tables),
             memories,
-            globals,
+            globals: ModuleGlobals::new(globals),
             exports: ModuleExports::new(exports),
             start,
             elements,
@@ -823,13 +823,6 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Add a new Global to the module. Returns the index of the new Global.
-    pub fn add_global(&mut self, global: Global) -> GlobalID {
-        let index = self.globals.len();
-        self.globals.push(global);
-        index as GlobalID
-    }
-
     /// Add a new Data Segment to the module.
     /// Returns the index of the new Data Segment in the Data Section.
     pub fn add_data(&mut self, data: DataSegment) -> DataSegmentID {
@@ -884,13 +877,6 @@ impl<'a> Module<'a> {
     //     // None
     // }
 
-    /// Remove the last global from the list. Can only remove the final Global due to indexing
-    pub fn remove_global(&mut self) {
-        if !self.globals.is_empty() {
-            self.globals.pop();
-        }
-    }
-
     /// Create an empty Module
     pub fn new() -> Self {
         Module {
@@ -899,7 +885,7 @@ impl<'a> Module<'a> {
             functions: Functions::new(vec![], 0, 0),
             tables: ModuleTables::new(vec![]),
             memories: vec![],
-            globals: vec![],
+            globals: ModuleGlobals::new(vec![]),
             exports: ModuleExports::new(vec![]),
             start: None,
             elements: vec![],
