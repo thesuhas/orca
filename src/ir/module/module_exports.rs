@@ -1,17 +1,37 @@
 use crate::ir::id::{ExportsID, FunctionID};
-use wasmparser::{Export, ExternalKind};
+use wasmparser::ExternalKind;
 
-#[derive(Clone, Debug)]
-pub struct ModuleExports<'a> {
-    exports: Vec<Export<'a>>,
+#[derive(Debug, Clone)]
+pub struct Export {
+    /// The name of the exported item.
+    pub name: String,
+    /// The kind of the export.
+    pub kind: ExternalKind,
+    /// The index of the exported item.
+    pub index: u32,
 }
 
-impl<'a> ModuleExports<'a> {
-    pub fn new(exports: Vec<Export<'a>>) -> Self {
+impl<'a> From<wasmparser::Export<'a>> for Export {
+    fn from(export: wasmparser::Export<'a>) -> Self {
+        Export {
+            name: export.name.to_string(),
+            kind: export.kind,
+            index: export.index,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ModuleExports {
+    exports: Vec<Export>,
+}
+
+impl ModuleExports {
+    pub fn new(exports: Vec<Export>) -> Self {
         ModuleExports { exports }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Export<'a>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Export> {
         self.exports.iter()
     }
 
@@ -19,10 +39,10 @@ impl<'a> ModuleExports<'a> {
         self.exports.is_empty()
     }
 
-    pub fn add_export_func(&mut self, name: &'a str, func_idx: u32) {
+    pub fn add_export_func(&mut self, name: String, func_idx: u32) {
         let export = Export {
             name,
-            kind: wasmparser::ExternalKind::Func,
+            kind: ExternalKind::Func,
             index: func_idx,
         };
         self.exports.push(export);

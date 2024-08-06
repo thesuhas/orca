@@ -136,7 +136,7 @@ impl<'a> FunctionBuilder<'a> {
         args: Vec<LocalID>,
         function_id: FunctionID,
         ty: TypeID,
-    ) -> LocalFunction {
+    ) -> LocalFunction<'a> {
         LocalFunction::new(ty, function_id, self.body.clone(), args)
     }
 }

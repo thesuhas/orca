@@ -30,3 +30,6 @@ pub type CustomSectionID = u32;
 
 /// Table ID
 pub type TableID = u32;
+
+/// Memory ID
+pub type MemoryID = u32;

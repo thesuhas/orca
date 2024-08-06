@@ -1,8 +1,10 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
-use crate::ir::id::{CustomSectionID, DataSegmentID, FunctionID, ImportsID, LocalID, TypeID};
-use crate::ir::module::module_exports::ModuleExports;
+use crate::ir::id::{
+    CustomSectionID, DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID,
+};
+use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
     FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
@@ -47,7 +49,7 @@ pub struct Module<'a> {
     pub data: Vec<DataSegment>,
     pub data_count_section_exists: bool,
     /// Exports
-    pub exports: ModuleExports<'a>,
+    pub exports: ModuleExports,
     /// Index of the start function.
     pub start: Option<FunctionID>,
     /// Elements
@@ -198,9 +200,9 @@ impl<'a> Module<'a> {
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
-                    exports = export_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    for exp in export_section_reader.into_iter() {
+                        exports.push(Export::from(exp?));
+                    }
                 }
                 Payload::StartSection { func, range: _ } => {
                     if start.is_some() {
@@ -606,7 +608,7 @@ impl<'a> Module<'a> {
             let mut exports = wasm_encoder::ExportSection::new();
             for export in self.exports.iter() {
                 exports.export(
-                    export.name,
+                    &*export.name,
                     wasm_encoder::ExportKind::from(export.kind),
                     export.index,
                 );
@@ -829,6 +831,18 @@ impl<'a> Module<'a> {
         let index = self.data.len();
         self.data.push(data);
         index as DataSegmentID
+    }
+
+    pub fn get_memory_id(&self) -> Option<MemoryID> {
+        if self.memories.len() > 1 {
+            panic!("multiple memories unsupported")
+        }
+
+        if !self.memories.is_empty() {
+            return Some(0 as MemoryID);
+        }
+        // module does not export a memory
+        return None;
     }
 
     /// Add a new function to the module. Returns the index of the imported function
