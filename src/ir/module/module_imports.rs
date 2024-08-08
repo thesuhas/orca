@@ -59,11 +59,11 @@ impl<'a> ModuleImports<'a> {
         self.imports.len()
     }
 
-    pub fn add(&mut self, import: Import<'a>) {
+    pub(crate) fn add(&mut self, import: Import<'a>) {
         self.imports.push(import)
     }
 
-    pub fn delete(&mut self, imports_id: ImportsID) {
+    pub(crate) fn delete(&mut self, imports_id: ImportsID) {
         self.imports.remove(imports_id as usize);
     }
 

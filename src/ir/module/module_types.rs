@@ -1,3 +1,5 @@
+//!  Intermediate representation of Module Types
+
 use crate::ir::id::TypeID;
 use crate::DataType;
 
@@ -11,21 +13,25 @@ pub struct FuncType {
 }
 
 impl FuncType {
+    /// Create a new Function Type
     pub fn new(params: Box<[DataType]>, results: Box<[DataType]>) -> Self {
         Self { params, results }
     }
 }
 
+/// The Module Types Section
 #[derive(Clone, Debug)]
 pub struct ModuleTypes {
     pub types: Vec<FuncType>,
 }
 
 impl ModuleTypes {
+    /// Create a new Module Types section
     pub fn new(types: Vec<FuncType>) -> Self {
         ModuleTypes { types }
     }
 
+    /// Check if there are any types in this module
     pub fn is_empty(&self) -> bool {
         self.types.is_empty()
     }
@@ -41,15 +47,16 @@ impl ModuleTypes {
         index as TypeID
     }
 
+    /// Number of types in this module
     pub fn len(&self) -> usize {
         self.types.len()
     }
 
+    /// Create an iterable over the Type Section
     pub fn iter(&self) -> std::slice::Iter<'_, FuncType> {
         self.types.iter()
     }
 
-    // TODO: this is easy to be confused with get_local_func_ty
     /// Get type from index of the type section
     pub fn get(&self, index: TypeID) -> Option<&FuncType> {
         self.types.get(index as usize)

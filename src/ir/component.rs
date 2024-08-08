@@ -15,6 +15,7 @@ use crate::ir::wrappers::{
 
 use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
+use crate::ir::types::CustomSections;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
@@ -45,7 +46,7 @@ pub struct Component<'a> {
     /// Canons
     pub canons: Vec<CanonicalFunction>,
     /// Custom sections
-    pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    pub custom_sections: CustomSections<'a>,
     /// Nested Components
     pub components: Vec<Component<'a>>,
     /// Number of modules
@@ -91,7 +92,7 @@ impl<'a> Component<'a> {
             instances: vec![],
             component_instance: vec![],
             canons: vec![],
-            custom_sections: vec![],
+            custom_sections: CustomSections::new(vec![]),
             num_modules: 0,
             start_section: vec![],
             sections: vec![],
@@ -441,7 +442,7 @@ impl<'a> Component<'a> {
             instances,
             component_instance,
             canons,
-            custom_sections,
+            custom_sections: CustomSections::new(custom_sections),
             num_modules: modules.len(),
             sections,
             start_section,
@@ -825,10 +826,12 @@ impl<'a> Component<'a> {
                     for custom_sec_idx in
                         last_processed_custom_section..last_processed_custom_section + num
                     {
-                        let (name, data) = &self.custom_sections[custom_sec_idx as usize];
+                        let section = &self
+                            .custom_sections
+                            .get_custom_section_by_id(custom_sec_idx);
                         component.section(&wasm_encoder::CustomSection {
-                            name: std::borrow::Cow::Borrowed(name),
-                            data: std::borrow::Cow::Borrowed(data),
+                            name: std::borrow::Cow::Borrowed(section.name),
+                            data: std::borrow::Cow::Borrowed(section.data),
                         });
                         last_processed_custom_section += 1;
                     }

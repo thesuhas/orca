@@ -80,12 +80,12 @@ impl ModuleExports {
         None
     }
 
-    pub fn get_func_by_name(&self, name: String) -> Option<Export> {
+    pub fn get_func_by_name(&self, name: String) -> Option<FunctionID> {
         for exp in self.exports.iter() {
             match exp.kind {
                 ExternalKind::Func => {
                     if exp.name.to_string() == name {
-                        return Some(exp.clone());
+                        return Some(exp.index);
                     }
                 }
                 _ => {}

@@ -1,3 +1,5 @@
+//! Intermediate representation of the globals.
+
 use crate::error::Error;
 use crate::ir::id::GlobalID;
 use crate::{DataType, InitExpr};
@@ -20,16 +22,19 @@ impl Global {
     }
 }
 
+/// The globals section of a module
 #[derive(Clone, Debug)]
 pub struct ModuleGlobals {
     globals: Vec<Global>,
 }
 
 impl ModuleGlobals {
+    /// Create a new globals section
     pub fn new(globals: Vec<Global>) -> Self {
         ModuleGlobals { globals }
     }
 
+    /// Check if there are any globals
     pub fn is_empty(&self) -> bool {
         self.globals.is_empty()
     }
@@ -41,6 +46,7 @@ impl ModuleGlobals {
         }
     }
 
+    /// Create a new global and add it
     pub fn create(
         &mut self,
         init_expr: InitExpr,
@@ -68,6 +74,7 @@ impl ModuleGlobals {
         index as GlobalID
     }
 
+    /// Create an iterable over the global section
     pub fn iter(&self) -> std::slice::Iter<'_, Global> {
         self.globals.iter()
     }

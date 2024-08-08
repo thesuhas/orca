@@ -66,7 +66,7 @@ mod round_trip {
         const_expr
     );
 
-    make_round_trip_tests_module!("handwritten/modules", blocks);
+    make_round_trip_tests_module!("handwritten/modules", blocks, add);
 
     make_round_trip_tests_module!("spin", hello_world_module);
 }

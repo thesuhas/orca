@@ -1,9 +1,10 @@
 //! Intermediate representation of sections in a wasm module.
 use crate::error::Error;
-use crate::ir::id::{FunctionID, GlobalID, ModuleID, TypeID};
+use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
+use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, Operator, RefType, ValType};
@@ -768,6 +769,76 @@ impl From<BlockType> for wasmparser::BlockType {
             BlockType::FuncType(u) => wasmparser::BlockType::FuncType(u),
             BlockType::Type(data) => wasmparser::BlockType::Type(wasmparser::ValType::from(&data)),
         }
+    }
+}
+
+/// Intermediate Representation of Custom Sections
+#[derive(Clone, Debug)]
+pub struct CustomSections<'a> {
+    custom_sections: Vec<CustomSection<'a>>,
+}
+
+impl<'a> CustomSections<'a> {
+    pub fn new(custom_sections: Vec<(&'a str, &'a [u8])>) -> Self {
+        CustomSections {
+            custom_sections: custom_sections
+                .iter()
+                .map(|cs| CustomSection::new(cs.0, cs.1))
+                .collect(),
+        }
+    }
+
+    /// Get a custom section ID by name
+    pub fn get_custom_section_id(&self, name: String) -> Option<CustomSectionID> {
+        for (index, section) in self.custom_sections.iter().enumerate() {
+            if section.name == name {
+                return Some(index as CustomSectionID);
+            }
+        }
+        None
+    }
+
+    pub fn get_custom_section_by_id(&self, custom_section_id: CustomSectionID) -> &CustomSection {
+        if custom_section_id < self.custom_sections.len() as u32 {
+            return &self.custom_sections[custom_section_id as usize];
+        }
+        panic!("Invalid custom section ID");
+    }
+
+    /// Delete a Custom Section by its ID
+    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
+        if id < self.custom_sections.len() as u32 {
+            self.custom_sections.remove(id as usize);
+        }
+    }
+
+    /// Number of custom sections
+    pub fn len(&self) -> usize {
+        self.custom_sections.len()
+    }
+
+    /// Check if there are any custom sections
+    pub fn is_empty(&self) -> bool {
+        self.custom_sections.is_empty()
+    }
+
+    /// Creates an iterable over the custom sections
+    pub fn iter(&self) -> Iter<'_, CustomSection<'a>> {
+        self.custom_sections.iter()
+    }
+}
+
+/// Intermediate Representation of a single Custom Section
+#[derive(Clone, Debug)]
+pub struct CustomSection<'a> {
+    pub name: &'a str,
+    pub data: &'a [u8],
+}
+
+impl<'a> CustomSection<'a> {
+    /// Create a new custom section
+    pub fn new(name: &'a str, data: &'a [u8]) -> Self {
+        CustomSection { name, data }
     }
 }
 

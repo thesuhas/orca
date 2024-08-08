@@ -1,4 +1,4 @@
-//! Intermediate Representation of a function
+//! Function Builder
 
 use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::FuncKind::Local;
@@ -37,15 +37,11 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, args: Vec<LocalID>, module: &mut Module<'a>) -> FunctionID {
         // add End as last instruction
         self.end();
 
         let ty = module.types.add(&self.params, &self.results);
-        let mut args = vec![];
-        for _ in 0..self.params.len() {
-            args.push(0 as LocalID);
-        }
 
         let id = module.functions.len();
 
@@ -63,21 +59,25 @@ impl<'a> FunctionBuilder<'a> {
         module.num_functions += 1;
 
         // assert_eq!(module.functions.len(), module.code_sections.len());
-        assert_eq!(module.functions.len(), module.num_functions);
+        assert_eq!(
+            module.functions.len(),
+            module.num_functions + module.num_imported_functions
+        );
         id as FunctionID
     }
 
     /// Finish building a function (have side effect on component IR),
     /// return function index
-    pub fn finish_component(mut self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
+    pub fn finish_component(
+        mut self,
+        args: Vec<LocalID>,
+        comp: &mut Component<'a>,
+        mod_idx: ModuleID,
+    ) -> FunctionID {
         // add End as last instruction
         self.end();
 
         let ty = comp.modules[0].types.add(&self.params, &self.results);
-        let mut args = vec![];
-        for _ in 0..self.params.len() {
-            args.push(0 as LocalID);
-        }
 
         let id = comp.modules[mod_idx as usize].functions.len();
 
@@ -103,6 +103,7 @@ impl<'a> FunctionBuilder<'a> {
         assert_eq!(
             comp.modules[mod_idx as usize].functions.len(),
             comp.modules[mod_idx as usize].num_functions
+                + comp.modules[mod_idx as usize].num_imported_functions
         );
         id as FunctionID
     }

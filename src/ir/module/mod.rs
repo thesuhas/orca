@@ -1,9 +1,7 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
-use crate::ir::id::{
-    CustomSectionID, DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID,
-};
+use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
     FuncKind, Function, Functions, ImportedFunction, LocalFunction,
@@ -13,7 +11,9 @@ use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
-use crate::ir::types::{Body, DataSegment, DataSegmentKind, ElementItems, ElementKind};
+use crate::ir::types::{
+    Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
+};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
 
@@ -37,7 +37,7 @@ pub struct Module<'a> {
     /// Imports
     pub imports: ModuleImports<'a>,
     /// Mapping from function index to type index.
-    /// Note that |functions| == |code_sections| == num_functions
+    /// Note that `|functions| == num_functions + num_imported_functions`
     pub functions: Functions<'a>,
     /// Each table has a type and optional initialization expression.
     pub tables: ModuleTables<'a>,
@@ -54,12 +54,11 @@ pub struct Module<'a> {
     pub start: Option<FunctionID>,
     /// Elements
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
-    /// Function Bodies
-    // pub code_sections: Vec<Body<'a>>,
     /// Custom Sections
-    pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    pub custom_sections: CustomSections<'a>,
     /// Number of local functions (not counting imported functions)
     pub num_functions: usize,
+    /// Number of imported functions
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
@@ -453,7 +452,7 @@ impl<'a> Module<'a> {
             data_count_section_exists: data_section_count.is_some(),
             // code_sections: code_sections.clone(),
             data,
-            custom_sections,
+            custom_sections: CustomSections::new(custom_sections),
             num_functions: code_sections.len(),
             num_imported_functions,
             module_name,
@@ -800,29 +799,14 @@ impl<'a> Module<'a> {
         module.section(&names);
 
         // encode the rest of custom sections
-        for (name, data) in self.custom_sections.iter() {
+        for section in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
-                name: std::borrow::Cow::Borrowed(name),
-                data: std::borrow::Cow::Borrowed(data),
+                name: std::borrow::Cow::Borrowed(section.name),
+                data: std::borrow::Cow::Borrowed(section.data),
             });
         }
 
         module
-    }
-
-    pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
-        for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
-            if **section_name == name {
-                return Some(index as CustomSectionID);
-            }
-        }
-        None
-    }
-
-    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
-        if id < self.custom_sections.len() as u32 {
-            self.custom_sections.remove(id as usize);
-        }
     }
 
     /// Add a new Data Segment to the module.
@@ -833,6 +817,7 @@ impl<'a> Module<'a> {
         index as DataSegmentID
     }
 
+    /// Get the memory ID of a module. Does not support multiple memories
     pub fn get_memory_id(&self) -> Option<MemoryID> {
         if self.memories.len() > 1 {
             panic!("multiple memories unsupported")
@@ -845,9 +830,7 @@ impl<'a> Module<'a> {
         return None;
     }
 
-    /// Add a new function to the module. Returns the index of the imported function
-    /// Note: this as no effect on the code or function section
-    // TODO: In walrus, add_import_func after adding a function has no effect
+    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
         if self.num_functions > 0 {
             panic!("Cannot add import function after adding a local function");
@@ -864,8 +847,20 @@ impl<'a> Module<'a> {
         // Add to function as well as it has imported functions
         self.functions
             .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
+        self.num_imported_functions += 1;
 
         index as ImportsID
+    }
+
+    /// Delete an imported function
+    pub fn delete_import_func(&mut self, import_id: ImportsID) {
+        if import_id >= self.num_imported_functions as u32 {
+            panic!("Invalid import function")
+        }
+
+        self.functions.delete(import_id);
+        self.imports.delete(import_id);
+        self.num_imported_functions -= 1;
     }
 
     /// Count number of imported function
@@ -882,15 +877,6 @@ impl<'a> Module<'a> {
         }
     }
 
-    // // /// Get a function modifier from a function index
-    // pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
-    //     // grab type and section and code section
-    //     // let ty = self.functions.get(func_idx as usize)?;
-    //     let body = self.code_sections.get_mut(func_id as usize)?;
-    //     Some(FunctionModifier::init(body))
-    //     // None
-    // }
-
     /// Create an empty Module
     pub fn new() -> Self {
         Module {
@@ -905,7 +891,7 @@ impl<'a> Module<'a> {
             elements: vec![],
             data_count_section_exists: false,
             data: vec![],
-            custom_sections: vec![],
+            custom_sections: CustomSections::new(vec![]),
             num_functions: 0,
             num_imported_functions: 0,
             module_name: None,
