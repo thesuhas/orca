@@ -1,6 +1,8 @@
-//! Intermediate Representation of a function
+//! Function Builder
 
-use crate::ir::id::{FunctionID, LocalID, ModuleID};
+use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
+use crate::ir::module::module_functions::FuncKind::Local;
+use crate::ir::module::module_functions::{Function, LocalFunction};
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
@@ -35,44 +37,73 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, args: Vec<LocalID>, module: &mut Module<'a>) -> FunctionID {
         // add End as last instruction
         self.end();
 
-        let ty = module.add_type(&self.params, &self.results);
+        let ty = module.types.add(&self.params, &self.results);
 
-        // the function index should also take account for imports
-        let id = module.functions.len() + module.imports.len();
-        module.functions.push(ty);
-        module.code_sections.push(self.body);
+        let id = module.functions.len();
+
+        let func = Function::new(
+            Local(LocalFunction::new(
+                ty,
+                id as FunctionID,
+                self.body.clone(),
+                args,
+            )),
+            self.name,
+        );
+        module.functions.push(func);
+        // module.code_sections.push(self.body);
         module.num_functions += 1;
 
-        assert_eq!(module.functions.len(), module.code_sections.len());
-        assert_eq!(module.functions.len(), module.num_functions);
+        // assert_eq!(module.functions.len(), module.code_sections.len());
+        assert_eq!(
+            module.functions.len(),
+            module.num_functions + module.num_imported_functions
+        );
         id as FunctionID
     }
 
     /// Finish building a function (have side effect on component IR),
     /// return function index
-    pub fn finish_component(mut self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
+    pub fn finish_component(
+        mut self,
+        args: Vec<LocalID>,
+        comp: &mut Component<'a>,
+        mod_idx: ModuleID,
+    ) -> FunctionID {
         // add End as last instruction
         self.end();
 
-        let ty = comp.modules[0].add_type(&self.params, &self.results);
+        let ty = comp.modules[0].types.add(&self.params, &self.results);
+
+        let id = comp.modules[mod_idx as usize].functions.len();
+
+        let func = Function::new(
+            Local(LocalFunction::new(
+                ty,
+                id as FunctionID,
+                self.body.clone(),
+                args,
+            )),
+            self.name,
+        );
 
         // the function index should also take account for imports
-        let id = comp.modules[mod_idx as usize].functions.len() + comp.imports.len();
-        comp.modules[mod_idx as usize].functions.push(ty);
-        comp.modules[mod_idx as usize].code_sections.push(self.body);
+        comp.modules[mod_idx as usize].functions.push(func);
+        // comp.modules[mod_idx as usize].code_sections.push(self.body);
         comp.modules[mod_idx as usize].num_functions += 1;
 
-        assert_eq!(
-            comp.modules[mod_idx as usize].functions.len(),
-            comp.modules[mod_idx as usize].code_sections.len()
-        );
+        // assert_eq!(
+        //     comp.modules[mod_idx as usize].functions.len(),
+        //     comp.modules[mod_idx as usize].code_sections.len()
+        // );
         assert_eq!(
             comp.modules[mod_idx as usize].functions.len(),
             comp.modules[mod_idx as usize].num_functions
+                + comp.modules[mod_idx as usize].num_imported_functions
         );
         id as FunctionID
     }
@@ -96,6 +127,19 @@ impl<'a> FunctionBuilder<'a> {
         }
         index as LocalID
     }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = Some(name)
+    }
+
+    pub fn local_func(
+        &self,
+        args: Vec<LocalID>,
+        function_id: FunctionID,
+        ty: TypeID,
+    ) -> LocalFunction<'a> {
+        LocalFunction::new(ty, function_id, self.body.clone(), args)
+    }
 }
 
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {
@@ -117,7 +161,7 @@ impl ModuleBuilder for FunctionBuilder<'_> {
 /// FunctionBuilder since FunctionModifier does side effect to operators at encoding
 /// (it only modifies the Instrument type)
 pub struct FunctionModifier<'a, 'b> {
-    pub(crate) body: &'a mut Body<'b>,
+    pub body: &'a mut Body<'b>,
     pub(crate) instr_idx: Option<usize>,
 }
 
@@ -149,6 +193,17 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
     /// adding instructions alternate to the specified instruction
     pub fn alternate_at(&mut self, idx: usize) -> &mut Self {
         self.set_instrument_type(idx, InstrumentationMode::Alternate);
+        self
+    }
+
+    pub fn inject_at(
+        &mut self,
+        idx: usize,
+        mode: InstrumentationMode,
+        instr: Operator<'b>,
+    ) -> &mut Self {
+        self.set_instrument_type(idx, mode);
+        self.body.instructions[idx].1.add_instr(instr);
         self
     }
 

@@ -1,20 +1,31 @@
 //! Intermediate Representation of a wasm module.
 
 use crate::error::Error;
-use crate::ir::function::FunctionModifier;
-use crate::ir::id::{
-    CustomSectionID, DataSegmentID, ExportsID, FunctionID, GlobalID, ImportsID, LocalID, TypeID,
+use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
+use crate::ir::module::module_exports::{Export, ModuleExports};
+use crate::ir::module::module_functions::{
+    FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
-use crate::ir::types::FuncKind::{Import, Local};
+use crate::ir::module::module_globals::{Global, ModuleGlobals};
+use crate::ir::module::module_imports::{Import, ModuleImports};
+use crate::ir::module::module_tables::ModuleTables;
+use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
-    Body, DataSegment, DataSegmentKind, ElementItems, ElementKind, FuncKind, FuncType, Global,
+    Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
 };
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{Export, ExternalKind, MemoryType, Operator, Parser, Payload, TableType};
+use wasmparser::{MemoryType, Operator, Parser, Payload};
 
 use super::types::DataType;
 use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
+
+pub mod module_exports;
+pub mod module_functions;
+pub mod module_globals;
+pub mod module_imports;
+pub mod module_tables;
+pub mod module_types;
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -22,33 +33,32 @@ use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encode
 /// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
 pub struct Module<'a> {
     /// Types
-    pub types: Vec<FuncType>,
+    pub types: ModuleTypes,
     /// Imports
-    pub imports: Vec<crate::ir::types::Import<'a>>,
+    pub imports: ModuleImports<'a>,
     /// Mapping from function index to type index.
-    /// Note that |functions| == |code_sections| == num_functions
-    pub functions: Vec<TypeID>,
+    /// Note that `|functions| == num_functions + num_imported_functions`
+    pub functions: Functions<'a>,
     /// Each table has a type and optional initialization expression.
-    pub tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    pub tables: ModuleTables<'a>,
     /// Memories
     pub memories: Vec<MemoryType>,
     /// Globals
-    pub globals: Vec<Global>,
+    pub globals: ModuleGlobals,
     /// Data Sections
     pub data: Vec<DataSegment>,
     pub data_count_section_exists: bool,
     /// Exports
-    pub exports: Vec<Export<'a>>,
+    pub exports: ModuleExports,
     /// Index of the start function.
     pub start: Option<FunctionID>,
     /// Elements
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
-    /// Function Bodies
-    pub code_sections: Vec<Body<'a>>,
     /// Custom Sections
-    pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    pub custom_sections: CustomSections<'a>,
     /// Number of local functions (not counting imported functions)
     pub num_functions: usize,
+    /// Number of imported functions
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
@@ -88,8 +98,8 @@ impl<'a> Module<'a> {
         enable_multi_memory: bool,
         parser: Parser,
     ) -> Result<Self, Error> {
-        let mut imports: Vec<crate::ir::types::Import> = vec![];
-        let mut types = vec![];
+        let mut imports: Vec<Import> = vec![];
+        let mut types: Vec<FuncType> = vec![];
         let mut data = vec![];
         let mut tables = vec![];
         let mut memories = vec![];
@@ -124,7 +134,7 @@ impl<'a> Module<'a> {
                     let mut temp = vec![];
                     // count number of imported functions
                     for import in import_section_reader.into_iter() {
-                        let imp = crate::ir::types::Import::from(import?);
+                        let imp = Import::from(import?);
                         if imp.is_function() {
                             num_imported_functions += 1;
                         }
@@ -189,9 +199,9 @@ impl<'a> Module<'a> {
                         .collect::<Result<_, _>>()?;
                 }
                 Payload::ExportSection(export_section_reader) => {
-                    exports = export_section_reader
-                        .into_iter()
-                        .collect::<Result<_, _>>()?;
+                    for exp in export_section_reader.into_iter() {
+                        exports.push(Export::from(exp?));
+                    }
                 }
                 Payload::StartSection { func, range: _ } => {
                     if start.is_some() {
@@ -400,20 +410,49 @@ impl<'a> Module<'a> {
                 });
             }
         }
+
+        // Add all the functions. First add all the imported functions as they have the first IDs
+        let mut final_funcs = vec![];
+        for (index, imp) in imports.iter().enumerate() {
+            match imp.ty {
+                wasmparser::TypeRef::Func(u) => final_funcs.push(Function::new(
+                    FuncKind::Import(ImportedFunction::new(index as ImportsID, u)),
+                    Some(imp.name.parse().unwrap()),
+                )),
+                _ => {}
+            }
+        }
+        // Local Functions
+        for (index, code_sec) in code_sections.iter().enumerate() {
+            let mut args = vec![];
+            for i in 0..types[functions[index] as usize].params.len() {
+                args.push(i as LocalID);
+            }
+            final_funcs.push(Function::new(
+                FuncKind::Local(LocalFunction::new(
+                    functions[index],
+                    (num_imported_functions + index) as FunctionID,
+                    (*code_sec).clone(),
+                    args,
+                )),
+                (*code_sec).clone().name,
+            ));
+        }
+
         Ok(Module {
-            types,
-            imports,
-            functions,
-            tables,
+            types: ModuleTypes::new(types),
+            imports: ModuleImports::new(imports),
+            functions: Functions::new(final_funcs, num_imported_functions, code_sections.len()),
+            tables: ModuleTables::new(tables),
             memories,
-            globals,
-            exports,
+            globals: ModuleGlobals::new(globals),
+            exports: ModuleExports::new(exports),
             start,
             elements,
             data_count_section_exists: data_section_count.is_some(),
-            code_sections: code_sections.clone(),
+            // code_sections: code_sections.clone(),
             data,
-            custom_sections,
+            custom_sections: CustomSections::new(custom_sections),
             num_functions: code_sections.len(),
             num_imported_functions,
             module_name,
@@ -447,7 +486,7 @@ impl<'a> Module<'a> {
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    /// let module = Module::parse(&buff, false).unwrap();
+    /// let mut module = Module::parse(&buff, false).unwrap();
     /// let result = module.encode();
     /// ```
     pub fn encode(&self) -> Vec<u8> {
@@ -502,8 +541,13 @@ impl<'a> Module<'a> {
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            for type_index in self.functions.iter() {
-                functions.function(*type_index);
+            for func in self.functions.iter() {
+                match func.kind() {
+                    FuncKind::Local(l) => {
+                        functions.function(l.ty_id);
+                    }
+                    _ => {}
+                }
             }
             module.section(&functions);
         }
@@ -563,7 +607,7 @@ impl<'a> Module<'a> {
             let mut exports = wasm_encoder::ExportSection::new();
             for export in self.exports.iter() {
                 exports.export(
-                    export.name,
+                    &*export.name,
                     wasm_encoder::ExportKind::from(export.kind),
                     export.index,
                 );
@@ -632,19 +676,25 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
-        if !self.code_sections.is_empty() {
+        if !self.num_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
-            for (
-                rel_func_idx,
-                Body {
+            for rel_func_idx in self.num_imported_functions..self.functions.len() {
+                match &self.functions.get_kind(rel_func_idx as FunctionID) {
+                    FuncKind::Import(_) => continue,
+                    _ => {}
+                }
+                let Body {
                     locals,
                     num_locals: _,
                     instructions,
                     num_instructions: _,
                     name,
-                },
-            ) in self.code_sections.iter().enumerate()
-            {
+                } = &self
+                    .functions
+                    .get(rel_func_idx as FunctionID)
+                    .unwrap_local()
+                    .body;
+
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
                     converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
@@ -655,7 +705,7 @@ impl<'a> Module<'a> {
                         NotInstrumented => {
                             function.instruction(
                                 &reencode
-                                    .instruction((*op).clone())
+                                    .instruction(op.clone())
                                     .expect("Unable to convert Instruction"),
                             );
                         }
@@ -686,7 +736,7 @@ impl<'a> Module<'a> {
                             } else {
                                 function.instruction(
                                     &reencode
-                                        .instruction((*op).clone())
+                                        .instruction(op.clone())
                                         .expect("Unable to convert Instruction"),
                                 );
                             }
@@ -702,10 +752,7 @@ impl<'a> Module<'a> {
                     }
                 }
                 if let Some(name) = name {
-                    function_names.append(
-                        self.num_imported_functions as u32 + rel_func_idx as u32,
-                        name,
-                    );
+                    function_names.append(rel_func_idx as u32, name.as_str());
                 }
                 code.function(&function);
             }
@@ -752,132 +799,14 @@ impl<'a> Module<'a> {
         module.section(&names);
 
         // encode the rest of custom sections
-        for (name, data) in self.custom_sections.iter() {
+        for section in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
-                name: std::borrow::Cow::Borrowed(name),
-                data: std::borrow::Cow::Borrowed(data),
+                name: std::borrow::Cow::Borrowed(section.name),
+                data: std::borrow::Cow::Borrowed(section.data),
             });
         }
 
         module
-    }
-
-    /// Add a new type to the module, returns the index of the new type.
-    pub fn add_type(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
-        let index = self.types.len();
-        let ty = FuncType::new(
-            param.to_vec().into_boxed_slice(),
-            ret.to_vec().into_boxed_slice(),
-        );
-        self.types.push(ty);
-        index as TypeID
-    }
-
-    /// Get export by name and return ExportID if present
-    pub fn get_export_by_name(&self, name: String) -> Option<ExportsID> {
-        for exp in self.exports.iter() {
-            if exp.name == name {
-                return Some(exp.index);
-            }
-        }
-        None
-    }
-
-    pub fn get_export_by_id(&self, id: ExportsID) -> Option<Export> {
-        for exp in self.exports.iter() {
-            if exp.index == id {
-                return Some(exp.clone());
-            }
-        }
-        None
-    }
-
-    pub fn get_exported_func(&self, id: FunctionID) -> Option<Export> {
-        for exp in self.exports.iter() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.index == id {
-                        return Some(exp.clone());
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    pub fn delete_export(&mut self, id: ExportsID) {
-        self.exports.retain(|exp| exp.index != id)
-    }
-
-    pub fn delete_function(&mut self, id: FunctionID) {
-        if id < self.functions.len() as u32 {
-            self.functions.remove(id as usize);
-        }
-    }
-
-    pub fn get_custom_section(&self, name: String) -> Option<CustomSectionID> {
-        for (index, (section_name, _data)) in self.custom_sections.iter().enumerate() {
-            if **section_name == name {
-                return Some(index as CustomSectionID);
-            }
-        }
-        None
-    }
-
-    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
-        if id < self.custom_sections.len() as u32 {
-            self.custom_sections.remove(id as usize);
-        }
-    }
-
-    /// Get type from local fucntion index
-    pub fn get_local_func_ty(&self, index: LocalID) -> Option<&FuncType> {
-        let idx = index as usize;
-        if idx < self.code_sections.len() {
-            self.get_type(self.functions[idx])
-        } else {
-            None
-        }
-    }
-
-    // TODO: this is easy to be confused with get_local_func_ty
-    /// Get type from index of the type section
-    pub fn get_type(&self, index: TypeID) -> Option<&FuncType> {
-        self.types.get(index as usize)
-    }
-
-    /// Add a new Global to the module. Returns the index of the new Global.
-    pub fn add_global(&mut self, global: Global) -> GlobalID {
-        let index = self.globals.len();
-        self.globals.push(global);
-        index as GlobalID
-    }
-
-    pub(crate) fn add_local(&mut self, func_idx: usize, ty: DataType) -> LocalID {
-        // get type
-        let func_ty = self.get_type(self.functions[func_idx]).unwrap();
-        let num_params = func_ty.params.len();
-
-        let func_body = &mut self.code_sections[func_idx];
-        let num_locals = func_body.num_locals;
-        let index = num_params + num_locals;
-
-        let len = func_body.locals.len();
-        func_body.num_locals += 1;
-        if len > 0 {
-            let last = len - 1;
-            if func_body.locals[last].1 == ty {
-                func_body.locals[last].0 += 1;
-            } else {
-                func_body.locals.push((1, ty));
-            }
-        } else {
-            // If no locals, just append
-            func_body.locals.push((1, ty));
-        }
-
-        index as LocalID
     }
 
     /// Add a new Data Segment to the module.
@@ -888,24 +817,50 @@ impl<'a> Module<'a> {
         index as DataSegmentID
     }
 
-    /// Add a new function to the module. Returns the index of the imported function
-    /// Note: this as no effect on the code or function section
-    // TODO: In walrus, add_import_func after adding a function has no effect
+    /// Get the memory ID of a module. Does not support multiple memories
+    pub fn get_memory_id(&self) -> Option<MemoryID> {
+        if self.memories.len() > 1 {
+            panic!("multiple memories unsupported")
+        }
+
+        if !self.memories.is_empty() {
+            return Some(0 as MemoryID);
+        }
+        // module does not export a memory
+        return None;
+    }
+
+    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        if !self.code_sections.is_empty() {
+        if self.num_functions > 0 {
             panic!("Cannot add import function after adding a local function");
         }
 
         let index = self.imports.len();
-        let import = crate::ir::types::Import {
+        let import = Import {
             module: module.leak(),
-            name: name.leak(),
+            name: name.clone().leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
         };
-        self.imports.push(import);
+        self.imports.add(import);
+        // Add to function as well as it has imported functions
+        self.functions
+            .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
+        self.num_imported_functions += 1;
 
         index as ImportsID
+    }
+
+    /// Delete an imported function
+    pub fn delete_import_func(&mut self, import_id: ImportsID) {
+        if import_id >= self.num_imported_functions as u32 {
+            panic!("Invalid import function")
+        }
+
+        self.functions.delete(import_id);
+        self.imports.delete(import_id);
+        self.num_imported_functions -= 1;
     }
 
     /// Count number of imported function
@@ -916,98 +871,27 @@ impl<'a> Module<'a> {
     /// Set a function name to a function using its absolute index
     pub fn set_fn_name(&mut self, func_idx: FunctionID, name: String) {
         if func_idx < self.num_imported_functions as u32 {
-            let import = &mut self.imports[func_idx as usize];
-            import.import_name = Some(name.to_owned());
+            self.imports.set_name(name, func_idx);
         } else {
-            let local_fn_id = func_idx - self.num_imported_functions as u32;
-            let body = &mut self.code_sections[local_fn_id as usize];
-            body.name = Some(name.to_owned());
-        }
-    }
-
-    /// Add an Export to a `Module`
-    pub fn add_export_func(&mut self, name: String, func_idx: u32) {
-        let export = Export {
-            name: name.leak(),
-            kind: wasmparser::ExternalKind::Func,
-            index: func_idx,
-        };
-        self.exports.push(export);
-    }
-
-    /// Get a function modifier from a function index
-    pub fn get_fn<'b>(&'b mut self, func_id: FunctionID) -> Option<FunctionModifier<'b, 'a>> {
-        // grab type and section and code section
-        // let ty = self.functions.get(func_idx as usize)?;
-        let body = self.code_sections.get_mut(func_id as usize)?;
-        Some(FunctionModifier::init(body))
-        // None
-    }
-
-    /// Get Local Function ID by name
-    // Note: returned absolute id here
-    pub fn get_fid_by_name(&self, name: &str) -> Option<FunctionID> {
-        for (idx, body) in self.code_sections.iter().enumerate() {
-            if let Some(n) = &body.name {
-                if n == name {
-                    return Some(idx as u32 + self.num_imported_functions as u32);
-                }
-            }
-        }
-        None
-    }
-
-    /// Returns the kind of function, if its Local or Import and returns the TypeID
-    pub fn get_fn_kind(&self, id: FunctionID) -> Option<FuncKind> {
-        if id < self.num_imported_functions as u32 {
-            match self.imports[id as usize].ty {
-                wasmparser::TypeRef::Func(u) => Some(Import(u)),
-                _ => None,
-            }
-        } else {
-            let local_fn_id = id - self.num_imported_functions as u32;
-            if local_fn_id >= self.code_sections.len() as u32 {
-                None
-            } else {
-                Some(Local(self.functions[local_fn_id as usize]))
-            }
-        }
-    }
-
-    /// Get a Function name from its Local Function ID
-    pub fn get_fname(&self, id: FunctionID) -> Option<String> {
-        // TODO: we can actually get fname for imported functions now
-        //       we might want to change the name of this function
-        if (id as usize) < self.code_sections.len() {
-            self.code_sections[id as usize].name.clone()
-        } else {
-            None
-        }
-    }
-
-    /// Remove the last global from the list. Can only remove the final Global due to indexing
-    pub fn remove_global(&mut self) {
-        if !self.globals.is_empty() {
-            self.globals.pop();
+            self.functions.set_local_fn_name(func_idx, name);
         }
     }
 
     /// Create an empty Module
     pub fn new() -> Self {
         Module {
-            types: vec![],
-            imports: vec![],
-            functions: vec![],
-            tables: vec![],
+            types: ModuleTypes::new(vec![]),
+            imports: ModuleImports::new(vec![]),
+            functions: Functions::new(vec![], 0, 0),
+            tables: ModuleTables::new(vec![]),
             memories: vec![],
-            globals: vec![],
-            exports: vec![],
+            globals: ModuleGlobals::new(vec![]),
+            exports: ModuleExports::new(vec![]),
             start: None,
             elements: vec![],
             data_count_section_exists: false,
-            code_sections: vec![],
             data: vec![],
-            custom_sections: vec![],
+            custom_sections: CustomSections::new(vec![]),
             num_functions: 0,
             num_imported_functions: 0,
             module_name: None,

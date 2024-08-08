@@ -6,6 +6,7 @@
 // for FunctionBuilder, we inject at the end of the function
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
 use crate::ir::types::BlockType;
+use wasmparser::MemArg;
 use wasmparser::Operator;
 
 #[allow(dead_code)]
@@ -102,6 +103,11 @@ pub trait Opcode<'a> {
     /// Inject a local.set
     fn local_set(&mut self, idx: LocalID) -> &mut Self {
         self.inject(Operator::LocalSet { local_index: idx });
+        self
+    }
+
+    fn local_tee(&mut self, idx: LocalID) -> &mut Self {
+        self.inject(Operator::LocalTee { local_index: idx });
         self
     }
 
@@ -268,6 +274,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn i32_wrap_i64(&mut self) -> &mut Self {
+        self.inject(Operator::I32WrapI64);
+        self
+    }
+
     /// Inject an i64.const
     fn i64_const(&mut self, value: i64) -> &mut Self {
         self.inject(Operator::I64Const { value });
@@ -430,6 +441,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn i64_extend_i32u(&mut self) -> &mut Self {
+        self.inject(Operator::I64ExtendI32U);
+        self
+    }
+
     // Floating point
     /// Inject a f32.const instruction
     fn f32_const(&mut self, val: f32) -> &mut Self {
@@ -538,6 +554,16 @@ pub trait Opcode<'a> {
     /// Inject a f32.le instruction
     fn f32_le(&mut self) -> &mut Self {
         self.inject(Operator::F32Le);
+        self
+    }
+
+    fn f32_convert_i32s(&mut self) -> &mut Self {
+        self.inject(Operator::F32ConvertI32S);
+        self
+    }
+
+    fn f32_demote_f64(&mut self) -> &mut Self {
+        self.inject(Operator::F32DemoteF64);
         self
     }
 
@@ -651,6 +677,16 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn f64_reinterpret_i64(&mut self) -> &mut Self {
+        self.inject(Operator::F64ReinterpretI64);
+        self
+    }
+
+    fn f64_promote_f32(&mut self) -> &mut Self {
+        self.inject(Operator::F64PromoteF32);
+        self
+    }
+
     // Memory Instructions
     /// Inject a memory.init instruction
     fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
@@ -704,86 +740,106 @@ pub trait Opcode<'a> {
     // note: walrus does not specify max_align (probably it's the same as align)
 
     /// load 1 byte and sign-extend i8 to i32
-    fn i32_load8_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i32_load8_s(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I32Load8S { memarg });
         self
     }
 
     /// load 1 byte and zero-extend i8 to i32
-    fn i32_load8_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i32_load8_u(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I32Load8U { memarg });
         self
     }
 
     /// load 2 bytes and sign-extend i16 to i32
-    fn i32_load16_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i32_load16_s(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I32Load16S { memarg });
         self
     }
 
     /// load 2 bytes and zero-extend i16 to i32
-    fn i32_load16_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i32_load16_u(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I32Load16U { memarg });
         self
     }
 
     /// load 4 bytes as i32
-    fn i32_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i32_load(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I32Load { memarg });
         self
     }
 
+    fn i32_store(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::I32Store { memarg });
+        self
+    }
+
     /// load 1 byte and sign-extend i8 to i64
-    fn i64_load8_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load8_s(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load8S { memarg });
         self
     }
 
     /// load 1 byte and zero-extend i8 to i64
-    fn i64_load8_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load8_u(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load8U { memarg });
         self
     }
 
     /// load 2 bytes and sign-extend i16 to i64
-    fn i64_load16_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load16_s(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load16S { memarg });
         self
     }
 
     /// load 2 bytes and zero-extend i16 to i64
-    fn i64_load16_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load16_u(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load16U { memarg });
         self
     }
 
     /// load 4 bytes and sign-extend i32 to i64
-    fn i64_load32_s(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load32_s(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load32S { memarg });
         self
     }
 
     /// load 4 bytes and zero-extend i32 to i64
-    fn i64_load32_u(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load32_u(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load32U { memarg });
         self
     }
 
     /// load 4 bytes as i64
-    fn i64_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn i64_load(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::I64Load { memarg });
         self
     }
 
+    fn i64_store(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::I64Store { memarg });
+        self
+    }
+
     /// load 4 bytes as f32
-    fn f32_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn f32_load(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::F32Load { memarg });
         self
     }
 
+    fn f32_store(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::F32Store { memarg });
+        self
+    }
+
     /// load 8 bytes as f64
-    fn f64_load(&mut self, memarg: wasmparser::MemArg) -> &mut Self {
+    fn f64_load(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::F64Load { memarg });
+        self
+    }
+
+    fn f64_store(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::F64Store { memarg });
         self
     }
 

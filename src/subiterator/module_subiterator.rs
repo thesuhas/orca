@@ -22,10 +22,12 @@ impl ModuleSubIterator {
     /// Creates a new ModuleSubIterator
     pub fn new(num_funcs: usize, metadata: HashMap<usize, usize>, skip_funcs: Vec<usize>) -> Self {
         let mut mod_it = ModuleSubIterator {
-            curr_func: 0,
+            curr_func: *metadata.keys().min().unwrap(),
             num_funcs,
             metadata: metadata.clone(),
-            func_iterator: FuncSubIterator::new(*metadata.get(&0).unwrap()),
+            func_iterator: FuncSubIterator::new(
+                *metadata.get(&metadata.keys().min().unwrap()).unwrap(),
+            ),
             skip_funcs,
         };
         // In case 0 is in skip func
@@ -52,7 +54,12 @@ impl ModuleSubIterator {
     pub(crate) fn reset_from_comp_iterator(&mut self, metadata: HashMap<usize, usize>) {
         self.curr_func = 0;
         self.metadata = metadata;
-        self.func_iterator.reset(*self.metadata.get(&0).unwrap());
+        self.func_iterator.reset(
+            *self
+                .metadata
+                .get(&self.metadata.keys().min().unwrap())
+                .unwrap(),
+        );
     }
 
     /// Resets the ModuleSubIterator when it is not a Child SubIterator

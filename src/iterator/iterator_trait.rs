@@ -1,7 +1,8 @@
 //! Trait that needs to be satisfied by all iterators
 
 use crate::ir::id::GlobalID;
-use crate::ir::types::{Global, InstrumentType, InstrumentationMode, Location};
+use crate::ir::module::module_globals::Global;
+use crate::ir::types::{InstrumentType, InstrumentationMode, Location};
 use wasmparser::Operator;
 
 #[allow(dead_code)]

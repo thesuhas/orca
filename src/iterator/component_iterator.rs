@@ -1,8 +1,10 @@
 //! Iterator to traverse a Component
 
 use crate::ir::component::Component;
-use crate::ir::id::{GlobalID, LocalID, ModuleID};
-use crate::ir::types::{Global, Instrument, InstrumentType, InstrumentationMode, Location};
+use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
+use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_globals::Global;
+use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
 use crate::opcode::Opcode;
 use crate::subiterator::component_subiterator::ComponentSubIterator;
@@ -18,6 +20,15 @@ pub struct ComponentIterator<'a, 'b> {
     comp_iterator: ComponentSubIterator,
 }
 
+fn print_metadata(metadata: &HashMap<usize, HashMap<usize, usize>>) {
+    for c in metadata.keys() {
+        println!("Module: {:?}", c);
+        for (m, i) in metadata.get(c).unwrap().iter() {
+            println!("Function: {:?} Instr: {:?}", m, i);
+        }
+    }
+}
+
 #[allow(dead_code)]
 impl<'a, 'b> ComponentIterator<'a, 'b> {
     /// Creates a new Component Iterator
@@ -26,11 +37,17 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         let mut metadata = HashMap::new();
         for (mod_idx, m) in comp.modules.iter().enumerate() {
             let mut mod_metadata = HashMap::new();
-            for (idx, func) in m.code_sections.iter().enumerate() {
-                mod_metadata.insert(idx, func.num_instructions);
+            for (idx, func) in m.functions.iter().enumerate() {
+                match &func.kind {
+                    FuncKind::Import(_) => {}
+                    FuncKind::Local(l) => {
+                        mod_metadata.insert(idx, l.body.num_instructions);
+                    }
+                }
             }
             metadata.insert(mod_idx, mod_metadata);
         }
+        print_metadata(&metadata);
         let num_modules = comp.num_modules;
         ComponentIterator {
             comp,
@@ -61,13 +78,34 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            Some(
-                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                    .0
-                    .clone(),
-            )
+            match &self.comp.modules[mod_idx]
+                .functions
+                .get(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => None,
+                FuncKind::Local(l) => Some(l.body.instructions[instr_idx].0.clone()),
+            }
         } else {
             panic!("Should have gotten Component Location!")
+        }
+    }
+
+    pub fn add_local(&mut self, val_type: DataType) -> LocalID {
+        let curr_loc = self.curr_loc();
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            {
+                self.comp.modules[mod_idx]
+                    .functions
+                    .add_local(func_idx as FunctionID, val_type)
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 }
@@ -122,9 +160,14 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                .1
-                .add_instr(instr)
+            match self.comp.modules[mod_idx]
+                .functions
+                .get_mut(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(ref mut l) => l.body.instructions[instr_idx].1.add_instr(instr),
+            }
         } else {
             panic!("Should have gotten component location!")
         }
@@ -177,9 +220,16 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                .1
-                .get_curr()
+            match &self.comp.modules[mod_idx]
+                .functions
+                .get(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => {
+                    panic!("Can't get instrumentation from an imported function!")
+                }
+                FuncKind::Local(l) => l.body.instructions[instr_idx].1.get_curr(),
+            }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
@@ -195,7 +245,14 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            Some(&self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].0)
+            match &self.comp.modules[mod_idx]
+                .functions
+                .get(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(l) => Some(&l.body.instructions[instr_idx].0),
+            }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
@@ -209,9 +266,14 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                .1
-                .get_instr(idx)
+            match &self.comp.modules[mod_idx]
+                .functions
+                .get(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(l) => l.body.instructions[instr_idx].1.get_instr(idx),
+            }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
@@ -238,19 +300,27 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = loc
         {
-            // Only injects if it is an instrumented location
-            let instr_of_loc =
-                &mut self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1;
-            match instr_of_loc {
-                Instrument::NotInstrumented => {
-                    panic!("Can't inject to a location that is not instrumented!")
+            match self.comp.modules[mod_idx]
+                .functions
+                .get_mut(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
+                FuncKind::Local(ref mut l) => {
+                    // Only injects if it is an instrumented location
+                    let instr_of_loc = &mut l.body.instructions[instr_idx].1;
+                    match instr_of_loc {
+                        Instrument::NotInstrumented => {
+                            panic!("Can't inject to a location that is not instrumented!")
+                        }
+                        Instrument::Instrumented {
+                            before: _before,
+                            after: _after,
+                            alternate: _alternate,
+                            current: _current,
+                        } => instr_of_loc.add_instr(instr),
+                    }
                 }
-                Instrument::Instrumented {
-                    before: _before,
-                    after: _after,
-                    alternate: _alternate,
-                    current: _current,
-                } => instr_of_loc.add_instr(instr),
             }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
@@ -306,22 +376,26 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = loc
         {
-            if self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                .1
-                .get_curr()
-                == InstrumentType::NotInstrumented
+            match self.comp.modules[mod_idx]
+                .functions
+                .get_mut(func_idx as FunctionID)
+                .kind
             {
-                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx].1 =
-                    Instrument::Instrumented {
-                        before: vec![],
-                        after: vec![],
-                        alternate: vec![],
-                        current: mode,
+                FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
+                FuncKind::Local(ref mut l) => {
+                    if l.body.instructions[instr_idx].1.get_curr()
+                        == InstrumentType::NotInstrumented
+                    {
+                        l.body.instructions[instr_idx].1 = Instrument::Instrumented {
+                            before: vec![],
+                            after: vec![],
+                            alternate: vec![],
+                            current: mode,
+                        }
+                    } else {
+                        l.body.instructions[instr_idx].1.set_curr(mode);
                     }
-            } else {
-                self.comp.modules[mod_idx].code_sections[func_idx].instructions[instr_idx]
-                    .1
-                    .set_curr(mode);
+                }
             }
         } else {
             panic!("Should have gotten component location!")
@@ -330,12 +404,12 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
 
     fn add_global(&mut self, global: Global) -> GlobalID {
         let curr_mod = self.curr_module() as usize;
-        self.comp.modules[curr_mod].add_global(global)
+        self.comp.modules[curr_mod].globals.add(global)
     }
 }
 
 impl ModuleBuilder for ComponentIterator<'_, '_> {
-    fn add_local(&mut self, _val_type: crate::ir::types::DataType) -> LocalID {
+    fn add_local(&mut self, val_type: DataType) -> LocalID {
         let curr_loc = self.curr_loc();
         if let Location::Component {
             mod_idx,
@@ -343,7 +417,11 @@ impl ModuleBuilder for ComponentIterator<'_, '_> {
             instr_idx: _,
         } = curr_loc
         {
-            self.comp.modules[mod_idx].add_local(func_idx, _val_type)
+            {
+                self.comp.modules[mod_idx]
+                    .functions
+                    .add_local(func_idx as FunctionID, val_type)
+            }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }

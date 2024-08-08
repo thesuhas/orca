@@ -8,12 +8,14 @@ use crate::ir::helpers::{
 use crate::ir::id::{FunctionID, GlobalID, ModuleID};
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
-use crate::ir::types::Global;
 use crate::ir::wrappers::{
     add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
     convert_results, encode_core_type_subtype, process_alias,
 };
 
+use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_globals::Global;
+use crate::ir::types::CustomSections;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
@@ -44,7 +46,7 @@ pub struct Component<'a> {
     /// Canons
     pub canons: Vec<CanonicalFunction>,
     /// Custom sections
-    pub custom_sections: Vec<(&'a str, &'a [u8])>,
+    pub custom_sections: CustomSections<'a>,
     /// Nested Components
     pub components: Vec<Component<'a>>,
     /// Number of modules
@@ -90,7 +92,7 @@ impl<'a> Component<'a> {
             instances: vec![],
             component_instance: vec![],
             canons: vec![],
-            custom_sections: vec![],
+            custom_sections: CustomSections::new(vec![]),
             num_modules: 0,
             start_section: vec![],
             sections: vec![],
@@ -129,7 +131,7 @@ impl<'a> Component<'a> {
 
     /// Add a Global to this Component.
     pub fn add_globals(&mut self, global: Global, module_idx: usize) -> GlobalID {
-        self.modules[module_idx].add_global(global)
+        self.modules[module_idx].globals.add(global)
     }
 
     fn add_to_sections(
@@ -440,7 +442,7 @@ impl<'a> Component<'a> {
             instances,
             component_instance,
             canons,
-            custom_sections,
+            custom_sections: CustomSections::new(custom_sections),
             num_modules: modules.len(),
             sections,
             start_section,
@@ -824,10 +826,10 @@ impl<'a> Component<'a> {
                     for custom_sec_idx in
                         last_processed_custom_section..last_processed_custom_section + num
                     {
-                        let (name, data) = &self.custom_sections[custom_sec_idx as usize];
+                        let section = &self.custom_sections.get_by_id(custom_sec_idx);
                         component.section(&wasm_encoder::CustomSection {
-                            name: std::borrow::Cow::Borrowed(name),
-                            data: std::borrow::Cow::Borrowed(data),
+                            name: std::borrow::Cow::Borrowed(section.name),
+                            data: std::borrow::Cow::Borrowed(section.data),
                         });
                         last_processed_custom_section += 1;
                     }
@@ -920,18 +922,21 @@ impl<'a> Component<'a> {
     /// Get Local Function ID by name
     // Note: returned absolute id here
     pub fn get_fid_by_name(&self, name: &str, module_idx: ModuleID) -> Option<FunctionID> {
-        for (idx, body) in self.modules[module_idx as usize]
-            .code_sections
+        for (idx, func) in self.modules[module_idx as usize]
+            .functions
             .iter()
             .enumerate()
         {
-            if let Some(n) = &body.name {
-                if n == name {
-                    return Some(
-                        idx as u32
-                            + self.modules[module_idx as usize].num_imported_functions as u32,
-                    );
-                }
+            match &func.kind {
+                FuncKind::Local(l) => match &l.body.name {
+                    Some(n) => {
+                        if n == name {
+                            return Some(idx as FunctionID);
+                        }
+                    }
+                    None => {}
+                },
+                _ => {}
             }
         }
         None

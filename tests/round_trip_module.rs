@@ -31,12 +31,13 @@ fn round_trip_module(testname: &str, folder: &str) {
     let module = Module::parse(&buff, false).unwrap();
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
-    assert_eq!(out, original);
+
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
 
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
+    assert_eq!(out, original);
 }
 
 macro_rules! make_round_trip_tests_module {
@@ -65,7 +66,7 @@ mod round_trip {
         const_expr
     );
 
-    make_round_trip_tests_module!("handwritten/modules", blocks);
+    make_round_trip_tests_module!("handwritten/modules", blocks, add);
 
     make_round_trip_tests_module!("spin", hello_world_module);
 }
@@ -76,7 +77,7 @@ fn set_name() {
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).unwrap();
     module.set_fn_name(1, "test".to_string());
-    println!("{:#?}", module);
+    // println!("{:#?}", module);
     let result = module.encode();
     //write result to file
     let filename = "a.wasm";

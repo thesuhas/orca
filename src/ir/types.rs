@@ -1,29 +1,15 @@
 //! Intermediate representation of sections in a wasm module.
 use crate::error::Error;
-use crate::ir::id::{FunctionID, GlobalID, ModuleID, TypeID};
+use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
+use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
-use wasmparser::{ConstExpr, GlobalType, Operator, RefType, ValType};
+use wasmparser::{ConstExpr, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, Clone)]
-/// Globals in a wasm module.
-pub struct Global {
-    pub ty: GlobalType,
-    pub init_expr: InitExpr,
-}
-
-impl Global {
-    pub(crate) fn from_wasmparser(global: wasmparser::Global) -> Result<Global> {
-        let ty = global.ty;
-        let init_expr = InitExpr::eval(&global.init_expr);
-        Ok(Global { ty, init_expr })
-    }
-}
 
 /// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///
@@ -353,21 +339,6 @@ pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType 
     reencoder.val_type(*val_type).unwrap()
 }
 
-/// Orca's representation of function types, shortened from [Walrus' Representation].
-///
-/// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-#[derive(Debug, Clone)]
-pub struct FuncType {
-    pub params: Box<[DataType]>,
-    pub results: Box<[DataType]>,
-}
-
-impl FuncType {
-    pub fn new(params: Box<[DataType]>, results: Box<[DataType]>) -> Self {
-        Self { params, results }
-    }
-}
-
 #[derive(Debug, Clone)]
 /// Data Segment in a wasm module.
 pub struct DataSegment {
@@ -446,7 +417,7 @@ impl ElementKind<'_> {
 #[derive(Debug, Clone)]
 /// Type of element
 pub enum ElementItems<'a> {
-    Functions(Vec<u32>),
+    Functions(Vec<FunctionID>),
     ConstExprs {
         ty: RefType,
         exprs: Vec<ConstExpr<'a>>,
@@ -612,25 +583,6 @@ impl PartialEq for InstrumentType {
 
 impl Eq for InstrumentType {}
 
-/// Represents whether a function is a Local Function or an Imported Function. Also contains its type ID
-#[derive(Debug, Clone, Copy)]
-pub enum FuncKind {
-    Local(TypeID),
-    Import(TypeID),
-}
-
-impl PartialEq for FuncKind {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (FuncKind::Import(a), FuncKind::Import(b)) => a == b,
-            (FuncKind::Local(a), FuncKind::Local(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for FuncKind {}
-
 /// Used to represent a unique location in a wasm component or module.
 #[derive(Debug, Clone, Copy)]
 pub enum Location {
@@ -643,37 +595,6 @@ pub enum Location {
         func_idx: usize,
         instr_idx: usize,
     },
-}
-
-/// Represents an import in a WebAssembly module.
-#[derive(Debug, Clone)]
-pub struct Import<'a> {
-    /// The module being imported from.
-    pub module: &'a str,
-    /// The name of the imported item.
-    pub name: &'a str,
-    /// The type of the imported item.
-    pub ty: wasmparser::TypeRef,
-    /// The name (in the custom section) of the imported item.
-    pub import_name: Option<String>,
-}
-
-impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
-    fn from(import: wasmparser::Import<'a>) -> Self {
-        Import {
-            module: import.module,
-            name: import.name,
-            ty: import.ty,
-            import_name: None,
-        }
-    }
-}
-
-impl Import<'_> {
-    // TODO: Add documentation here
-    pub fn is_function(&self) -> bool {
-        matches!(self.ty, wasmparser::TypeRef::Func(_))
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -848,6 +769,77 @@ impl From<BlockType> for wasmparser::BlockType {
             BlockType::FuncType(u) => wasmparser::BlockType::FuncType(u),
             BlockType::Type(data) => wasmparser::BlockType::Type(wasmparser::ValType::from(&data)),
         }
+    }
+}
+
+/// Intermediate Representation of Custom Sections
+#[derive(Clone, Debug)]
+pub struct CustomSections<'a> {
+    custom_sections: Vec<CustomSection<'a>>,
+}
+
+impl<'a> CustomSections<'a> {
+    pub fn new(custom_sections: Vec<(&'a str, &'a [u8])>) -> Self {
+        CustomSections {
+            custom_sections: custom_sections
+                .iter()
+                .map(|cs| CustomSection::new(cs.0, cs.1))
+                .collect(),
+        }
+    }
+
+    /// Get a custom section ID by name
+    pub fn get_id(&self, name: String) -> Option<CustomSectionID> {
+        for (index, section) in self.custom_sections.iter().enumerate() {
+            if section.name == name {
+                return Some(index as CustomSectionID);
+            }
+        }
+        None
+    }
+
+    /// Get a custom section by its ID
+    pub fn get_by_id(&self, custom_section_id: CustomSectionID) -> &CustomSection {
+        if custom_section_id < self.custom_sections.len() as u32 {
+            return &self.custom_sections[custom_section_id as usize];
+        }
+        panic!("Invalid custom section ID");
+    }
+
+    /// Delete a Custom Section by its ID
+    pub fn delete(&mut self, id: CustomSectionID) {
+        if id < self.custom_sections.len() as u32 {
+            self.custom_sections.remove(id as usize);
+        }
+    }
+
+    /// Number of custom sections
+    pub fn len(&self) -> usize {
+        self.custom_sections.len()
+    }
+
+    /// Check if there are any custom sections
+    pub fn is_empty(&self) -> bool {
+        self.custom_sections.is_empty()
+    }
+
+    /// Creates an iterable over the custom sections
+    pub fn iter(&self) -> Iter<'_, CustomSection<'a>> {
+        self.custom_sections.iter()
+    }
+}
+
+/// Intermediate Representation of a single Custom Section
+#[derive(Clone, Debug)]
+pub struct CustomSection<'a> {
+    pub name: &'a str,
+    pub data: &'a [u8],
+}
+
+impl<'a> CustomSection<'a> {
+    /// Create a new custom section
+    pub fn new(name: &'a str, data: &'a [u8]) -> Self {
+        CustomSection { name, data }
     }
 }
 
