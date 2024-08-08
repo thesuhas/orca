@@ -789,7 +789,7 @@ impl<'a> CustomSections<'a> {
     }
 
     /// Get a custom section ID by name
-    pub fn get_custom_section_id(&self, name: String) -> Option<CustomSectionID> {
+    pub fn get_id(&self, name: String) -> Option<CustomSectionID> {
         for (index, section) in self.custom_sections.iter().enumerate() {
             if section.name == name {
                 return Some(index as CustomSectionID);
@@ -798,7 +798,8 @@ impl<'a> CustomSections<'a> {
         None
     }
 
-    pub fn get_custom_section_by_id(&self, custom_section_id: CustomSectionID) -> &CustomSection {
+    /// Get a custom section by its ID
+    pub fn get_by_id(&self, custom_section_id: CustomSectionID) -> &CustomSection {
         if custom_section_id < self.custom_sections.len() as u32 {
             return &self.custom_sections[custom_section_id as usize];
         }
@@ -806,7 +807,7 @@ impl<'a> CustomSections<'a> {
     }
 
     /// Delete a Custom Section by its ID
-    pub fn delete_custom_section(&mut self, id: CustomSectionID) {
+    pub fn delete(&mut self, id: CustomSectionID) {
         if id < self.custom_sections.len() as u32 {
             self.custom_sections.remove(id as usize);
         }

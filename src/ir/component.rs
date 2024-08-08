@@ -826,9 +826,7 @@ impl<'a> Component<'a> {
                     for custom_sec_idx in
                         last_processed_custom_section..last_processed_custom_section + num
                     {
-                        let section = &self
-                            .custom_sections
-                            .get_custom_section_by_id(custom_sec_idx);
+                        let section = &self.custom_sections.get_by_id(custom_sec_idx);
                         component.section(&wasm_encoder::CustomSection {
                             name: std::borrow::Cow::Borrowed(section.name),
                             data: std::borrow::Cow::Borrowed(section.data),
