@@ -4,10 +4,8 @@ use crate::ir::component::Component;
 use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
 use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
-use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
-use crate::iterator::iterator_trait::{
-    set_instrument_type_for_local_func_at, Instrumenter, Iterator,
-};
+use crate::ir::types::{DataType, InstrumentationMode, Location};
+use crate::iterator::iterator_trait::{Instrumenter, Iterator};
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::component_subiterator::ComponentSubIterator;
 use crate::ModuleBuilder;
@@ -136,7 +134,7 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
     ///
     /// loop {
     ///     let op = comp_it.curr_op();
-    ///     let instr_type = comp_it.curr_instrument_type();
+    ///     let instr_mode = comp_it.curr_instrument_mode();
     ///
     ///     if let Location::Component {
     ///         mod_idx,
@@ -180,7 +178,7 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {}
 impl<'a, 'b> MacroOpcode<'b> for ComponentIterator<'a, 'b> {}
 impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
     /// Returns the Instrumentation at the current Location
-    fn curr_instrument_type(&self) -> InstrumentType {
+    fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let Location::Component {
             mod_idx,
             func_idx,
@@ -195,7 +193,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
                 FuncKind::Import(_) => {
                     panic!("Can't get instrumentation from an imported function!")
                 }
-                FuncKind::Local(l) => l.body.instructions[instr_idx].1.get_curr(),
+                FuncKind::Local(l) => &l.body.instructions[instr_idx].1.current_mode,
             }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
@@ -203,20 +201,20 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
     }
 
     /// Sets the type of Instrumentation Mode of the current location
-    fn set_instrument_type(&mut self, mode: InstrumentationMode) {
+    fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
         if let Location::Component {
             mod_idx: _mod_idx,
             func_idx: _func_idx,
             instr_idx: _instr_idx,
         } = self.curr_loc()
         {
-            self.set_instrument_type_at(mode, self.curr_loc());
+            self.set_instrument_mode_at(mode, self.curr_loc());
         } else {
             panic!("Should have gotten component location!")
         }
     }
 
-    fn set_instrument_type_at(&mut self, mode: InstrumentationMode, loc: Location) {
+    fn set_instrument_mode_at(&mut self, mode: InstrumentationMode, loc: Location) {
         if let Location::Component {
             mod_idx,
             func_idx,
@@ -230,7 +228,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
                 FuncKind::Local(ref mut l) => {
-                    set_instrument_type_for_local_func_at(mode, l, instr_idx);
+                    l.body.instructions[instr_idx].1.current_mode = Some(mode)
                 }
             }
         } else {
@@ -254,17 +252,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
                 FuncKind::Local(ref mut l) => {
                     // Only injects if it is an instrumented location
                     let instr_of_loc = &mut l.body.instructions[instr_idx].1;
-                    match instr_of_loc {
-                        Instrument::NotInstrumented => {
-                            panic!("Can't inject to a location that is not instrumented!")
-                        }
-                        Instrument::Instrumented {
-                            before: _before,
-                            after: _after,
-                            alternate: _alternate,
-                            current: _current,
-                        } => instr_of_loc.add_instr(instr),
-                    }
+                    instr_of_loc.add_instr(instr);
                 }
             }
         } else {
@@ -274,7 +262,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
 
     fn before_at(&mut self, loc: Location) -> &mut Self {
         if let Location::Component { .. } = loc {
-            self.set_instrument_type_at(InstrumentationMode::Before, loc);
+            self.set_instrument_mode_at(InstrumentationMode::Before, loc);
             self
         } else {
             panic!("Should have gotten Component location!");
@@ -283,7 +271,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
 
     fn after_at(&mut self, loc: Location) -> &mut Self {
         if let Location::Component { .. } = loc {
-            self.set_instrument_type_at(InstrumentationMode::After, loc);
+            self.set_instrument_mode_at(InstrumentationMode::After, loc);
             self
         } else {
             panic!("Should have gotten Component location!");
@@ -297,7 +285,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             instr_idx: _instr_idx,
         } = loc
         {
-            self.set_instrument_type_at(InstrumentationMode::Alternate, loc);
+            self.set_instrument_mode_at(InstrumentationMode::Alternate, loc);
             self
         } else {
             panic!("Should have gotten Component location!");

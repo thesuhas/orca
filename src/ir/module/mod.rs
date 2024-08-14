@@ -10,9 +10,9 @@ use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
-use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
+    InstrumentationFlag,
 };
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
@@ -261,7 +261,7 @@ impl<'a> Module<'a> {
                     }
                     let instructions_bool: Vec<_> = instructions
                         .into_iter()
-                        .map(|op| (op, NotInstrumented))
+                        .map(|op| (op, InstrumentationFlag::default()))
                         .collect();
                     code_sections.push(Body {
                         locals,
@@ -696,53 +696,53 @@ impl<'a> Module<'a> {
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 for (op, instrument) in instructions {
-                    match instrument {
-                        NotInstrumented => {
+                    if !instrument.has_instr() {
+                        function.instruction(
+                            &reencode
+                                .instruction(op.clone())
+                                .expect("Unable to convert Instruction"),
+                        );
+                    } else {
+                        // this instruction has instrumentation, handle it!
+                        let InstrumentationFlag {
+                            before,
+                            after,
+                            alternate,
+                            ..
+                        } = instrument;
+
+                        // First encode before instructions
+                        for instr in before {
+                            function.instruction(
+                                &reencode
+                                    .instruction(instr.clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                        }
+
+                        // If there are any alternate, encode the alternate
+                        if !alternate.is_empty() {
+                            for instr in alternate {
+                                function.instruction(
+                                    &reencode
+                                        .instruction(instr.clone())
+                                        .expect("Unable to convert Instruction"),
+                                );
+                            }
+                        } else {
                             function.instruction(
                                 &reencode
                                     .instruction(op.clone())
                                     .expect("Unable to convert Instruction"),
                             );
                         }
-                        Instrumented {
-                            before,
-                            after,
-                            alternate,
-                            current: _current,
-                        } => {
-                            // First encode before instructions
-                            for instr in before {
-                                function.instruction(
-                                    &reencode
-                                        .instruction(instr.clone())
-                                        .expect("Unable to convert Instruction"),
-                                );
-                            }
-
-                            // If there are any alternate, encode the alternate
-                            if !alternate.is_empty() {
-                                for instr in alternate {
-                                    function.instruction(
-                                        &reencode
-                                            .instruction(instr.clone())
-                                            .expect("Unable to convert Instruction"),
-                                    );
-                                }
-                            } else {
-                                function.instruction(
-                                    &reencode
-                                        .instruction(op.clone())
-                                        .expect("Unable to convert Instruction"),
-                                );
-                            }
-                            // Now encode the after instructions
-                            for instr in after {
-                                function.instruction(
-                                    &reencode
-                                        .instruction(instr.clone())
-                                        .expect("Unable to convert Instruction"),
-                                );
-                            }
+                        // Now encode the after instructions
+                        for instr in after {
+                            function.instruction(
+                                &reencode
+                                    .instruction(instr.clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
                         }
                     }
                 }
