@@ -6,9 +6,10 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
-use crate::opcode::Opcode;
+use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
+use std::iter::Iterator as StdIterator;
 use wasmparser::Operator;
 
 /// Iterator for a Module.
@@ -72,7 +73,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
+impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example
@@ -129,6 +130,8 @@ impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {
         }
     }
 }
+impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {}
+impl<'a, 'b> MacroOpcode<'b> for ModuleIterator<'a, 'b> {}
 
 // Note: Marked Trait as the same lifetime as component
 impl<'a, 'b> Iterator<'b> for ModuleIterator<'a, 'b> {

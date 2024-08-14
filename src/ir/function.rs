@@ -7,7 +7,7 @@ use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
-use crate::opcode::Opcode;
+use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::{Component, ModuleBuilder};
 use wasmparser::Operator;
 
@@ -142,13 +142,15 @@ impl<'a> FunctionBuilder<'a> {
     }
 }
 
-impl<'a> Opcode<'a> for FunctionBuilder<'a> {
+impl<'a> Inject<'a> for FunctionBuilder<'a> {
     /// Inject an operator at the end of the function
     // here the location of the injection is always at the end of the function
     fn inject(&mut self, instr: Operator<'a>) {
         self.body.push_instr(instr)
     }
 }
+impl<'a> Opcode<'a> for FunctionBuilder<'a> {}
+impl<'a> MacroOpcode<'a> for FunctionBuilder<'a> {}
 
 impl ModuleBuilder for FunctionBuilder<'_> {
     fn add_local(&mut self, ty: DataType) -> LocalID {
@@ -224,7 +226,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {
+impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
     // TODO: refactor the inject the function to return a Result rather than panicking?
     fn inject(&mut self, instr: Operator<'b>) {
         if let Some(idx) = self.instr_idx {
@@ -234,3 +236,5 @@ impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {
         }
     }
 }
+impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {}
+impl<'a, 'b> MacroOpcode<'b> for FunctionModifier<'a, 'b> {}

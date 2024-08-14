@@ -9,15 +9,17 @@ use crate::ir::types::BlockType;
 use wasmparser::MemArg;
 use wasmparser::Operator;
 
+pub trait Inject<'a> {
+    /// Inject an operator at the current location
+    fn inject(&mut self, instr: Operator<'a>);
+}
+
 #[allow(dead_code)]
 /// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
 ///
 /// [`wasmparser::Operator`]: https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html
 /// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
-pub trait Opcode<'a> {
-    /// Inject an operator at the current location
-    fn inject(&mut self, instr: Operator<'a>);
-
+pub trait Opcode<'a>: Inject<'a> {
     // Control Flow
     /// Inject a call instruction
     fn call(&mut self, idx: FunctionID) -> &mut Self {
@@ -852,6 +854,23 @@ pub trait Opcode<'a> {
     /// Inject a global.set
     fn global_set(&mut self, idx: GlobalID) -> &mut Self {
         self.inject(Operator::GlobalSet { global_index: idx });
+        self
+    }
+}
+
+#[allow(dead_code)]
+/// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
+///
+/// [`wasmparser::Operator`]: https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html
+/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
+pub trait MacroOpcode<'a>: Inject<'a> {
+    /// Helper function to reinterpret an u32 as an i32 and inject an i32.const instruction with that reinterpreted value.
+    /// (Useful to emitting memory addresses.)
+    /// We cast using the `as` keyword to accomplish this.
+    /// See https://github.com/thesuhas/orca/issues/133 for an explanation.
+    fn u32_const(&mut self, value: u32) -> &mut Self {
+        let i32_val = value as i32;
+        self.inject(Operator::I32Const { value: i32_val });
         self
     }
 }

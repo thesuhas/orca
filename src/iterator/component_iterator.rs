@@ -6,7 +6,7 @@ use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
 use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::Iterator;
-use crate::opcode::Opcode;
+use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::component_subiterator::ComponentSubIterator;
 use crate::ModuleBuilder;
 use std::collections::HashMap;
@@ -110,7 +110,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
+impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example
@@ -173,6 +173,8 @@ impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {
         }
     }
 }
+impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {}
+impl<'a, 'b> MacroOpcode<'b> for ComponentIterator<'a, 'b> {}
 
 // Note: Marked Trait as the same lifetime as component
 impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {

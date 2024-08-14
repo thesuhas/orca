@@ -414,12 +414,11 @@ impl<'a> Module<'a> {
         // Add all the functions. First add all the imported functions as they have the first IDs
         let mut final_funcs = vec![];
         for (index, imp) in imports.iter().enumerate() {
-            match imp.ty {
-                wasmparser::TypeRef::Func(u) => final_funcs.push(Function::new(
+            if let wasmparser::TypeRef::Func(u) = imp.ty {
+                final_funcs.push(Function::new(
                     FuncKind::Import(ImportedFunction::new(index as ImportsID, u)),
                     Some(imp.name.parse().unwrap()),
-                )),
-                _ => {}
+                ))
             }
         }
         // Local Functions
@@ -542,11 +541,8 @@ impl<'a> Module<'a> {
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
             for func in self.functions.iter() {
-                match func.kind() {
-                    FuncKind::Local(l) => {
-                        functions.function(l.ty_id);
-                    }
-                    _ => {}
+                if let FuncKind::Local(l) = func.kind() {
+                    functions.function(l.ty_id);
                 }
             }
             module.section(&functions);
@@ -607,7 +603,7 @@ impl<'a> Module<'a> {
             let mut exports = wasm_encoder::ExportSection::new();
             for export in self.exports.iter() {
                 exports.export(
-                    &*export.name,
+                    &export.name,
                     wasm_encoder::ExportKind::from(export.kind),
                     export.index,
                 );
@@ -679,9 +675,8 @@ impl<'a> Module<'a> {
         if !self.num_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in self.num_imported_functions..self.functions.len() {
-                match &self.functions.get_kind(rel_func_idx as FunctionID) {
-                    FuncKind::Import(_) => continue,
-                    _ => {}
+                if let FuncKind::Import(..) = &self.functions.get_kind(rel_func_idx as FunctionID) {
+                    continue;
                 }
                 let Body {
                     locals,
@@ -827,7 +822,7 @@ impl<'a> Module<'a> {
             return Some(0 as MemoryID);
         }
         // module does not export a memory
-        return None;
+        None
     }
 
     /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
