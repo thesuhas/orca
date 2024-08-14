@@ -2,7 +2,7 @@ use orca::ir::component::Component;
 use orca::ir::module::Module;
 use orca::ir::types::{InstrumentType, Location};
 use orca::iterator::component_iterator::ComponentIterator;
-use orca::iterator::iterator_trait::Iterator;
+use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
 use std::collections::{HashMap, HashSet};
