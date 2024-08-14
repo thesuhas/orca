@@ -6,7 +6,7 @@ use crate::ir::module::module_functions::{Function, LocalFunction};
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
-use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode};
+use crate::ir::types::InstrumentationMode;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::{Component, ModuleBuilder};
 use wasmparser::Operator;
@@ -182,19 +182,19 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
 
     /// adding instructions before the specified instruction
     pub fn before_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_type(idx, InstrumentationMode::Before);
+        self.set_instrument_mode(idx, InstrumentationMode::Before);
         self
     }
 
     /// adding instructions after the specified instruction
     pub fn after_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_type(idx, InstrumentationMode::After);
+        self.set_instrument_mode(idx, InstrumentationMode::After);
         self
     }
 
     /// adding instructions alternate to the specified instruction
     pub fn alternate_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_type(idx, InstrumentationMode::Alternate);
+        self.set_instrument_mode(idx, InstrumentationMode::Alternate);
         self
     }
 
@@ -204,25 +204,14 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         mode: InstrumentationMode,
         instr: Operator<'b>,
     ) -> &mut Self {
-        self.set_instrument_type(idx, mode);
+        self.set_instrument_mode(idx, mode);
         self.body.instructions[idx].1.add_instr(instr);
         self
     }
 
-    fn set_instrument_type(&mut self, idx: usize, mode: InstrumentationMode) {
-        {
-            self.instr_idx = Some(idx);
-            if self.body.instructions[idx].1.get_curr() == InstrumentType::NotInstrumented {
-                self.body.instructions[idx].1 = Instrument::Instrumented {
-                    before: vec![],
-                    after: vec![],
-                    alternate: vec![],
-                    current: mode,
-                }
-            } else {
-                self.body.instructions[idx].1.set_curr(mode);
-            }
-        }
+    fn set_instrument_mode(&mut self, idx: usize, mode: InstrumentationMode) {
+        self.instr_idx = Some(idx);
+        self.body.instructions[idx].1.current_mode = Some(mode);
     }
 }
 

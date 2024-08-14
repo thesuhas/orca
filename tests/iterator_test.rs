@@ -1,11 +1,12 @@
 use orca::ir::component::Component;
 use orca::ir::module::Module;
-use orca::ir::types::{InstrumentType, Location};
+use orca::ir::types::{InstrumentationMode, Location};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::opcode::Opcode;
 use std::collections::{HashMap, HashSet};
+use std::mem::discriminant;
 use wasmparser::Operator;
 
 #[test]
@@ -111,7 +112,7 @@ fn iterator_mark_as_before_test() {
 
     loop {
         let op = comp_it.curr_op();
-        let instr_type = comp_it.curr_instrument_type();
+        let instr_mode = comp_it.curr_instrument_mode();
 
         if let Location::Component {
             mod_idx,
@@ -121,7 +122,7 @@ fn iterator_mark_as_before_test() {
         {
             println!(
                 "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, func_idx, instr_idx, op, instr_type
+                mod_idx, func_idx, instr_idx, op, instr_mode
             );
             if *comp_it.curr_op().unwrap() == interested {
                 comp_it.before();
@@ -138,7 +139,7 @@ fn iterator_mark_as_before_test() {
 
     loop {
         let op = comp_it.curr_op();
-        let instr_type = comp_it.curr_instrument_type();
+        let instr_mode = comp_it.curr_instrument_mode();
         if let Location::Component {
             mod_idx,
             func_idx,
@@ -146,12 +147,12 @@ fn iterator_mark_as_before_test() {
         } = comp_it.curr_loc()
         {
             if *comp_it.curr_op().unwrap() == interested {
-                assert_ne!(instr_type, InstrumentType::NotInstrumented);
+                assert_ne!(discriminant(instr_mode), discriminant(&None));
             }
 
             println!(
                 "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, func_idx, instr_idx, op, instr_type
+                mod_idx, func_idx, instr_idx, op, instr_mode
             );
 
             if comp_it.next().is_none() {
@@ -175,7 +176,7 @@ fn iterator_inject_i32_before() {
 
     loop {
         let op = comp_it.curr_op();
-        let instr_type = comp_it.curr_instrument_type();
+        let instr_mode = comp_it.curr_instrument_mode();
 
         if let Location::Component {
             mod_idx,
@@ -185,7 +186,7 @@ fn iterator_inject_i32_before() {
         {
             println!(
                 "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, func_idx, instr_idx, op, instr_type
+                mod_idx, func_idx, instr_idx, op, instr_mode
             );
             if *comp_it.curr_op().unwrap() == interested {
                 comp_it.before().i32_const(1);
@@ -204,7 +205,7 @@ fn iterator_inject_i32_before() {
 
     loop {
         let op = comp_it.curr_op();
-        let instr_type = comp_it.curr_instrument_type();
+        let instr_mode = comp_it.curr_instrument_mode();
 
         if let Location::Component {
             mod_idx,
@@ -214,12 +215,12 @@ fn iterator_inject_i32_before() {
         {
             println!(
                 "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, func_idx, instr_idx, op, instr_type
+                mod_idx, func_idx, instr_idx, op, instr_mode
             );
             if *comp_it.curr_op().unwrap() == interested {
                 assert_eq!(
-                    comp_it.curr_instrument_type(),
-                    InstrumentType::InstrumentBefore
+                    discriminant(comp_it.curr_instrument_mode().as_ref().unwrap()),
+                    discriminant(&InstrumentationMode::Before)
                 );
                 assert_eq!(
                     comp_it.get_injected_val(0),
@@ -245,7 +246,7 @@ fn iterate(component: &mut Component) {
 
     loop {
         let op = comp_it.curr_op();
-        let instr_type = comp_it.curr_instrument_type();
+        let instr_mode = comp_it.curr_instrument_mode();
 
         if let Location::Component {
             mod_idx,
@@ -255,7 +256,7 @@ fn iterate(component: &mut Component) {
         {
             println!(
                 "Mod: {}, Fun: {}, +{}: {:?}, {:?}",
-                mod_idx, func_idx, instr_idx, op, instr_type
+                mod_idx, func_idx, instr_idx, op, instr_mode
             );
             if *comp_it.curr_op().unwrap() == before {
                 comp_it.before().call(0);
