@@ -6,7 +6,29 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use wasmparser::Operator;
 
-pub trait Instrumenter<'a> {
+#[allow(dead_code)]
+/// Iterator trait that must be satisfied by all Iterators to enable code traversal.
+pub trait Iterator<'a> {
+    /// Reset the Iterator and all Child Iterators and SubIterators
+    fn reset(&mut self);
+
+    /// Go to the next Instruction
+    fn next(&mut self) -> Option<&Operator>;
+
+    /// Get the current location
+    fn curr_loc(&self) -> Location;
+
+    /// Get the current instruction
+    fn curr_op(&self) -> Option<&Operator>;
+}
+
+/// This trait coincides with the Iterator as instrumentation occurs during Wasm visitation.
+/// This trait enables code injection during traversal, thus the Iterator trait is required
+/// to be implemented on the structure to inject on.
+/// Instructions as defined [here].
+///
+/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
+pub trait Instrumenter<'a>: Iterator<'a> {
     // ==== MODES ====
 
     /// Get the InstrumentType of the current location
@@ -75,23 +97,4 @@ pub(crate) fn set_instrument_type_for_local_func_at(
     } else {
         func.body.instructions[instr_idx].1.set_curr(mode);
     }
-}
-
-#[allow(dead_code)]
-/// Iterator trait that must be satisfied by all Iterators. Enables code injection and traversal.
-/// Instructions as defined [here].
-///
-/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
-pub trait Iterator<'a>: Instrumenter<'a> {
-    /// Reset the Iterator and all Child Iterators and SubIterators
-    fn reset(&mut self);
-
-    /// Go to the next Instruction
-    fn next(&mut self) -> Option<&Operator>;
-
-    /// Get the current location
-    fn curr_loc(&self) -> Location;
-
-    /// Get the current instruction
-    fn curr_op(&self) -> Option<&Operator>;
 }
