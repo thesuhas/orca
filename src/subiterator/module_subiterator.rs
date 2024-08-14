@@ -26,7 +26,7 @@ impl ModuleSubIterator {
             num_funcs,
             metadata: metadata.clone(),
             func_iterator: FuncSubIterator::new(
-                *metadata.get(&metadata.keys().min().unwrap()).unwrap(),
+                *metadata.get(metadata.keys().min().unwrap()).unwrap(),
             ),
             skip_funcs,
         };
@@ -57,7 +57,7 @@ impl ModuleSubIterator {
         self.func_iterator.reset(
             *self
                 .metadata
-                .get(&self.metadata.keys().min().unwrap())
+                .get(self.metadata.keys().min().unwrap())
                 .unwrap(),
         );
     }

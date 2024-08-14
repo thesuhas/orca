@@ -58,7 +58,7 @@ impl<'a> ModuleTables<'a> {
     /// Get a table
     pub fn get(&self, table_id: TableID) -> Option<TableType> {
         if table_id < self.tables.len() as u32 {
-            return Some(self.tables[table_id as usize].0.clone());
+            return Some(self.tables[table_id as usize].0);
         }
         None
     }

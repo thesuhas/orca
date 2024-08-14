@@ -69,12 +69,8 @@ impl<'a> ModuleImports<'a> {
 
     pub fn find(&self, module: String, name: Option<String>) -> Option<ExportsID> {
         for (id, imp) in self.imports.iter().enumerate() {
-            match imp.ty {
-                _ => {
-                    if imp.module == module.as_str() && imp.import_name == name {
-                        return Some(id as ExportsID);
-                    }
-                }
+            if imp.module == module.as_str() && imp.import_name == name {
+                return Some(id as ExportsID);
             }
         }
         None
@@ -82,13 +78,10 @@ impl<'a> ModuleImports<'a> {
 
     pub fn get_func(&self, module: String, name: Option<String>) -> Option<FunctionID> {
         for imp in self.imports.iter() {
-            match imp.ty {
-                TypeRef::Func(id) => {
-                    if imp.module == module.as_str() && imp.import_name == name {
-                        return Some(id);
-                    }
+            if let TypeRef::Func(id) = imp.ty {
+                if imp.module == module.as_str() && imp.import_name == name {
+                    return Some(id);
                 }
-                _ => {}
             }
         }
         None

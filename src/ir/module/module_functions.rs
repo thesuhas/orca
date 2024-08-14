@@ -35,7 +35,7 @@ impl<'a> Function<'a> {
 
     /// Unwrap a local function. If it is an imported function, it panics.
     pub fn unwrap_local(&'a self) -> &LocalFunction<'a> {
-        &self.kind.unwrap_local()
+        self.kind.unwrap_local()
     }
 
     /// Unwrap a local function as mutable. If it is an imported function, it panics.
@@ -225,16 +225,15 @@ impl<'a> Functions<'a> {
     /// Get local Function ID by name
     pub fn get_local_fid_by_name(&self, name: &str) -> Option<FunctionID> {
         for (idx, func) in self.functions.iter().enumerate() {
-            match &func.kind {
-                FuncKind::Local(l) => match &l.body.name {
+            if let FuncKind::Local(l) = &func.kind {
+                match &l.body.name {
                     Some(n) => {
                         if n == name {
                             return Some(idx as FunctionID);
                         }
                     }
                     None => {}
-                },
-                _ => {}
+                }
             }
         }
         None

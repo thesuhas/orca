@@ -927,16 +927,15 @@ impl<'a> Component<'a> {
             .iter()
             .enumerate()
         {
-            match &func.kind {
-                FuncKind::Local(l) => match &l.body.name {
+            if let FuncKind::Local(l) = &func.kind {
+                match &l.body.name {
                     Some(n) => {
                         if n == name {
                             return Some(idx as FunctionID);
                         }
-                    }
-                    None => {}
-                },
-                _ => {}
+                     }
+                     None => {}
+                }
             }
         }
         None

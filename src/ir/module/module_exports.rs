@@ -68,13 +68,8 @@ impl ModuleExports {
 
     pub fn get_func_by_id(&self, id: FunctionID) -> Option<ExportsID> {
         for exp in self.exports.iter() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.index == id {
-                        return Some(exp.index);
-                    }
-                }
-                _ => {}
+            if exp.kind == ExternalKind::Func && exp.index == id {
+                return Some(exp.index);
             }
         }
         None
@@ -82,13 +77,8 @@ impl ModuleExports {
 
     pub fn get_func_by_name(&self, name: String) -> Option<FunctionID> {
         for exp in self.exports.iter() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.name.to_string() == name {
-                        return Some(exp.index);
-                    }
-                }
-                _ => {}
+            if exp.kind == ExternalKind::Func && exp.name == name {
+                return Some(exp.index);
             }
         }
         None
