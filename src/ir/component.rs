@@ -934,8 +934,8 @@ impl<'a> Component<'a> {
                         if n == name {
                             return Some(idx as FunctionID);
                         }
-                     }
-                     None => {}
+                    }
+                    None => {}
                 }
             }
         }

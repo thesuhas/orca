@@ -675,7 +675,9 @@ impl<'a> Module<'a> {
         if !self.num_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in self.num_imported_functions..self.functions.len() {
-                if let FuncKind::Import(..) = &self.functions.get_kind(rel_func_idx as FunctionID) { continue }
+                if let FuncKind::Import(..) = &self.functions.get_kind(rel_func_idx as FunctionID) {
+                    continue;
+                }
                 let Body {
                     locals,
                     num_locals: _,
