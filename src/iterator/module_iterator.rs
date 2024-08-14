@@ -5,9 +5,7 @@ use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::types::{DataType, Instrument, InstrumentType, InstrumentationMode, Location};
-use crate::iterator::iterator_trait::{
-    set_instrument_type_for_local_func_at, Instrumenter, Iterator,
-};
+use crate::iterator::iterator_trait::{Instrumenter, Iterator, set_instrument_type_for_local_func_at};
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
@@ -134,7 +132,7 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
 }
 impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {}
 impl<'a, 'b> MacroOpcode<'b> for ModuleIterator<'a, 'b> {}
-impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
+impl <'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_type(&self) -> InstrumentType {
         if let Location::Module {
@@ -152,7 +150,8 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn set_instrument_type(&mut self, mode: InstrumentationMode) {
-        if let Location::Module { .. } = self.curr_loc() {
+        if let Location::Module { .. } = self.curr_loc()
+        {
             self.set_instrument_type_at(mode, self.curr_loc());
         } else {
             panic!("Should have gotten module location!")
@@ -206,7 +205,8 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn before_at(&mut self, loc: Location) -> &mut Self {
-        if let Location::Module { .. } = loc {
+        if let Location::Module { .. } = loc
+        {
             self.set_instrument_type_at(InstrumentationMode::Before, loc);
             self
         } else {
@@ -215,7 +215,8 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn after_at(&mut self, loc: Location) -> &mut Self {
-        if let Location::Module { .. } = loc {
+        if let Location::Module { .. } = loc
+        {
             self.set_instrument_type_at(InstrumentationMode::After, loc);
             self
         } else {
@@ -224,7 +225,8 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn alternate_at(&mut self, loc: Location) -> &mut Self {
-        if let Location::Module { .. } = loc {
+        if let Location::Module { .. } = loc
+        {
             self.set_instrument_type_at(InstrumentationMode::Alternate, loc);
             self
         } else {
