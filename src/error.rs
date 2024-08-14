@@ -1,6 +1,8 @@
 use std::ops::Range;
 use wasmparser::BinaryReaderError;
 
+use gimli;
+
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
 
@@ -33,6 +35,14 @@ pub enum Error {
     InvalidMemoryReservedByte {
         func_range: Range<usize>,
     },
+}
+
+impl From<gimli::Error> for Error {
+    fn from(err: gimli::Error) -> Error {
+        // You need to map `gimli::Error` to your custom error type here.
+        // This is a simple example, adjust based on your `error::Error` definition.
+        Self::ConversionError(err.to_string()) // Assuming you have a variant `GimliError` in your `error::Error` enum
+    }
 }
 
 impl From<BinaryReaderError> for Error {

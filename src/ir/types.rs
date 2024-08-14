@@ -4,7 +4,7 @@ use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
-use std::slice::Iter;
+use std::slice::{Iter, IterMut};
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
 use wasmparser::{ConstExpr, Operator, RefType, ValType};
@@ -826,6 +826,10 @@ impl<'a> CustomSections<'a> {
     /// Creates an iterable over the custom sections
     pub fn iter(&self) -> Iter<'_, CustomSection<'a>> {
         self.custom_sections.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<'_, CustomSection<'a>> {
+        self.custom_sections.iter_mut()
     }
 }
 

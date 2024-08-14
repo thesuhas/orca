@@ -14,11 +14,14 @@ use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
 };
+use gimli::{read, Dwarf, DwarfFileType, EndianSlice, LittleEndian};
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
 
 use super::types::DataType;
-use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
+use crate::ir::wrappers::{
+    get_section_id, indirect_namemap_parser2encoder, namemap_parser2encoder,
+};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -26,6 +29,13 @@ pub mod module_globals;
 pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
+
+/// The DWARF debug section in input WebAssembly binary.
+#[derive(Debug, Default)]
+pub struct ModuleDebugData {
+    /// DWARF debug data
+    pub dwarf: read::Dwarf<Vec<u8>>,
+}
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -62,6 +72,8 @@ pub struct Module<'a> {
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
+    /// Dwarf debug data.
+    pub debug: ModuleDebugData,
 
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -126,6 +138,9 @@ impl<'a> Module<'a> {
         let mut data_names = wasm_encoder::NameMap::new();
         let mut field_names = wasm_encoder::IndirectNameMap::new();
         let mut tag_names = wasm_encoder::NameMap::new();
+
+        // Flag that indicates whether the first dwarf section was parsed or not
+        let mut debug_sections = vec![];
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -340,23 +355,25 @@ impl<'a> Module<'a> {
                                 }
                             }
                         }
-                        wasmparser::KnownCustom::Producers(producer_section_reader) => {
-                            let field = producer_section_reader
-                                .into_iter()
-                                .next()
-                                .unwrap()
-                                .expect("producers field");
-                            let _value = field
-                                .values
-                                .into_iter()
-                                .collect::<Result<Vec<_>, _>>()
-                                .expect("values");
-                            custom_sections
-                                .push((custom_section_reader.name(), custom_section_reader.data()));
-                        }
                         _ => {
-                            custom_sections
-                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                            // If it's a dwarf section
+                            match get_section_id(custom_section_reader.name()) {
+                                None => custom_sections.push((
+                                    custom_section_reader.name(),
+                                    custom_section_reader.data(),
+                                )),
+                                Some(_section_id) => {
+                                    debug_sections.push((
+                                        custom_section_reader.name(),
+                                        custom_section_reader.data(),
+                                    ));
+                                    // Do it regardless for now
+                                    custom_sections.push((
+                                        custom_section_reader.name(),
+                                        custom_section_reader.data(),
+                                    ));
+                                }
+                            }
                         }
                     }
                 }
@@ -395,6 +412,9 @@ impl<'a> Module<'a> {
                 | Payload::End(_) => {}
             }
         }
+        let mut debug_vec = CustomSections::new(debug_sections);
+        let debug = Module::parse_debug_sections(debug_vec);
+
         if code_section_count != code_sections.len() || code_section_count != functions.len() {
             return Err(Error::IncorrectCodeCounts {
                 function_section_count: functions.len(),
@@ -466,6 +486,7 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
+            debug,
         })
     }
 
@@ -817,6 +838,25 @@ impl<'a> Module<'a> {
         index as DataSegmentID
     }
 
+    pub(crate) fn parse_debug_sections(
+        &mut self,
+        mut debug_sections: CustomSections,
+    ) -> ModuleDebugData {
+        let load_section = |id: gimli::SectionId| -> Vec<u8> {
+            match debug_sections
+                .iter_mut()
+                .find(|section| section.name == id.name())
+            {
+                Some(section) => std::mem::take(&mut section.data.to_vec()),
+                None => Vec::new(),
+            }
+        };
+
+        ModuleDebugData {
+            dwarf: Dwarf::load(load_section).unwrap(),
+        }
+    }
+
     /// Get the memory ID of a module. Does not support multiple memories
     pub fn get_memory_id(&self) -> Option<MemoryID> {
         if self.memories.len() > 1 {
@@ -905,6 +945,7 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
+            debug: ModuleDebugData::default(),
         }
     }
 }

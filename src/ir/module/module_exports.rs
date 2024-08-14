@@ -58,20 +58,19 @@ impl ModuleExports {
     }
 
     pub fn get_by_id(&self, id: ExportsID) -> Option<Export> {
-        for exp in self.exports.iter() {
-            if exp.index == id {
-                return Some(exp.clone());
-            }
+        if id < self.exports.len() as ExportsID {
+            Some(self.exports[id as usize].clone())
+        } else {
+            None
         }
-        None
     }
 
     pub fn get_func_by_id(&self, id: FunctionID) -> Option<ExportsID> {
-        for exp in self.exports.iter() {
+        for (export_id, exp) in self.exports.iter().enumerate() {
             match exp.kind {
                 ExternalKind::Func => {
                     if exp.index == id {
-                        return Some(exp.index);
+                        return Some(export_id as ExportsID);
                     }
                 }
                 _ => {}
@@ -95,6 +94,6 @@ impl ModuleExports {
     }
 
     pub fn delete(&mut self, id: ExportsID) {
-        self.exports.retain(|exp| exp.index != id)
+        self.exports.remove(id as usize);
     }
 }

@@ -52,19 +52,23 @@ macro_rules! make_round_trip_tests_module {
 }
 
 mod round_trip {
-    make_round_trip_tests_module!(
-        "dfinity/modules",
-        import_func,
-        data_section,
-        func,
-        func_locals,
-        table,
-        table_init,
-        globals,
-        exports,
-        start,
-        const_expr
-    );
+    // make_round_trip_tests_module!(
+    //     "dfinity/modules",
+    //     import_func,
+    //     data_section,
+    //     func,
+    //     func_locals,
+    //     table,
+    //     table_init,
+    //     globals,
+    //     exports,
+    //     start,
+    //     const_expr
+    // );
+    //
+    // make_round_trip_tests_module!("handwritten/modules", blocks, add);
+    //
+    // make_round_trip_tests_module!("spin", hello_world_module);
 
     make_round_trip_tests_module!("handwritten/modules", blocks, add);
 

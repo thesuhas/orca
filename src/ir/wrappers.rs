@@ -1,4 +1,5 @@
 //! Wrapper functions
+use gimli::SectionId;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
@@ -317,5 +318,31 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
     for name in names {
         let naming = name.unwrap();
         namemap.append(naming.index, naming.name);
+    }
+}
+
+pub fn get_section_id(name: &str) -> Option<SectionId> {
+    match name {
+        ".debug_abbrev" => Some(SectionId::DebugAbbrev),
+        ".debug_addr" => Some(SectionId::DebugAddr),
+        ".debug_aranges" => Some(SectionId::DebugAranges),
+        ".debug_frame" => Some(SectionId::DebugFrame),
+        ".debug_info" => Some(SectionId::DebugInfo),
+        ".debug_line" => Some(SectionId::DebugLine),
+        ".debug_line_str" => Some(SectionId::DebugLineStr),
+        ".debug_loc" => Some(SectionId::DebugLoc),
+        ".debug_loclists" => Some(SectionId::DebugLocLists),
+        ".debug_pubnames" => Some(SectionId::DebugPubNames),
+        ".debug_pubtypes" => Some(SectionId::DebugPubTypes),
+        ".debug_ranges" => Some(SectionId::DebugRanges),
+        ".debug_rnglists" => Some(SectionId::DebugRngLists),
+        ".debug_str" => Some(SectionId::DebugStr),
+        ".debug_str_offsets" => Some(SectionId::DebugStrOffsets),
+        ".debug_types" => Some(SectionId::DebugTypes),
+        ".debug_cu_index" => Some(SectionId::DebugCuIndex),
+        ".debug_tu_index" => Some(SectionId::DebugTuIndex),
+        ".eh_frame" => Some(SectionId::EhFrame),
+        ".eh_frame_hdr" => Some(SectionId::EhFrameHdr),
+        _ => None,
     }
 }
