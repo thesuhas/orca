@@ -1,3 +1,4 @@
+#![allow(clippy::mut_range_bound)] // see https://github.com/rust-lang/rust-clippy/issues/6072
 //! Intermediate Representation of a wasm component.
 
 use crate::error::Error;
@@ -343,7 +344,7 @@ impl<'a> Component<'a> {
                         &wasm[unchecked_range.start - start..unchecked_range.end - start],
                         enable_multi_memory,
                         parser,
-                        unchecked_range.start.clone(),
+                        unchecked_range.start,
                         &mut stack,
                     )?;
                     components.push(cmp.clone());
