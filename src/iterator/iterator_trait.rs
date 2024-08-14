@@ -3,7 +3,7 @@
 use crate::ir::id::GlobalID;
 use crate::ir::module::module_functions::LocalFunction;
 use crate::ir::module::module_globals::Global;
-use crate::ir::types::{InstrumentType, InstrumentationMode, Location, Instrument};
+use crate::ir::types::{Instrument, InstrumentType, InstrumentationMode, Location};
 use wasmparser::Operator;
 
 pub trait Instrumenter<'a> {
@@ -60,10 +60,12 @@ pub trait Instrumenter<'a> {
 }
 
 // Helper functions to reduce duplicate code, cannot be member of trait due to E0599
-pub(crate) fn set_instrument_type_for_local_func_at(mode: InstrumentationMode, func: &mut LocalFunction, instr_idx: usize) {
-    if func.body.instructions[instr_idx].1.get_curr()
-        == InstrumentType::NotInstrumented
-    {
+pub(crate) fn set_instrument_type_for_local_func_at(
+    mode: InstrumentationMode,
+    func: &mut LocalFunction,
+    instr_idx: usize,
+) {
+    if func.body.instructions[instr_idx].1.get_curr() == InstrumentType::NotInstrumented {
         func.body.instructions[instr_idx].1 = Instrument::Instrumented {
             before: vec![],
             after: vec![],
