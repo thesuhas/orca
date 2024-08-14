@@ -858,7 +858,6 @@ pub trait Opcode<'a>: Inject<'a> {
     }
 }
 
-
 #[allow(dead_code)]
 /// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
 ///
