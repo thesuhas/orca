@@ -23,6 +23,7 @@ pub type GlobalID = u32;
 pub type ImportsID = u32;
 
 /// ExportsID
+// Note: Refers to an exports position in a module/component's list of exports
 pub type ExportsID = u32;
 
 /// Custom Section ID

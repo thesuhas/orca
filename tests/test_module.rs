@@ -1,3 +1,4 @@
+use orca::ir::id::{ExportsID, FunctionID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
 use orca::ir::types::Body;
@@ -21,5 +22,28 @@ fn test_fn_types() {
     assert_eq!(
         *module.functions.get_kind(2),
         Local(LocalFunction::new(0, 0, Body::new(), vec![]))
+    );
+}
+
+#[test]
+fn test_exports() {
+    let file = "tests/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // Get func ID by name
+    assert_eq!(
+        module.exports.get_func_by_name("add".to_string()).unwrap(),
+        1 as FunctionID
+    );
+
+    // Get Export ID by name
+    assert_eq!(
+        module
+            .exports
+            .get_export_id_by_name("add".to_string())
+            .unwrap(),
+        0 as ExportsID
     );
 }

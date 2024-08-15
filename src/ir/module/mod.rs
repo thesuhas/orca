@@ -602,11 +602,13 @@ impl<'a> Module<'a> {
         if !self.exports.is_empty() {
             let mut exports = wasm_encoder::ExportSection::new();
             for export in self.exports.iter() {
-                exports.export(
-                    &export.name,
-                    wasm_encoder::ExportKind::from(export.kind),
-                    export.index,
-                );
+                if !export.deleted {
+                    exports.export(
+                        &export.name,
+                        wasm_encoder::ExportKind::from(export.kind),
+                        export.index,
+                    );
+                }
             }
             module.section(&exports);
         }
