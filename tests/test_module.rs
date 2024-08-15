@@ -30,7 +30,7 @@ fn test_exports() {
     let file = "tests/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let module = Module::parse(&buff, false).expect("Unable to parse module");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // Get func ID by name
     assert_eq!(
@@ -46,4 +46,17 @@ fn test_exports() {
             .unwrap(),
         0 as ExportsID
     );
+
+    // Check deletion
+    let id = module
+        .exports
+        .get_export_id_by_name("add".to_string())
+        .unwrap();
+    module.exports.delete(id);
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("unable to parse");
+
+    assert!(m.exports.get_export_id_by_name("add".to_string()).is_none());
 }

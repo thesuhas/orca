@@ -79,12 +79,6 @@ impl ModuleExports {
         } else {
             None
         }
-        // for exp in self.exports.iter() {
-        //     if exp.index == id {
-        //         return Some(exp.clone());
-        //     }
-        // }
-        // None
     }
 
     /// Get the Export ID from its function ID
