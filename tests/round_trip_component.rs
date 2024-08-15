@@ -1,6 +1,6 @@
 mod common;
 
-use crate::common::{WASM_OUTPUT_DIR};
+use crate::common::WASM_OUTPUT_DIR;
 use orca::ir::component::Component;
 use std::fs::File;
 use std::io::Write;
@@ -32,7 +32,10 @@ fn round_trip_component(testname: &str, folder: &str) {
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     // component.print();
     let result = component.encode();
-    write_to_file(&result, format!("{WASM_OUTPUT_DIR}/component_{testname}.wasm"));
+    write_to_file(
+        &result,
+        format!("{WASM_OUTPUT_DIR}/component_{testname}.wasm"),
+    );
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
 

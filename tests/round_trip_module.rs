@@ -1,10 +1,10 @@
 mod common;
 
-use crate::common::{WASM_OUTPUT_DIR, try_path, WAT_OUTPUT_DIR};
+use crate::common::{try_path, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};
+use log::{debug, error, trace};
 use orca::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
-use log::{debug, error, trace};
 
 fn write_to_file(bytes: &Vec<u8>, path: String) {
     try_path(&path);
@@ -39,7 +39,10 @@ fn round_trip_module(testname: &str, folder: &str) {
 
     if out != original {
         debug!("Test: {:?} failed! Writing to file to check", testname);
-        write_to_file(&out.as_bytes().to_vec(), format!("{WAT_OUTPUT_DIR}/module_{}.wat", testname));
+        write_to_file(
+            &out.as_bytes().to_vec(),
+            format!("{WAT_OUTPUT_DIR}/module_{}.wat", testname),
+        );
     }
     assert_eq!(out, original);
 }
@@ -72,7 +75,8 @@ mod round_trip {
     );
 
     make_round_trip_tests_module!("handwritten/modules", add);
-    make_round_trip_tests_module!("handwritten/modules/blocks",
+    make_round_trip_tests_module!(
+        "handwritten/modules/blocks",
         complex_mult_nested_diff_opcodes,
         medium_1br,
         medium_1br_if,
