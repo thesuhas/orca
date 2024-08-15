@@ -25,7 +25,7 @@ fn write_to_file(bytes: &Vec<u8>, path: String) {
 
 fn round_trip_module(testname: &str, folder: &str) {
     let filename = format!(
-        "{}/tests/{}/{}.wat",
+        "{}/tests/test_inputs/{}/{}.wat",
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         folder,
         testname
@@ -100,7 +100,7 @@ mod round_trip {
 
 #[test]
 fn set_name() {
-    let filename = "tests/handwritten/modules/func1.wat";
+    let filename = "tests/test_inputs/handwritten/modules/func1.wat";
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).unwrap();
     module.set_fn_name(1, "test".to_string());

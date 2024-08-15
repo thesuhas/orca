@@ -12,7 +12,7 @@ use wasmparser::Operator;
 
 #[test]
 fn test_iterator_count() {
-    let file = "tests/handwritten/components/add.wat";
+    let file = "tests/test_inputs/handwritten/components/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
@@ -21,7 +21,7 @@ fn test_iterator_count() {
 
 #[test]
 fn test_iterator_count_mul_mod() {
-    let file = "tests/handwritten/components/mul_mod.wat";
+    let file = "tests/test_inputs/handwritten/components/mul_mod.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
@@ -31,7 +31,7 @@ fn test_iterator_count_mul_mod() {
 // example of a ModuleIterator
 #[test]
 fn test_blocks() {
-    let file = "tests/handwritten/modules/blocks/medium_1br.wat";
+    let file = "tests/test_inputs/handwritten/modules/blocks/medium_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 0);
@@ -42,7 +42,7 @@ fn test_blocks() {
 
 #[test]
 fn iterator_mark_as_before_test() {
-    let file = "tests/handwritten/components/add.wat";
+    let file = "tests/test_inputs/handwritten/components/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
@@ -113,7 +113,7 @@ fn iterator_mark_as_before_test() {
 
 #[test]
 fn iterator_inject_i32_before() {
-    let file = "tests/handwritten/components/add.wat";
+    let file = "tests/test_inputs/handwritten/components/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
@@ -238,7 +238,7 @@ fn iterate(comp_it: &mut ComponentIterator) {
 #[test]
 // TODO: no assertions for now, verify by eyeballing
 fn iterator_verify_injection() {
-    let file = "tests/handwritten/components/add.wat";
+    let file = "tests/test_inputs/handwritten/components/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
     let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
@@ -254,7 +254,7 @@ fn iterator_verify_injection() {
 // TODO: no assertions for now, verify by eyeballing
 #[test]
 fn test_it_add_local() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
@@ -282,7 +282,7 @@ fn test_it_add_local() {
                 break;
             };
         } else {
-            panic!("Should've gotten Component Location!");
+            panic!("Should've gotten Module Location!");
         }
     }
 
@@ -291,19 +291,47 @@ fn test_it_add_local() {
     debug!("{}", wat);
 }
 
+// TODO: no assertions for now, verify by eyeballing
 #[test]
 fn test_semantic_after_basic() {
-    let file = "tests/handwritten/modules/blocks/simple_1br.wat";
+    let file = "tests/test_inputs/handwritten/modules/blocks/simple_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+
+    loop {
+        let op = mod_it.curr_op();
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = mod_it.curr_loc()
+        {
+            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+
+            if discriminant(mod_it.curr_op().unwrap())
+                == discriminant(&Operator::Br { relative_depth: 0 })
+            {
+                mod_it.semantic_after().i32_const(1234).drop();
+            }
+
+            if mod_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Module Location!");
+        }
+    }
+
+    let a = module.encode();
+    let wat = wasmprinter::print_bytes(&a).unwrap();
+    println!("{}", wat);
 }
 
 // example of splicing an instrument at specific location
 // TODO: no assertions for now, verify by eyeballing
 #[test]
 fn test_it_instr_at() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
@@ -339,7 +367,7 @@ fn test_it_instr_at() {
 // TODO: no assertions for now, verify by eyeballing
 #[test]
 fn test_it_dup_instr() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
@@ -373,7 +401,7 @@ fn test_it_dup_instr() {
 // no asserts, eyeballing for now
 #[test]
 fn test_imports() {
-    let file = "tests/handwritten/modules/import.wat";
+    let file = "tests/test_inputs/handwritten/modules/import.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 2);
@@ -388,7 +416,7 @@ fn test_imports() {
 
 #[test]
 fn test_it_add_local_diff_type() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
@@ -402,7 +430,7 @@ fn test_it_add_local_diff_type() {
 
 #[test]
 fn test_function_skipping_module() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
@@ -432,7 +460,7 @@ fn test_function_skipping_module() {
 
 #[test]
 fn test_function_skipping_component() {
-    let file = "tests/handwritten/components/add.wat";
+    let file = "tests/test_inputs/handwritten/components/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut comp = Component::parse(&buff, false).expect("Unable to parse");
@@ -460,7 +488,7 @@ fn test_function_skipping_component() {
 
 #[test]
 fn test_fn_name() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse(&buff, false).expect("Unable to parse");

@@ -23,7 +23,7 @@ fn write_to_file(bytes: &Vec<u8>, path: String) {
 
 fn round_trip_component(testname: &str, folder: &str) {
     let filename = format!(
-        "{}/tests/{}/{}.wat",
+        "{}/tests/test_inputs/{}/{}.wat",
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         folder,
         testname

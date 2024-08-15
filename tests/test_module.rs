@@ -5,7 +5,7 @@ use orca::Module;
 
 #[test]
 fn test_fn_types() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse(&buff, false).expect("Unable to parse module");

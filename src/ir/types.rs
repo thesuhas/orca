@@ -509,10 +509,18 @@ impl Eq for InstrumentationFlag<'_> {}
 
 impl<'a> InstrumentationFlag<'a> {
     pub fn has_instr(&self) -> bool {
-        !self.before.is_empty()
-            && !self.after.is_empty()
-            && !self.alternate.is_empty()
-            && !self.semantic_after.is_empty()
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            before,
+            after,
+            alternate,
+            semantic_after,
+            current_mode: _,
+        } = self;
+        !before.is_empty()
+            || !after.is_empty()
+            || !alternate.is_empty()
+            || !semantic_after.is_empty()
     }
 
     /// Add an instruction to the current InstrumentationMode's list

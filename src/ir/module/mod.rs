@@ -549,7 +549,6 @@ impl<'a> Module<'a> {
 
                                         if is_first {
                                             builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
-                                            is_first = false;
                                         } else {
                                             // injecting multiple, already have an if statement
                                             builder.else_stmt();
@@ -562,6 +561,7 @@ impl<'a> Module<'a> {
                                             // need to inject end of nested if!
                                             builder.end();
                                         }
+                                        is_first = false;
                                     }
                                     if !flagged.is_empty() {
                                         // inject end of flag check (the outer if)
@@ -626,6 +626,12 @@ impl<'a> Module<'a> {
                                         &mut builder.body.num_locals,
                                         &mut builder.body.locals,
                                     );
+
+                                    // set flag to true before the opcode
+                                    builder.before_at(idx).i32_const(1).local_set(bool_flag_id);
+
+                                    // set flag to false after the opcode
+                                    builder.after_at(idx).i32_const(0).local_set(bool_flag_id);
 
                                     let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
                                     to_resolve
