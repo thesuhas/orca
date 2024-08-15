@@ -31,7 +31,7 @@ fn test_iterator_count_mul_mod() {
 // example of a ModuleIterator
 #[test]
 fn test_blocks() {
-    let file = "tests/handwritten/modules/blocks.wat";
+    let file = "tests/handwritten/modules/blocks/medium_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 0);
@@ -293,11 +293,13 @@ fn test_it_add_local() {
 
 #[test]
 fn test_semantic_after_basic() {
-    let file = "tests/handwritten/modules/blocks.wat";
+    let file = "tests/handwritten/modules/blocks/simple_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
-    // TODO
+
+
+
 }
 
 // example of splicing an instrument at specific location
