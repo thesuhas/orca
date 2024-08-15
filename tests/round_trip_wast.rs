@@ -11,7 +11,7 @@ fn wasm_tools() -> Command {
 fn roundtrip(filename: String) {
     println!("filename: {:?}", filename);
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-    let component = Component::parse(&buff, false).expect("Unable to parse");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
     // component.print();
     let result = component.encode();
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");

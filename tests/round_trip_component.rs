@@ -26,7 +26,7 @@ fn round_trip_component(testname: &str, folder: &str) {
         testname
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-    let component = Component::parse(&buff, false).expect("Unable to parse");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
     // component.print();
     let result = component.encode();
     write_to_file(&result, "test.wasm".to_string());

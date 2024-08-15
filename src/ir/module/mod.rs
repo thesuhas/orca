@@ -1,24 +1,26 @@
 //! Intermediate Representation of a wasm module.
 
+use super::types::DataType;
 use crate::error::Error;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
-    FuncKind, Function, Functions, ImportedFunction, LocalFunction,
+    add_local, FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
 use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
 use crate::ir::types::{
-    Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
+    BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
 };
+use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
+use crate::Opcode;
+use log::error;
+use std::collections::HashMap;
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{MemoryType, Operator, Parser, Payload};
-
-use super::types::DataType;
-use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -469,7 +471,7 @@ impl<'a> Module<'a> {
     }
 
     /// Emit the module into a wasm binary file.
-    pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
+    pub fn emit_wasm(&mut self, file_name: &str) -> Result<(), std::io::Error> {
         let module = self.encode_internal();
         let wasm = module.finish();
         std::fs::write(file_name, wasm)?;
@@ -488,12 +490,175 @@ impl<'a> Module<'a> {
     /// let mut module = Module::parse(&buff, false).unwrap();
     /// let result = module.encode();
     /// ```
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode(&mut self) -> Vec<u8> {
         self.encode_internal().finish()
     }
 
-    /// Encodes an Orca Module to a wasm_encoder Module
-    pub(crate) fn encode_internal(&self) -> wasm_encoder::Module {
+    /// Visits the Orca Module and resolves the special instrumentation by
+    /// translating them into the straightforward before/after/alt modes.
+    fn resolve_special_instrumentation(&mut self) {
+        if !self.num_functions > 0 {
+            for rel_func_idx in self.num_imported_functions..self.functions.len() {
+                let func_idx = rel_func_idx as FunctionID;
+                if let FuncKind::Import(..) = &self.functions.get_kind(func_idx as FunctionID) {
+                    continue;
+                }
+
+                type BlockID = usize;
+                type Body<'a> = Vec<Operator<'a>>;
+                struct InstrBodyFlagged<'a> {
+                    body: Body<'a>,
+                    bool_flag: LocalID,
+                }
+                struct InstrToInject<'a> {
+                    flagged: Vec<InstrBodyFlagged<'a>>,
+                    not_flagged: Vec<Body<'a>>,
+                }
+
+                // initialize with 0 to store the func block!
+                let mut block_stack: Vec<BlockID> = vec![0];
+                let mut to_resolve: HashMap<BlockID, InstrToInject> = HashMap::new();
+                let mut builder = self.functions.get_fn_modifier(func_idx).unwrap();
+
+                // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
+                let readable_copy_of_body = builder.body.instructions.clone();
+                for (idx, (op, instrumentation)) in readable_copy_of_body.iter().enumerate() {
+                    match op {
+                        Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
+                            // The block ID will just be the curr len of the stack!
+                            block_stack.push(block_stack.len());
+                        }
+                        Operator::End => {
+                            // Pop the stack and check to see if we have instrumentation to inject!
+                            if let Some(block_id) = block_stack.pop() {
+                                // remove top of stack! (end of vec)
+                                if let Some(InstrToInject {
+                                    flagged,
+                                    not_flagged,
+                                }) = to_resolve.remove(&block_id)
+                                {
+                                    // remove so we don't try to re-inject!
+                                    let mut is_first = true;
+                                    // inject the bodies predicated with the flag
+                                    for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
+                                        // Inject the bodies AFTER the current END opcode
+                                        builder.after_at(idx);
+
+                                        // inject flag check
+                                        builder.local_get(*bool_flag);
+
+                                        if is_first {
+                                            builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
+                                            is_first = false;
+                                        } else {
+                                            // injecting multiple, already have an if statement
+                                            builder.else_stmt();
+                                            builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
+                                        }
+
+                                        // inject body
+                                        builder.inject_all(body);
+                                        if !is_first {
+                                            // need to inject end of nested if!
+                                            builder.end();
+                                        }
+                                    }
+                                    if !flagged.is_empty() {
+                                        // inject end of flag check (the outer if)
+                                        builder.end();
+                                    }
+
+                                    // handle non-flagged bodies
+                                    for body in not_flagged.iter() {
+                                        // inject body
+                                        builder.inject_all(body);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {} // skip non block-structured opcodes
+                    }
+
+                    // this must go after the above logic to ensure the block_id is on the top of the stack!
+                    if instrumentation.has_instr() {
+                        // this instruction has instrumentation, check if there is any to resolve!
+                        let InstrumentationFlag {
+                            semantic_after,
+                            before: _,
+                            after: _,
+                            alternate: _,
+                            current_mode: _,
+                            // exhaustive to help identify where to add code to handle other special modes.
+                        } = instrumentation;
+
+                        // Handle semantic_after!
+                        if !semantic_after.is_empty() {
+                            // save instrumentation to be converted to simple before/after/alt
+                            match op {
+                                Operator::Block { .. }
+                                | Operator::Loop { .. }
+                                | Operator::If { .. } => {
+                                    // add body-to-inject as non-flagged
+                                    let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
+                                    to_resolve
+                                        .entry(*block_id)
+                                        .and_modify(|instr_to_inject| {
+                                            instr_to_inject
+                                                .not_flagged
+                                                .push(semantic_after.to_owned());
+                                        })
+                                        .or_insert(InstrToInject {
+                                            flagged: vec![],
+                                            not_flagged: vec![semantic_after.to_owned()],
+                                        });
+                                }
+                                Operator::Br { .. }
+                                | Operator::BrTable { .. }
+                                | Operator::BrIf { .. }
+                                | Operator::BrOnCast { .. }
+                                | Operator::BrOnCastFail { .. }
+                                | Operator::BrOnNonNull { .. }
+                                | Operator::BrOnNull { .. } => {
+                                    // add body-to-inject as flagged
+                                    let bool_flag_id = add_local(
+                                        DataType::I32,
+                                        builder.args.len(),
+                                        &mut builder.body.num_locals,
+                                        &mut builder.body.locals,
+                                    );
+
+                                    let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
+                                    to_resolve
+                                        .entry(*block_id)
+                                        .and_modify(|instr_to_inject| {
+                                            instr_to_inject.flagged.push(InstrBodyFlagged {
+                                                body: semantic_after.to_owned(),
+                                                bool_flag: bool_flag_id,
+                                            });
+                                        })
+                                        .or_insert(InstrToInject {
+                                            flagged: vec![InstrBodyFlagged {
+                                                body: semantic_after.to_owned(),
+                                                bool_flag: bool_flag_id,
+                                            }],
+                                            not_flagged: vec![],
+                                        });
+                                }
+                                _ => {} // skip all other opcodes
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Encodes an Orca Module to a wasm_encoder Module.
+    /// This requires a mutable reference to self due to the special instrumentation resolution step.
+    pub(crate) fn encode_internal(&mut self) -> wasm_encoder::Module {
+        // First resolve any instrumentation that needs to be translated to before/after/alt
+        self.resolve_special_instrumentation();
+
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
@@ -678,18 +843,16 @@ impl<'a> Module<'a> {
                 if let FuncKind::Import(..) = &self.functions.get_kind(rel_func_idx as FunctionID) {
                     continue;
                 }
-                let Body {
-                    locals,
-                    num_locals: _,
-                    instructions,
-                    num_instructions: _,
-                    name,
-                } = &self
+                let func = self
                     .functions
                     .get(rel_func_idx as FunctionID)
-                    .unwrap_local()
-                    .body;
-
+                    .unwrap_local();
+                let Body {
+                    instructions,
+                    locals,
+                    name,
+                    ..
+                } = &func.body;
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
                     converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
@@ -708,8 +871,14 @@ impl<'a> Module<'a> {
                             before,
                             after,
                             alternate,
+                            semantic_after,
                             ..
                         } = instrument;
+
+                        // Check if special instrumentation modes have been resolved!
+                        if !semantic_after.is_empty() {
+                            error!("BUG: Semantic after instrumentation should be resolved already, please report.");
+                        }
 
                         // First encode before instructions
                         for instr in before {

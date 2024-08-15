@@ -2,7 +2,7 @@
 
 use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::FuncKind::Local;
-use crate::ir::module::module_functions::{Function, LocalFunction};
+use crate::ir::module::module_functions::{add_local, Function, LocalFunction};
 use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
@@ -31,7 +31,7 @@ impl<'a> FunctionBuilder<'a> {
             params: params.to_vec(),
             results: results.to_vec(),
             name: None,
-            body: Body::new(),
+            body: Body::default(),
         }
     }
 
@@ -111,21 +111,12 @@ impl<'a> FunctionBuilder<'a> {
     /// add a local and return local index
     /// (note that local indices start after)
     pub fn add_local(&mut self, ty: DataType) -> LocalID {
-        let index = self.params.len() + self.body.num_locals;
-        let len = self.body.locals.len();
-        self.body.num_locals += 1;
-        if len > 0 {
-            let last = len - 1;
-            if self.body.locals[last].1 == ty {
-                self.body.locals[last].0 += 1;
-            } else {
-                self.body.locals.push((1, ty));
-            }
-        } else {
-            // If no locals, just append
-            self.body.locals.push((1, ty));
-        }
-        index as LocalID
+        add_local(
+            ty,
+            self.params.len(),
+            &mut self.body.num_locals,
+            &mut self.body.locals,
+        )
     }
 
     pub fn set_name(&mut self, name: String) {
@@ -164,16 +155,18 @@ impl ModuleBuilder for FunctionBuilder<'_> {
 /// (it only modifies the Instrument type)
 pub struct FunctionModifier<'a, 'b> {
     pub body: &'a mut Body<'b>,
+    pub args: &'a mut Vec<LocalID>,
     pub(crate) instr_idx: Option<usize>,
 }
 
 impl<'a, 'b> FunctionModifier<'a, 'b> {
     // by default, the instr_idx the last instruction (always Operator::End indicating end of the function)
     // and the Instrument type is set to before
-    pub fn init(body: &'a mut Body<'b>) -> Self {
+    pub fn init(body: &'a mut Body<'b>, args: &'a mut Vec<LocalID>) -> Self {
         let instr_idx = body.instructions.len() - 1;
         let mut func_modifier = FunctionModifier {
             body,
+            args,
             instr_idx: None,
         };
         func_modifier.before_at(instr_idx);
@@ -209,9 +202,26 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         self
     }
 
+    pub fn inject_all(&mut self, instrs: &[Operator<'b>]) -> &mut Self {
+        instrs.iter().for_each(|instr| {
+            self.inject(instr.to_owned());
+        });
+        self
+    }
+
     fn set_instrument_mode(&mut self, idx: usize, mode: InstrumentationMode) {
         self.instr_idx = Some(idx);
         self.body.instructions[idx].1.current_mode = Some(mode);
+    }
+
+    /// add a local and return local index
+    pub fn add_local(&mut self, ty: DataType) -> LocalID {
+        add_local(
+            ty,
+            self.args.len(),
+            &mut self.body.num_locals,
+            &mut self.body.locals,
+        )
     }
 }
 

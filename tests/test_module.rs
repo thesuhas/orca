@@ -16,10 +16,10 @@ fn test_fn_types() {
     );
     assert_eq!(
         *module.functions.get_kind(1),
-        Local(LocalFunction::new(5, 0, Body::new(), vec![]))
+        Local(LocalFunction::new(5, 0, Body::default(), vec![]))
     );
     assert_eq!(
         *module.functions.get_kind(2),
-        Local(LocalFunction::new(0, 0, Body::new(), vec![]))
+        Local(LocalFunction::new(0, 0, Body::default(), vec![]))
     );
 }

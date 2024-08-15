@@ -16,6 +16,7 @@ wasm-encoder = { version = "0.215.0", features = ["wasmparser"]}
 wasmparser = "0.215.0"
 tempfile = "3.10.1"
 serde_json = "1.0.121"
+log = "0.4.22"
 
 [dev-dependencies]
 wasmprinter = "0.215.0"

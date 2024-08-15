@@ -450,6 +450,9 @@ pub enum InstrumentationMode {
     Before,
     After,
     Alternate,
+
+    // special modes
+    SemanticAfter,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -459,6 +462,9 @@ pub struct InstrumentationFlag<'a> {
     pub before: Vec<Operator<'a>>,
     pub after: Vec<Operator<'a>>,
     pub alternate: Vec<Operator<'a>>,
+
+    // special modes
+    pub semantic_after: Vec<Operator<'a>>,
 }
 
 impl fmt::Display for InstrumentationFlag<'_> {
@@ -467,6 +473,7 @@ impl fmt::Display for InstrumentationFlag<'_> {
             before,
             after,
             alternate,
+            semantic_after,
             ..
         } = self;
         if !self.has_instr() {
@@ -476,10 +483,12 @@ impl fmt::Display for InstrumentationFlag<'_> {
             f,
             "Before: {:?} instructions\n \
                    After: {:?} instructions\n \
-                   Alternate: {:?} instructions\n",
+                   Alternate: {:?} instructions\n \
+                   Semantic After: {:?} instructions",
             before.len(),
             after.len(),
-            alternate.len()
+            alternate.len(),
+            semantic_after.len()
         )
     }
 }
@@ -489,6 +498,7 @@ impl PartialEq for InstrumentationFlag<'_> {
         let mut result = self.before.eq(&other.before);
         result &= self.after.eq(&other.after);
         result &= self.alternate.eq(&other.alternate);
+        result &= self.semantic_after.eq(&other.semantic_after);
         result &= discriminant(&self.current_mode) == discriminant(&other.current_mode);
 
         result
@@ -499,7 +509,10 @@ impl Eq for InstrumentationFlag<'_> {}
 
 impl<'a> InstrumentationFlag<'a> {
     pub fn has_instr(&self) -> bool {
-        !self.before.is_empty() && !self.after.is_empty() && !self.alternate.is_empty()
+        !self.before.is_empty()
+            && !self.after.is_empty()
+            && !self.alternate.is_empty()
+            && !self.semantic_after.is_empty()
     }
 
     /// Add an instruction to the current InstrumentationMode's list
@@ -511,6 +524,7 @@ impl<'a> InstrumentationFlag<'a> {
             Some(InstrumentationMode::Before) => self.before.push(val),
             Some(InstrumentationMode::After) => self.after.push(val),
             Some(InstrumentationMode::Alternate) => self.alternate.push(val),
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.push(val),
         }
     }
 
@@ -523,6 +537,7 @@ impl<'a> InstrumentationFlag<'a> {
             Some(InstrumentationMode::Before) => self.before.get(idx).unwrap(),
             Some(InstrumentationMode::After) => self.after.get(idx).unwrap(),
             Some(InstrumentationMode::Alternate) => self.alternate.get(idx).unwrap(),
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get(idx).unwrap(),
         }
     }
 }
@@ -541,7 +556,7 @@ pub enum Location {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 /// Body of a function in a wasm module
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
@@ -557,22 +572,11 @@ pub struct Body<'a> {
     pub name: Option<String>,
 }
 
-#[allow(clippy::new_without_default)]
 // 'b should outlive 'a
 impl<'a, 'b> Body<'a>
 where
     'b: 'a,
 {
-    pub fn new() -> Self {
-        Self {
-            locals: Vec::new(),
-            num_locals: 0,
-            instructions: Vec::new(),
-            num_instructions: 0,
-            name: None,
-        }
-    }
-
     pub fn push_instr(&mut self, instr: Operator<'b>) {
         self.instructions
             .push((instr, InstrumentationFlag::default()));
