@@ -57,6 +57,12 @@ pub trait Instrumenter<'a>: Iterator<'a> {
         self
     }
 
+    /// Mark the current location to InstrumentSemanticAfter
+    fn semantic_after(&mut self) -> &mut Self {
+        self.set_instrument_mode(InstrumentationMode::SemanticAfter);
+        self
+    }
+
     // ==== INSTR INJECTION ====
 
     /// Splice a new instruction into a specific location

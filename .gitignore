@@ -6,6 +6,5 @@ target
 **/out.**
 out
 
-# Test wasm files
-a.wasm
-test.wasm
+# Test output
+output/
