@@ -866,11 +866,10 @@ fn inject_semantic_after<'a, 'b, 'c>(
                     }
                     SupportedOperators::BrTable => {
                         matches!(mod_it.curr_op().unwrap(), Operator::BrTable { .. })
-                    }
-                    // SupportedOperators::BrOnCast => matches!(mod_it.curr_op().unwrap(), Operator::BrOnCast {..}),
-                    // SupportedOperators::BrOnCastFail => matches!(mod_it.curr_op().unwrap(), Operator::BrOnCastFail {..}),
-                    // SupportedOperators::BrOnNull => matches!(mod_it.curr_op().unwrap(), Operator::BrOnNull {..}),
-                    // SupportedOperators::BrOnNonNull => matches!(mod_it.curr_op().unwrap(), Operator::BrOnNonNull {..}),
+                    } // SupportedOperators::BrOnCast => matches!(mod_it.curr_op().unwrap(), Operator::BrOnCast {..}),
+                      // SupportedOperators::BrOnCastFail => matches!(mod_it.curr_op().unwrap(), Operator::BrOnCastFail {..}),
+                      // SupportedOperators::BrOnNull => matches!(mod_it.curr_op().unwrap(), Operator::BrOnNull {..}),
+                      // SupportedOperators::BrOnNonNull => matches!(mod_it.curr_op().unwrap(), Operator::BrOnNonNull {..}),
                 };
                 if matches {
                     mod_it.semantic_after();
