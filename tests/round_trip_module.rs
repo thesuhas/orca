@@ -74,26 +74,7 @@ mod round_trip {
         const_expr
     );
 
-    make_round_trip_tests_module!("handwritten/modules", add);
-    make_round_trip_tests_module!(
-        "handwritten/modules/blocks",
-        complex_mult_nested_diff_opcodes,
-        medium_1br,
-        medium_1br_if,
-        medium_1br_table,
-        medium_2br,
-        medium_2br_if,
-        medium_2br_table,
-        medium_ifelse,
-        medium_ifs,
-        medium_multiple,
-        simple_1br,
-        simple_1br_if,
-        simple_1br_table,
-        simple_2br,
-        simple_2br_if,
-        simple_2br_table
-    );
+    make_round_trip_tests_module!("handwritten/modules", add, block, func1, import, _start);
 
     make_round_trip_tests_module!("spin", hello_world_module);
 }

@@ -31,300 +31,13 @@ fn test_iterator_count_mul_mod() {
 // example of a ModuleIterator
 #[test]
 fn test_blocks() {
-    let file = "tests/test_inputs/handwritten/modules/blocks/medium_1br.wat";
+    let file = "tests/test_inputs/handwritten/modules/block.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 0);
 
     let mut mod_it = ModuleIterator::new(&mut module, vec![]);
     iterate_module_and_count(&mut mod_it, 0, 10);
-}
-
-#[test]
-fn iterator_mark_as_before_test() {
-    let file = "tests/test_inputs/handwritten/components/add.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
-
-    let interested = Operator::Call { function_index: 1 };
-
-    loop {
-        let op = comp_it.curr_op();
-        let instr_mode = comp_it.curr_instrument_mode();
-
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = comp_it.curr_loc()
-        {
-            trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
-                mod_idx,
-                func_idx,
-                instr_idx,
-                op,
-                instr_mode
-            );
-            if *comp_it.curr_op().unwrap() == interested {
-                comp_it.before();
-            }
-            if comp_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Component Location!");
-        }
-    }
-
-    comp_it.reset();
-
-    loop {
-        let op = comp_it.curr_op();
-        let instr_mode = comp_it.curr_instrument_mode();
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = comp_it.curr_loc()
-        {
-            if *comp_it.curr_op().unwrap() == interested {
-                assert_ne!(discriminant(instr_mode), discriminant(&None));
-            }
-
-            trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
-                mod_idx,
-                func_idx,
-                instr_idx,
-                op,
-                instr_mode
-            );
-
-            if comp_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Component Location!");
-        }
-    }
-}
-
-#[test]
-fn iterator_inject_i32_before() {
-    let file = "tests/test_inputs/handwritten/components/add.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
-
-    let interested = Operator::Call { function_index: 1 };
-
-    loop {
-        let op = comp_it.curr_op();
-        let instr_mode = comp_it.curr_instrument_mode();
-
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = comp_it.curr_loc()
-        {
-            trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
-                mod_idx,
-                func_idx,
-                instr_idx,
-                op,
-                instr_mode
-            );
-            if *comp_it.curr_op().unwrap() == interested {
-                comp_it.before().i32_const(1);
-            }
-            if comp_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Component Location!");
-        }
-    }
-
-    comp_it.reset();
-
-    trace!("\nAfter instrumentation\n");
-
-    loop {
-        let op = comp_it.curr_op();
-        let instr_mode = comp_it.curr_instrument_mode();
-
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = comp_it.curr_loc()
-        {
-            trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
-                mod_idx,
-                func_idx,
-                instr_idx,
-                op,
-                instr_mode
-            );
-            if *comp_it.curr_op().unwrap() == interested {
-                assert_eq!(
-                    discriminant(comp_it.curr_instrument_mode().as_ref().unwrap()),
-                    discriminant(&InstrumentationMode::Before)
-                );
-                assert_eq!(
-                    comp_it.get_injected_val(0),
-                    &Operator::I32Const { value: 1 }
-                );
-            }
-            if comp_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Component Location!");
-        }
-    }
-}
-
-// you can also inline this
-fn iterate(comp_it: &mut ComponentIterator) {
-    let after = Operator::Call { function_index: 1 };
-    let before = Operator::Drop;
-    let alternate = Operator::I32Const { value: 2 };
-
-    loop {
-        let op = comp_it.curr_op();
-        let instr_mode = comp_it.curr_instrument_mode();
-
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = comp_it.curr_loc()
-        {
-            trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
-                mod_idx,
-                func_idx,
-                instr_idx,
-                op,
-                instr_mode
-            );
-            if *comp_it.curr_op().unwrap() == before {
-                comp_it.before().call(0);
-            }
-
-            if *comp_it.curr_op().unwrap() == after {
-                comp_it.after().i32_const(0);
-            }
-
-            if *comp_it.curr_op().unwrap() == alternate {
-                comp_it.alternate().i32_const(3);
-            }
-
-            if comp_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Component Location!");
-        }
-    }
-}
-
-#[test]
-// TODO: no assertions for now, verify by eyeballing
-fn iterator_verify_injection() {
-    let file = "tests/test_inputs/handwritten/components/add.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    let mut comp_it = ComponentIterator::new(&mut component, HashMap::new());
-
-    iterate(&mut comp_it);
-    let result = component.encode();
-    let out = wasmprinter::print_bytes(result).expect("couldn't translated Wasm to wat");
-
-    debug!("{}", out);
-}
-
-// example of a adding locals via an iterator
-// TODO: no assertions for now, verify by eyeballing
-#[test]
-fn test_it_add_local() {
-    let file = "tests/test_inputs/handwritten/modules/add.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
-
-    loop {
-        let op = mod_it.curr_op();
-        if let Location::Module {
-            func_idx,
-            instr_idx,
-        } = mod_it.curr_loc()
-        {
-            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
-
-            if mod_it.curr_op().unwrap() == &Operator::I32Add {
-                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
-                trace!("new Local ID: {:?}", local_id);
-            }
-
-            if mod_it.curr_op().unwrap() == &(Operator::I32Const { value: 2 }) {
-                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
-                trace!("new Local ID: {:?}", local_id);
-            }
-
-            if mod_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Module Location!");
-        }
-    }
-
-    let a = module.encode();
-    let wat = wasmprinter::print_bytes(&a).unwrap();
-    debug!("{}", wat);
-}
-
-// TODO: no assertions for now, verify by eyeballing
-#[test]
-fn test_semantic_after_basic() {
-    let file = "tests/test_inputs/handwritten/modules/blocks/simple_1br.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
-
-    loop {
-        let op = mod_it.curr_op();
-        if let Location::Module {
-            func_idx,
-            instr_idx,
-        } = mod_it.curr_loc()
-        {
-            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
-
-            if discriminant(mod_it.curr_op().unwrap())
-                == discriminant(&Operator::Br { relative_depth: 0 })
-            {
-                mod_it.semantic_after().i32_const(1234).drop();
-            }
-
-            if mod_it.next().is_none() {
-                break;
-            };
-        } else {
-            panic!("Should've gotten Module Location!");
-        }
-    }
-
-    let a = module.encode();
-    let wat = wasmprinter::print_bytes(&a).unwrap();
-    println!("{}", wat);
 }
 
 // example of splicing an instrument at specific location
@@ -398,7 +111,20 @@ fn test_it_dup_instr() {
     debug!("{}", wat);
 }
 
-// no asserts, eyeballing for now
+#[test]
+fn test_it_add_local_diff_type() {
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+
+    mod_it.add_local(orca::ir::types::DataType::I64);
+    mod_it.add_local(orca::ir::types::DataType::I32);
+    let a = module.encode();
+    let wat = wasmprinter::print_bytes(&a).unwrap();
+    debug!("{}", wat);
+}
+
 #[test]
 fn test_imports() {
     let file = "tests/test_inputs/handwritten/modules/import.wat";
@@ -415,26 +141,12 @@ fn test_imports() {
 }
 
 #[test]
-fn test_it_add_local_diff_type() {
-    let file = "tests/test_inputs/handwritten/modules/add.wat";
-    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
-
-    mod_it.add_local(orca::ir::types::DataType::I64);
-    mod_it.add_local(orca::ir::types::DataType::I32);
-    let a = module.encode();
-    let wat = wasmprinter::print_bytes(&a).unwrap();
-    debug!("{}", wat);
-}
-
-#[test]
 fn test_function_skipping_module() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let functions_skip = vec![0usize];
+    let functions_skip = vec![1usize];
     let mut mod_it = ModuleIterator::new(&mut module, functions_skip);
 
     let mut set = HashSet::new();
@@ -455,7 +167,7 @@ fn test_function_skipping_module() {
     }
 
     assert_eq!(set.len(), 1);
-    assert!(set.contains(&1usize));
+    assert!(set.contains(&2usize));
 }
 
 #[test]

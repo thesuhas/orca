@@ -544,14 +544,15 @@ impl<'a> Module<'a> {
                                         // Inject the bodies AFTER the current END opcode
                                         builder.after_at(idx);
 
-                                        // inject flag check
-                                        builder.local_get(*bool_flag);
-
                                         if is_first {
+                                            // inject flag check
+                                            builder.local_get(*bool_flag);
                                             builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
                                         } else {
                                             // injecting multiple, already have an if statement
                                             builder.else_stmt();
+                                            // inject flag check
+                                            builder.local_get(*bool_flag);
                                             builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
                                         }
 
@@ -619,6 +620,8 @@ impl<'a> Module<'a> {
                                 | Operator::BrOnCastFail { .. }
                                 | Operator::BrOnNonNull { .. }
                                 | Operator::BrOnNull { .. } => {
+                                    // TODO -- BrIf, BrOnCast, BrOnNonNull, BrOnNull
+                                    //         the bodies should be inserted immediately after too!
                                     // add body-to-inject as flagged
                                     let bool_flag_id = add_local(
                                         DataType::I32,
