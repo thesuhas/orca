@@ -13,6 +13,7 @@ pub struct Import<'a> {
     pub ty: wasmparser::TypeRef,
     /// The name (in the custom section) of the imported item.
     pub import_name: Option<String>,
+    pub(crate) deleted: bool,
 }
 
 impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
@@ -22,6 +23,7 @@ impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
             name: import.name,
             ty: import.ty,
             import_name: None,
+            deleted: false,
         }
     }
 }
@@ -64,13 +66,13 @@ impl<'a> ModuleImports<'a> {
     }
 
     pub(crate) fn delete(&mut self, imports_id: ImportsID) {
-        self.imports.remove(imports_id as usize);
+        self.imports[imports_id as usize].deleted = true;
     }
 
-    pub fn find(&self, module: String, name: Option<String>) -> Option<ExportsID> {
+    pub fn find(&self, module: String, name: String) -> Option<ImportsID> {
         for (id, imp) in self.imports.iter().enumerate() {
-            if imp.module == module.as_str() && imp.import_name == name {
-                return Some(id as ExportsID);
+            if imp.module == module.as_str() && imp.name == name.as_str() {
+                return Some(id as ImportsID);
             }
         }
         None

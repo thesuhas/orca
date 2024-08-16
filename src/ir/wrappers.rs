@@ -1,12 +1,11 @@
 //! Wrapper functions
+
+use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
 };
-use wasmparser::{
-    ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
-    InstanceTypeDeclaration, SubType,
-};
+use wasmparser::{ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType, InstanceTypeDeclaration, Operator, SubType};
 
 // Not added to wasm-tools
 /// Convert ModuleTypeDeclaration to ModuleType
@@ -317,5 +316,42 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
     for name in names {
         let naming = name.unwrap();
         namemap.append(naming.index, naming.name);
+    }
+}
+
+// Calculates new offsets for imports
+pub(crate) fn new_import_idx(curr_idx: u32, deleted_imports: u32, first_deleted_import: u32) -> u32 {
+    // If the current import is less than the first deleted import, no change in index
+    if curr_idx < first_deleted_import {
+        curr_idx
+    } else {
+        // New index will be current index - deleted imports. Added imports do not need to be taken into account as added at the end
+        curr_idx - deleted_imports
+    }
+}
+
+// Calculates new offsets for locals
+// NOTE: Assumes curr_idx and first_deleted_local_fn are local offsets (do not include imports)
+pub(crate) fn new_local_fn_idx(curr_idx: u32, num_imports: usize, deleted_imports: u32, deleted_local_fns:u32, first_deleted_local_fn: u32) -> u32 {
+
+    // If current index is less than first deleted local fn idx, do not need to take into account deleted local fns
+    if curr_idx < first_deleted_local_fn {
+        curr_idx + num_imports as u32 - deleted_imports
+    } else {
+        curr_idx + num_imports as u32 - deleted_imports - deleted_local_fns
+    }
+}
+
+// Returns an updated function index for call
+pub(crate) fn update_call(op: &Operator, num_imported_fns: usize, deleted_imports: u32, first_deleted_import: u32, deleted_local_fns:u32, first_deleted_local_fn: u32) -> u32 {
+    match op {
+        Operator::Call {function_index} => {
+            if *function_index < num_imported_fns as u32 {
+                new_import_idx(*function_index, deleted_imports, first_deleted_import)
+            } else {
+                new_local_fn_idx(*function_index, num_imported_fns, deleted_imports, deleted_local_fns, first_deleted_local_fn)
+            }
+        },
+        _ => panic!("Called on an operation that is not a call!")
     }
 }

@@ -1,5 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
+use std::cmp::min;
 use crate::error::Error;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
@@ -14,11 +15,13 @@ use crate::ir::types::Instrument::{Instrumented, NotInstrumented};
 use crate::ir::types::{
     Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
 };
+use std::collections::HashMap;
+use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
-use wasmparser::{MemoryType, Operator, Parser, Payload};
+use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
 use super::types::DataType;
-use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder};
+use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder, new_import_idx, new_local_fn_idx};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -74,6 +77,11 @@ pub struct Module<'a> {
     pub(crate) data_names: wasm_encoder::NameMap,
     pub(crate) field_names: wasm_encoder::IndirectNameMap,
     pub(crate) tag_names: wasm_encoder::NameMap,
+
+    // Variables representing functions added/deleted
+    pub(crate) deleted_imports: u32,
+    pub(crate) added_imports: u32,
+    pub(crate) first_deleted_import: u32,
 }
 
 impl<'a> Module<'a> {
@@ -465,6 +473,9 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
+            added_imports: 0,
+            deleted_imports: 0,
+            first_deleted_import: u32::MAX
         })
     }
 
@@ -497,6 +508,8 @@ impl<'a> Module<'a> {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
 
+        let mut new_num_imports = 0;
+
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
 
@@ -523,26 +536,33 @@ impl<'a> Module<'a> {
             let mut imports = wasm_encoder::ImportSection::new();
             let mut import_func_idx = 0;
             for import in self.imports.iter() {
-                if import.is_function() {
-                    if let Some(import_name) = &import.import_name {
-                        function_names.append(import_func_idx as u32, import_name);
+                if !import.deleted {
+                    if import.is_function() {
+                        if let Some(import_name) = &import.import_name {
+                            function_names.append(import_func_idx as u32, import_name);
+                        }
+                        import_func_idx += 1;
+                        new_num_imports += 1;
                     }
-                    import_func_idx += 1;
+                    imports.import(
+                        import.module,
+                        import.name,
+                        reencode.entity_type(import.ty).unwrap(),
+                    );
                 }
-                imports.import(
-                    import.module,
-                    import.name,
-                    reencode.entity_type(import.ty).unwrap(),
-                );
             }
             module.section(&imports);
         }
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            for func in self.functions.iter() {
-                if let FuncKind::Local(l) = func.kind() {
-                    functions.function(l.ty_id);
+            let mut count: FunctionID = 0; // Count which maintains current index in function section
+            for (old_idx, func) in self.functions.iter().enumerate() {
+                if !func.deleted {
+                    if let FuncKind::Local(l) = func.kind() {
+                        functions.function(l.ty_id);
+                    }
+                    count += 1;
                 }
             }
             module.section(&functions);
@@ -603,11 +623,33 @@ impl<'a> Module<'a> {
             let mut exports = wasm_encoder::ExportSection::new();
             for export in self.exports.iter() {
                 if !export.deleted {
-                    exports.export(
-                        &export.name,
-                        wasm_encoder::ExportKind::from(export.kind),
-                        export.index,
-                    );
+                    match export.kind {
+                        ExternalKind::Func => {
+                            // Update the function indices
+                            // If it's an imported function
+                            if export.index < self.num_imported_functions as u32 {
+                                exports.export(
+                                    &export.name,
+                                    wasm_encoder::ExportKind::from(export.kind),
+                                    new_import_idx(export.index, self.deleted_imports, self.first_deleted_import),
+                                );
+                            } else {
+                                // If it's a local function
+                                exports.export(
+                                    &export.name,
+                                    wasm_encoder::ExportKind::from(export.kind),
+                                    new_local_fn_idx(export.index, self.num_imported_functions, self.deleted_imports, self.functions.deleted_local_fns, self.functions.first_deleted_fn),
+                                );
+                            }
+                        },
+                        _ => {
+                            exports.export(
+                                &export.name,
+                                wasm_encoder::ExportKind::from(export.kind),
+                                export.index,
+                            );
+                        }
+                    }
                 }
             }
             module.section(&exports);
@@ -623,6 +665,7 @@ impl<'a> Module<'a> {
             for (kind, items) in self.elements.iter() {
                 temp_const_exprs.clear();
                 let element_items = match &items {
+                    // TODO: Update the elements section based on additions/deletion
                     ElementItems::Functions(funcs) => wasm_encoder::Elements::Functions(funcs),
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
@@ -839,13 +882,14 @@ impl<'a> Module<'a> {
             name: name.clone().leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
             import_name: None,
+            deleted: false,
         };
         self.imports.add(import);
         // Add to function as well as it has imported functions
         self.functions
             .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
         self.num_imported_functions += 1;
-
+        self.added_imports += 1;
         index as ImportsID
     }
 
@@ -857,7 +901,9 @@ impl<'a> Module<'a> {
 
         self.functions.delete(import_id);
         self.imports.delete(import_id);
-        self.num_imported_functions -= 1;
+        // self.num_imported_functions -= 1;
+        self.deleted_imports += 1;
+        self.first_deleted_import = min(self.first_deleted_import, import_id);
     }
 
     /// Count number of imported function
@@ -902,6 +948,9 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
+            deleted_imports: 0,
+            added_imports: 0,
+            first_deleted_import: u32::MAX
         }
     }
 }

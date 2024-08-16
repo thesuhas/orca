@@ -10,12 +10,17 @@ use crate::DataType;
 pub struct Function<'a> {
     pub(crate) kind: FuncKind<'a>,
     name: Option<String>,
+    pub(crate) deleted: bool,
 }
 
 impl<'a> Function<'a> {
     /// Create a new function
     pub fn new(kind: FuncKind<'a>, name: Option<String>) -> Self {
-        Function { kind, name }
+        Function {
+            kind,
+            name,
+            deleted: false,
+        }
     }
 
     /// Get the TypeID of the function
@@ -36,6 +41,10 @@ impl<'a> Function<'a> {
     /// Unwrap a local function. If it is an imported function, it panics.
     pub fn unwrap_local(&'a self) -> &LocalFunction<'a> {
         self.kind.unwrap_local()
+    }
+
+    pub(crate) fn delete(&mut self) {
+        self.deleted = true;
     }
 
     /// Unwrap a local function as mutable. If it is an imported function, it panics.
@@ -134,6 +143,9 @@ pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
     num_import_fns: usize,
     num_local_fns: usize,
+    added_local_fns: u32,
+    pub(crate) deleted_local_fns: u32,
+    pub(crate) first_deleted_fn: u32
 }
 
 impl<'a> Functions<'a> {
@@ -143,6 +155,9 @@ impl<'a> Functions<'a> {
             functions,
             num_import_fns,
             num_local_fns,
+            deleted_local_fns: 0,
+            added_local_fns: 0,
+            first_deleted_fn: u32::MAX
         }
     }
 
@@ -162,6 +177,10 @@ impl<'a> Functions<'a> {
     /// Add a new function
     pub fn push(&mut self, func: Function<'a>) {
         self.functions.push(func);
+        match func.kind {
+            FuncKind::Local(_) => self.added_local_fns += 1,
+            _ => {}
+        }
     }
 
     /// Checks if there are no functions
@@ -177,7 +196,14 @@ impl<'a> Functions<'a> {
     /// Delete a function
     pub fn delete(&mut self, id: FunctionID) {
         if id < self.functions.len() as u32 {
-            self.functions.remove(id as usize);
+            self.functions[id as usize].delete();
+            match self.functions[id as usize].kind {
+                FuncKind::Local(_) => {
+                    self.deleted_local_fns += 1;
+                    self.first_deleted_fn = min(self.first_deleted_fn, id);
+                },
+                _ => {}
+            }
         }
     }
 
