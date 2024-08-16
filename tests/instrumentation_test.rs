@@ -2,6 +2,7 @@ use log::{error, trace};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
+use orca::module_builder::AddLocal;
 use orca::opcode::Inject;
 use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
@@ -626,7 +627,7 @@ fn test_semantic_after_medium_multiple() {
 
 #[test]
 fn test_semantic_after_medium_other_operators() {
-    let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_other_operators.wat";
+    let _file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_other_operators.wat";
     // todo -- test the other operators (when I know how to write wat using them)
     assert!(true);
 }

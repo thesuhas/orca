@@ -1,13 +1,12 @@
 use log::{debug, trace};
 use orca::ir::component::Component;
 use orca::ir::module::Module;
-use orca::ir::types::{InstrumentationMode, Location};
+use orca::ir::types::Location;
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
-use orca::opcode::Opcode;
+use orca::module_builder::AddLocal;
 use std::collections::{HashMap, HashSet};
-use std::mem::discriminant;
 use wasmparser::Operator;
 
 #[test]

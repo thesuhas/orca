@@ -80,7 +80,7 @@ pub trait Instrumenter<'a>: Iterator<'a> {
     /// Get the instruction injected at index idx
     fn get_injected_val(&self, idx: usize) -> &Operator;
 
-    // ==== GLOBAL INJECTION ====
+    // ==== VAR INJECTION ====
 
     /// Adds a global to the current module and returns the Global ID
     fn add_global(&mut self, global: Global) -> GlobalID;

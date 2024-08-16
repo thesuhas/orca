@@ -6,6 +6,7 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::types::{DataType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{Instrumenter, Iterator};
+use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
@@ -54,19 +55,6 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
                 FuncKind::Local(l) => Some(l.body.instructions[instr_idx].0.clone()),
             }
-        } else {
-            panic!("Should have gotten Module Location!")
-        }
-    }
-
-    pub fn add_local(&mut self, val_type: DataType) -> LocalID {
-        let curr_loc = self.curr_loc();
-        if let Location::Module {
-            func_idx,
-            instr_idx: _,
-        } = curr_loc
-        {
-            self.module.functions.add_local(func_idx as u32, val_type)
         } else {
             panic!("Should have gotten Module Location!")
         }
@@ -238,6 +226,21 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
 
     fn add_global(&mut self, global: Global) -> GlobalID {
         self.module.globals.add(global)
+    }
+}
+
+impl<'a, 'b> AddLocal for ModuleIterator<'a, 'b> {
+    fn add_local(&mut self, val_type: DataType) -> LocalID {
+        let curr_loc = self.curr_loc();
+        if let Location::Module {
+            func_idx,
+            instr_idx: _,
+        } = curr_loc
+        {
+            self.module.functions.add_local(func_idx as u32, val_type)
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
     }
 }
 
