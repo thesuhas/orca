@@ -4,7 +4,7 @@ target
 .vscode/
 .DS_Store
 **/out.**
-out
+output
 
 # Test wasm files
 a.wasm

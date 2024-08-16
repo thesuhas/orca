@@ -27,7 +27,7 @@ fn test_fn_types() {
 
 #[test]
 fn test_exports() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -59,4 +59,80 @@ fn test_exports() {
     let m = Module::parse(&result, false).expect("unable to parse");
 
     assert!(m.exports.get_export_id_by_name("add".to_string()).is_none());
+}
+
+#[test]
+fn test_import_delete() {
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let id = module.imports.find("bogus".to_string(), "hi".to_string());
+
+    assert!(!id.is_none());
+
+    module.delete_import_func(id.unwrap());
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("unable to parse");
+
+    assert_eq!(m.functions.len(), 2);
+    assert_eq!(m.imports.len(), 0);
+}
+
+#[test]
+fn test_local_fn_delete() {
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.functions.delete(2);
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("unable to parse");
+
+    assert_eq!(m.functions.len(), 2);
+    assert_eq!(m.imports.len(), 1);
+    assert_eq!(m.functions.get_name(1).unwrap(), "add".to_string());
+}
+
+#[test]
+#[should_panic]
+fn test_panic_call_delete() {
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.functions.delete(1);
+
+    // Should panic here as func 2 calls func 1 which has been deleted
+    module.encode();
+}
+
+#[test]
+fn test_renumber_fn_id() {
+    let file = "tests/test_inputs/handwritten/modules/add_extra.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.functions.delete(1);
+
+    // Should reencode and get original add.wat file
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("error");
+
+    let old_file = "tests/test_inputs/handwritten/modules/add.wat";
+
+    let old_buff = wat::parse_file(old_file).expect("couldn't convert the input wat to Wasm");
+
+    let old_out = wasmprinter::print_bytes(old_buff).expect("uh oh");
+
+    assert_eq!(out, old_out);
 }

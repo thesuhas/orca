@@ -1,6 +1,5 @@
 //! Intermediate Representation of a wasm module.
 
-use std::cmp::min;
 use super::types::DataType;
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
@@ -17,11 +16,12 @@ use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
 };
-use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder, new_import_idx, new_local_fn_idx};
+use crate::ir::wrappers::{
+    index_lookup, indirect_namemap_parser2encoder, is_call, namemap_parser2encoder, update_call,
+};
 use crate::Opcode;
 use log::error;
 use std::collections::HashMap;
-use std::mem::discriminant;
 use wasm_encoder::reencode::Reencode;
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
@@ -79,11 +79,6 @@ pub struct Module<'a> {
     pub(crate) data_names: wasm_encoder::NameMap,
     pub(crate) field_names: wasm_encoder::IndirectNameMap,
     pub(crate) tag_names: wasm_encoder::NameMap,
-
-    // Variables representing functions added/deleted
-    pub(crate) deleted_imports: u32,
-    pub(crate) added_imports: u32,
-    pub(crate) first_deleted_import: u32,
 }
 
 impl<'a> Module<'a> {
@@ -475,9 +470,6 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
-            added_imports: 0,
-            deleted_imports: 0,
-            first_deleted_import: u32::MAX
         })
     }
 
@@ -672,8 +664,8 @@ impl<'a> Module<'a> {
 
         let mut module = wasm_encoder::Module::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
-
-        let mut new_num_imports = 0;
+        let mut num_deleted_fns: i32 = 0; // Represents both imports and local fns
+        let mut offset: Vec<i32> = vec![]; // Offset to modify function indices by
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
@@ -707,7 +699,6 @@ impl<'a> Module<'a> {
                             function_names.append(import_func_idx as u32, import_name);
                         }
                         import_func_idx += 1;
-                        new_num_imports += 1;
                     }
                     imports.import(
                         import.module,
@@ -721,17 +712,23 @@ impl<'a> Module<'a> {
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            let mut count: FunctionID = 0; // Count which maintains current index in function section
-            for (old_idx, func) in self.functions.iter().enumerate() {
+            for (_old_idx, func) in self.functions.iter().enumerate() {
                 if !func.deleted {
                     if let FuncKind::Local(l) = func.kind() {
                         functions.function(l.ty_id);
                     }
-                    count += 1;
+                    // Update the offset
+                    offset.push(num_deleted_fns);
+                } else {
+                    num_deleted_fns += 1;
+                    // Update the offset for local fns. Imports already done
+                    offset.push(-1);
                 }
             }
             module.section(&functions);
         }
+
+        assert_eq!(self.functions.len(), offset.len());
 
         if !self.tables.is_empty() {
             let mut tables = wasm_encoder::TableSection::new();
@@ -790,23 +787,14 @@ impl<'a> Module<'a> {
                 if !export.deleted {
                     match export.kind {
                         ExternalKind::Func => {
+                            // println!("Export updation {:?}", export.index);
                             // Update the function indices
-                            // If it's an imported function
-                            if export.index < self.num_imported_functions as u32 {
-                                exports.export(
-                                    &export.name,
-                                    wasm_encoder::ExportKind::from(export.kind),
-                                    new_import_idx(export.index, self.deleted_imports, self.first_deleted_import),
-                                );
-                            } else {
-                                // If it's a local function
-                                exports.export(
-                                    &export.name,
-                                    wasm_encoder::ExportKind::from(export.kind),
-                                    new_local_fn_idx(export.index, self.num_imported_functions, self.deleted_imports, self.functions.deleted_local_fns, self.functions.first_deleted_fn),
-                                );
-                            }
-                        },
+                            exports.export(
+                                &export.name,
+                                wasm_encoder::ExportKind::from(export.kind),
+                                index_lookup(&offset, export.index),
+                            );
+                        }
                         _ => {
                             exports.export(
                                 &export.name,
@@ -884,26 +872,33 @@ impl<'a> Module<'a> {
 
         if !self.num_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
-            for rel_func_idx in self.num_imported_functions..self.functions.len() {
-                if let FuncKind::Import(..) = &self.functions.get_kind(rel_func_idx as FunctionID) {
+            for rel_func_idx in 0..self.functions.len() {
+                if self.functions.is_deleted(rel_func_idx as FunctionID) {
                     continue;
                 }
+                if let FuncKind::Import(i) = &self.functions.get_kind(rel_func_idx as FunctionID) {
+                    continue;
+                }
+
                 let func = self
                     .functions
-                    .get(rel_func_idx as FunctionID)
-                    .unwrap_local();
+                    .get_mut(rel_func_idx as FunctionID)
+                    .unwrap_local_mut();
                 let Body {
                     instructions,
                     locals,
                     name,
                     ..
-                } = &func.body;
+                } = &mut func.body;
                 let mut converted_locals = Vec::with_capacity(locals.len());
                 for (c, ty) in locals {
-                    converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
+                    converted_locals.push((*c, wasm_encoder::ValType::from(&*ty)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                for (op, instrument) in instructions {
+                for (op, instrument) in instructions.iter_mut() {
+                    if is_call(op) {
+                        update_call(op, &offset);
+                    }
                     if !instrument.has_instr() {
                         function.instruction(
                             &reencode
@@ -927,6 +922,9 @@ impl<'a> Module<'a> {
 
                         // First encode before instructions
                         for instr in before {
+                            if is_call(instr) {
+                                update_call(instr, &offset);
+                            }
                             function.instruction(
                                 &reencode
                                     .instruction(instr.clone())
@@ -937,6 +935,9 @@ impl<'a> Module<'a> {
                         // If there are any alternate, encode the alternate
                         if !alternate.is_empty() {
                             for instr in alternate {
+                                if is_call(instr) {
+                                    update_call(instr, &offset);
+                                }
                                 function.instruction(
                                     &reencode
                                         .instruction(instr.clone())
@@ -952,6 +953,9 @@ impl<'a> Module<'a> {
                         }
                         // Now encode the after instructions
                         for instr in after {
+                            if is_call(instr) {
+                                update_call(instr, &offset);
+                            }
                             function.instruction(
                                 &reencode
                                     .instruction(instr.clone())
@@ -961,7 +965,8 @@ impl<'a> Module<'a> {
                     }
                 }
                 if let Some(name) = name {
-                    function_names.append(rel_func_idx as u32, name.as_str());
+                    let new_loc = index_lookup(&offset, rel_func_idx as u32);
+                    function_names.append(new_loc, name.as_str());
                 }
                 code.function(&function);
             }
@@ -1058,7 +1063,6 @@ impl<'a> Module<'a> {
         self.functions
             .add_import_func((self.imports.len() - 1) as ImportsID, ty_id, Some(name));
         self.num_imported_functions += 1;
-        self.added_imports += 1;
         index as ImportsID
     }
 
@@ -1071,8 +1075,6 @@ impl<'a> Module<'a> {
         self.functions.delete(import_id);
         self.imports.delete(import_id);
         // self.num_imported_functions -= 1;
-        self.deleted_imports += 1;
-        self.first_deleted_import = min(self.first_deleted_import, import_id);
     }
 
     /// Count number of imported function
@@ -1117,9 +1119,6 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
-            deleted_imports: 0,
-            added_imports: 0,
-            first_deleted_import: u32::MAX
         }
     }
 }
