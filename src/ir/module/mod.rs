@@ -2,6 +2,7 @@
 
 use super::types::DataType;
 use crate::error::Error;
+use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
@@ -504,17 +505,6 @@ impl<'a> Module<'a> {
                     continue;
                 }
 
-                type BlockID = usize;
-                type Body<'a> = Vec<Operator<'a>>;
-                struct InstrBodyFlagged<'a> {
-                    body: Body<'a>,
-                    bool_flag: LocalID,
-                }
-                struct InstrToInject<'a> {
-                    flagged: Vec<InstrBodyFlagged<'a>>,
-                    not_flagged: Vec<Body<'a>>,
-                }
-
                 // initialize with 0 to store the func block!
                 let mut block_stack: Vec<BlockID> = vec![0];
                 let mut to_resolve: HashMap<BlockID, InstrToInject> = HashMap::new();
@@ -526,7 +516,7 @@ impl<'a> Module<'a> {
                     match op {
                         Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                             // The block ID will just be the curr len of the stack!
-                            block_stack.push(block_stack.len());
+                            block_stack.push(block_stack.len() as u32);
                         }
                         Operator::End => {
                             // Pop the stack and check to see if we have instrumentation to inject!
@@ -570,6 +560,8 @@ impl<'a> Module<'a> {
                                     }
 
                                     // handle non-flagged bodies
+                                    // Inject the bodies AFTER the current END opcode
+                                    builder.after_at(idx);
                                     for body in not_flagged.iter() {
                                         // inject body
                                         builder.inject_all(body);
@@ -598,7 +590,8 @@ impl<'a> Module<'a> {
                             match op {
                                 Operator::Block { .. }
                                 | Operator::Loop { .. }
-                                | Operator::If { .. } => {
+                                | Operator::If { .. }
+                                | Operator::Else { .. } => {
                                     // add body-to-inject as non-flagged
                                     let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
                                     to_resolve
@@ -613,45 +606,44 @@ impl<'a> Module<'a> {
                                             not_flagged: vec![semantic_after.to_owned()],
                                         });
                                 }
-                                Operator::Br { .. }
-                                | Operator::BrTable { .. }
-                                | Operator::BrIf { .. }
-                                | Operator::BrOnCast { .. }
-                                | Operator::BrOnCastFail { .. }
-                                | Operator::BrOnNonNull { .. }
-                                | Operator::BrOnNull { .. } => {
-                                    // TODO -- BrIf, BrOnCast, BrOnNonNull, BrOnNull
-                                    //         the bodies should be inserted immediately after too!
-                                    // add body-to-inject as flagged
-                                    let bool_flag_id = add_local(
-                                        DataType::I32,
-                                        builder.args.len(),
-                                        &mut builder.body.num_locals,
-                                        &mut builder.body.locals,
+                                Operator::BrTable { targets } => {
+                                    let bool_flag_id =
+                                        create_bool_flag(&mut builder, idx, op, semantic_after);
+                                    targets.targets().for_each(|target| {
+                                        if let Ok(relative_depth) = target {
+                                            save_body_to_resolve(
+                                                &mut to_resolve,
+                                                semantic_after,
+                                                bool_flag_id,
+                                                relative_depth,
+                                                *block_stack.last().unwrap(),
+                                            );
+                                        }
+                                    });
+                                    // handle the default as well
+                                    save_body_to_resolve(
+                                        &mut to_resolve,
+                                        semantic_after,
+                                        bool_flag_id,
+                                        targets.default(),
+                                        *block_stack.last().unwrap(),
                                     );
-
-                                    // set flag to true before the opcode
-                                    builder.before_at(idx).i32_const(1).local_set(bool_flag_id);
-
-                                    // set flag to false after the opcode
-                                    builder.after_at(idx).i32_const(0).local_set(bool_flag_id);
-
-                                    let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
-                                    to_resolve
-                                        .entry(*block_id)
-                                        .and_modify(|instr_to_inject| {
-                                            instr_to_inject.flagged.push(InstrBodyFlagged {
-                                                body: semantic_after.to_owned(),
-                                                bool_flag: bool_flag_id,
-                                            });
-                                        })
-                                        .or_insert(InstrToInject {
-                                            flagged: vec![InstrBodyFlagged {
-                                                body: semantic_after.to_owned(),
-                                                bool_flag: bool_flag_id,
-                                            }],
-                                            not_flagged: vec![],
-                                        });
+                                }
+                                Operator::Br { relative_depth }
+                                | Operator::BrIf { relative_depth }
+                                | Operator::BrOnCast { relative_depth, .. }
+                                | Operator::BrOnCastFail { relative_depth, .. }
+                                | Operator::BrOnNonNull { relative_depth }
+                                | Operator::BrOnNull { relative_depth } => {
+                                    let bool_flag_id =
+                                        create_bool_flag(&mut builder, idx, op, semantic_after);
+                                    save_body_to_resolve(
+                                        &mut to_resolve,
+                                        semantic_after,
+                                        bool_flag_id,
+                                        *relative_depth,
+                                        *block_stack.last().unwrap(),
+                                    );
                                 }
                                 _ => {} // skip all other opcodes
                             }
@@ -1086,4 +1078,85 @@ impl<'a> Default for Module<'a> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ================================
+// ==== Semantic After Helpers ====
+// ================================
+
+type BlockID = u32;
+type InstrBody<'a> = Vec<Operator<'a>>;
+struct InstrBodyFlagged<'a> {
+    body: InstrBody<'a>,
+    bool_flag: LocalID,
+}
+struct InstrToInject<'a> {
+    flagged: Vec<InstrBodyFlagged<'a>>,
+    not_flagged: Vec<InstrBody<'a>>,
+}
+
+fn create_bool_flag<'a, 'b, 'c>(
+    builder: &mut FunctionModifier<'a, 'b>,
+    idx: usize,
+    op: &Operator,
+    semantic_after: &Vec<Operator<'c>>,
+) -> LocalID
+where
+    'c: 'b,
+{
+    // add body-to-inject as flagged
+    let bool_flag_id = add_local(
+        DataType::I32,
+        builder.args.len(),
+        &mut builder.body.num_locals,
+        &mut builder.body.locals,
+    );
+
+    // set flag to true before the opcode
+    builder.before_at(idx).i32_const(1).local_set(bool_flag_id);
+
+    // set flag to false after the opcode
+    builder.after_at(idx).i32_const(0).local_set(bool_flag_id);
+
+    // BrIf, BrOnCast, BrOnNonNull, BrOnNull
+    // the bodies should be inserted immediately after too!
+    // This is because there is a possibility of fallthrough.
+    // The body will not be executed 2x since the flag is set
+    // to `false` on fallthrough!
+    match op {
+        Operator::BrIf { .. }
+        | Operator::BrOnCast { .. }
+        | Operator::BrOnCastFail { .. }
+        | Operator::BrOnNonNull { .. }
+        | Operator::BrOnNull { .. } => {
+            builder.inject_all(semantic_after.as_slice());
+        }
+        _ => {}
+    }
+    bool_flag_id
+}
+
+fn save_body_to_resolve<'a>(
+    to_resolve: &mut HashMap<BlockID, InstrToInject<'a>>,
+    semantic_after: &Vec<Operator<'a>>,
+    bool_flag_id: LocalID,
+    relative_depth: u32,
+    curr_block: BlockID,
+) {
+    let block_id = curr_block - relative_depth;
+    to_resolve
+        .entry(block_id)
+        .and_modify(|instr_to_inject| {
+            instr_to_inject.flagged.push(InstrBodyFlagged {
+                body: semantic_after.to_owned(),
+                bool_flag: bool_flag_id,
+            });
+        })
+        .or_insert(InstrToInject {
+            flagged: vec![InstrBodyFlagged {
+                body: semantic_after.to_owned(),
+                bool_flag: bool_flag_id,
+            }],
+            not_flagged: vec![],
+        });
 }

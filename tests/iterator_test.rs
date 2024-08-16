@@ -28,6 +28,15 @@ fn test_iterator_count_mul_mod() {
     iterate_component_and_count(&mut comp_it, 15);
 }
 
+#[test]
+fn test_mod_iterator_count() {
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    iterate_module_and_count(&mut mod_it, 1, 9);
+}
+
 // example of a ModuleIterator
 #[test]
 fn test_blocks() {
@@ -238,6 +247,8 @@ fn iterate_component_and_count(comp_it: &mut ComponentIterator, exp_count: u32) 
         }
     }
 
+    // TODO Check this iterator test (does it assert that it visits every func?)
+    // (add an import)
     assert_eq!(count, exp_count);
 }
 
