@@ -7,8 +7,9 @@ use crate::ir::module::Module;
 use crate::ir::types::Body;
 use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
+use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
-use crate::{Component, ModuleBuilder};
+use crate::Component;
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
@@ -37,7 +38,11 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, args: Vec<LocalID>, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, num_args: usize, module: &mut Module<'a>) -> FunctionID {
+        let mut args = vec![];
+        for arg in 0..num_args {
+            args.push(arg as LocalID);
+        }
         // add End as last instruction
         self.end();
 
@@ -108,17 +113,6 @@ impl<'a> FunctionBuilder<'a> {
         id as FunctionID
     }
 
-    /// add a local and return local index
-    /// (note that local indices start after)
-    pub fn add_local(&mut self, ty: DataType) -> LocalID {
-        add_local(
-            ty,
-            self.params.len(),
-            &mut self.body.num_locals,
-            &mut self.body.locals,
-        )
-    }
-
     pub fn set_name(&mut self, name: String) {
         self.name = Some(name)
     }
@@ -143,9 +137,16 @@ impl<'a> Inject<'a> for FunctionBuilder<'a> {
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {}
 impl<'a> MacroOpcode<'a> for FunctionBuilder<'a> {}
 
-impl ModuleBuilder for FunctionBuilder<'_> {
+impl AddLocal for FunctionBuilder<'_> {
+    /// add a local and return local index
+    /// (note that local indices start after)
     fn add_local(&mut self, ty: DataType) -> LocalID {
-        self.add_local(ty)
+        add_local(
+            ty,
+            self.params.len(),
+            &mut self.body.num_locals,
+            &mut self.body.locals,
+        )
     }
 }
 

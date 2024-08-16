@@ -6,9 +6,9 @@ use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
 use crate::ir::types::{DataType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{Instrumenter, Iterator};
+use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::component_subiterator::ComponentSubIterator;
-use crate::ModuleBuilder;
 use std::collections::HashMap;
 use std::iter::Iterator as StdIter;
 use wasmparser::Operator;
@@ -89,24 +89,6 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             }
         } else {
             panic!("Should have gotten Component Location!")
-        }
-    }
-
-    pub fn add_local(&mut self, val_type: DataType) -> LocalID {
-        let curr_loc = self.curr_loc();
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx: _,
-        } = curr_loc
-        {
-            {
-                self.comp.modules[mod_idx]
-                    .functions
-                    .add_local(func_idx as FunctionID, val_type)
-            }
-        } else {
-            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 }
@@ -363,7 +345,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
     }
 }
 
-impl ModuleBuilder for ComponentIterator<'_, '_> {
+impl AddLocal for ComponentIterator<'_, '_> {
     fn add_local(&mut self, val_type: DataType) -> LocalID {
         let curr_loc = self.curr_loc();
         if let Location::Component {
