@@ -8,6 +8,8 @@ use std::collections::HashMap;
 pub struct ModuleSubIterator {
     /// The current function the SubIterator is at
     pub(crate) curr_func: usize,
+    /// The number of functions that have been visited thus far
+    visited_funcs: usize,
     /// Number of functions in this module
     num_funcs: usize,
     /// Metadata that maps Function Index -> Instruction Index
@@ -23,6 +25,7 @@ impl ModuleSubIterator {
     pub fn new(num_funcs: usize, metadata: HashMap<usize, usize>, skip_funcs: Vec<usize>) -> Self {
         let mut mod_it = ModuleSubIterator {
             curr_func: *metadata.keys().min().unwrap(),
+            visited_funcs: 0,
             num_funcs,
             metadata: metadata.clone(),
             func_iterator: FuncSubIterator::new(
@@ -39,7 +42,7 @@ impl ModuleSubIterator {
 
     /// Checks if the SubIterator has finished traversing all the functions
     pub fn end(&self) -> bool {
-        self.curr_func == self.num_funcs
+        self.visited_funcs == self.num_funcs
     }
 
     /// Returns the current Location in the Module as a Location
@@ -76,10 +79,14 @@ impl ModuleSubIterator {
     /// Goes to the next function in the module
     fn next_function(&mut self) -> bool {
         self.curr_func += 1;
-        while self.curr_func < self.num_funcs && self.skip_funcs.contains(&self.curr_func) {
+        self.visited_funcs += 1;
+
+        // skip over configured funcs
+        while self.visited_funcs < self.num_funcs && self.skip_funcs.contains(&self.curr_func) {
             self.curr_func += 1;
+            self.visited_funcs += 1;
         }
-        if self.curr_func < self.num_funcs {
+        if self.visited_funcs < self.num_funcs {
             self.func_iterator = FuncSubIterator::new(*self.metadata.get(&self.curr_func).unwrap());
             true
         } else {

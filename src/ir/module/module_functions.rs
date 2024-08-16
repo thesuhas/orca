@@ -117,6 +117,41 @@ impl<'a> LocalFunction<'a> {
             args,
         }
     }
+    pub fn add_local(&mut self, ty: DataType) -> LocalID {
+        add_local(
+            ty,
+            self.args.len(),
+            &mut self.body.num_locals,
+            &mut self.body.locals,
+        )
+    }
+}
+
+// Must split this out so that the Rust compiler knows that we're not mutating data being iterated
+// over in `resolve_special_instrumentation` func.
+pub(crate) fn add_local(
+    ty: DataType,
+    num_params: usize,
+    num_locals: &mut usize,
+    locals: &mut Vec<(u32, DataType)>,
+) -> LocalID {
+    let index = num_params + *num_locals;
+
+    let len = locals.len();
+    *num_locals += 1;
+    if len > 0 {
+        let last = len - 1;
+        if locals[last].1 == ty {
+            locals[last].0 += 1;
+        } else {
+            locals.push((1, ty));
+        }
+    } else {
+        // If no locals, just append
+        locals.push((1, ty));
+    }
+
+    index as LocalID
 }
 
 /// Intermediate representation of an Imported Function. The actual Import is stored in the Imports field of the module.
@@ -235,7 +270,7 @@ impl<'a> Functions<'a> {
         // grab type and section and code section
         // let ty = self.functions.get(func_idx as usize)?;
         return match &mut self.functions.get_mut(func_id as usize)?.kind {
-            FuncKind::Local(ref mut l) => Some(FunctionModifier::init(&mut l.body)),
+            FuncKind::Local(ref mut l) => Some(FunctionModifier::init(&mut l.body, &mut l.args)),
             _ => None,
         };
         // None
@@ -290,28 +325,8 @@ impl<'a> Functions<'a> {
             FuncKind::Local(_) => {}
         }
 
-        let func = &mut func_body.unwrap_local_mut();
-
-        let num_params = func.args.len();
-
-        let num_locals = func.body.num_locals;
-        let index = num_params + num_locals;
-
-        let len = func.body.locals.len();
-        func.body.num_locals += 1;
-        if len > 0 {
-            let last = len - 1;
-            if func.body.locals[last].1 == ty {
-                func.body.locals[last].0 += 1;
-            } else {
-                func.body.locals.push((1, ty));
-            }
-        } else {
-            // If no locals, just append
-            func.body.locals.push((1, ty));
-        }
-
-        index as LocalID
+        let func = func_body.unwrap_local_mut();
+        func.add_local(ty)
     }
 
     /// Set the name for a local function.

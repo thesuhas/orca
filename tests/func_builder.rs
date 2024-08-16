@@ -21,7 +21,7 @@ fn run_fac_orca() {
 // #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca() {
-    let file_name = "tests/handwritten/modules/start.wat";
+    let file_name = "tests/test_inputs/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");
 
@@ -39,7 +39,7 @@ fn run_start_orca() {
 #[test]
 // test start function instrumentation with FunctionModifier
 fn run_start_orca_default() {
-    let file_name = "tests/handwritten/modules/start.wat";
+    let file_name = "tests/test_inputs/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");
 

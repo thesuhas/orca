@@ -6,7 +6,7 @@ use orca::Module;
 
 #[test]
 fn test_fn_types() {
-    let file = "tests/handwritten/modules/add.wat";
+    let file = "tests/test_inputs/handwritten/modules/add.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -17,11 +17,11 @@ fn test_fn_types() {
     );
     assert_eq!(
         *module.functions.get_kind(1),
-        Local(LocalFunction::new(5, 0, Body::new(), vec![]))
+        Local(LocalFunction::new(5, 0, Body::default(), vec![]))
     );
     assert_eq!(
         *module.functions.get_kind(2),
-        Local(LocalFunction::new(0, 0, Body::new(), vec![]))
+        Local(LocalFunction::new(0, 0, Body::default(), vec![]))
     );
 }
 
