@@ -41,6 +41,22 @@ impl<'a> Function<'a> {
         &self.kind
     }
 
+    /// Check if it's a local function
+    pub fn is_local(&self) -> bool {
+        match &self.kind {
+            FuncKind::Local(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Check if it's an imported function
+    pub fn is_import(&self) -> bool {
+        match &self.kind {
+            FuncKind::Import(_) => true,
+            _ => false,
+        }
+    }
+
     /// Unwrap a local function. If it is an imported function, it panics.
     pub fn unwrap_local(&'a self) -> &LocalFunction<'a> {
         self.kind.unwrap_local()
@@ -160,16 +176,18 @@ pub(crate) fn add_local(
 /// Intermediate representation of an Imported Function. The actual Import is stored in the Imports field of the module.
 #[derive(Clone, Debug)]
 pub struct ImportedFunction {
-    pub import_id: ImportsID,
+    pub import_id: ImportsID,            // Maps to location in a modules imports
+    pub(crate) import_fn_id: FunctionID, // Maps to location in a modules imported functions
     pub ty_id: TypeID,
 }
 
 impl ImportedFunction {
     /// Create a new imported function
-    pub fn new(id: ImportsID, type_id: TypeID) -> Self {
+    pub fn new(id: ImportsID, type_id: TypeID, function_id: FunctionID) -> Self {
         ImportedFunction {
             import_id: id,
             ty_id: type_id,
+            import_fn_id: function_id,
         }
     }
 }
@@ -265,6 +283,16 @@ impl<'a> Functions<'a> {
         &self.functions[function_id as usize].kind
     }
 
+    /// Check if a function is a local
+    pub fn is_local(&self, function_id: FunctionID) -> bool {
+        self.functions[function_id as usize].is_local()
+    }
+
+    /// Check if a function is an import
+    pub fn is_import(&self, function_id: FunctionID) -> bool {
+        self.functions[function_id as usize].is_import()
+    }
+
     /// Get a function modifier from a function index
     pub fn get_fn_modifier<'b>(
         &'b mut self,
@@ -309,13 +337,14 @@ impl<'a> Functions<'a> {
         imp_id: ImportsID,
         ty_id: TypeID,
         name: Option<String>,
+        imp_fn_id: u32,
     ) -> FunctionID {
         if self.num_local_fns > 0 {
             panic!("Cannot add an imported function after local functions!")
         }
 
         self.functions.push(Function::new(
-            FuncKind::Import(ImportedFunction::new(imp_id, ty_id)),
+            FuncKind::Import(ImportedFunction::new(imp_id, ty_id, imp_fn_id)),
             name,
         ));
         (self.functions.len() - 1) as FunctionID
@@ -348,5 +377,14 @@ impl<'a> Functions<'a> {
     /// Check if it's deleted
     pub fn is_deleted(&self, function_id: FunctionID) -> bool {
         self.functions[function_id as usize].deleted
+    }
+
+    // Helper functions for rearrange
+    pub(crate) fn remove(&mut self, function_id: FunctionID) -> Function<'a> {
+        self.functions.remove(function_id as usize)
+    }
+
+    pub(crate) fn insert(&mut self, function_id: FunctionID, func: Function<'a>) {
+        self.functions.insert(function_id as usize, func);
     }
 }

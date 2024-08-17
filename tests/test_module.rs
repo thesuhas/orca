@@ -1,8 +1,9 @@
+use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{ExportsID, FunctionID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
 use orca::ir::types::Body;
-use orca::Module;
+use orca::{Module, Opcode};
 
 #[test]
 fn test_fn_types() {
@@ -13,7 +14,7 @@ fn test_fn_types() {
 
     assert_eq!(
         *module.functions.get_kind(0),
-        Import(ImportedFunction::new(0, 2))
+        Import(ImportedFunction::new(0, 2, 0))
     );
     assert_eq!(
         *module.functions.get_kind(1),
@@ -135,4 +136,144 @@ fn test_renumber_fn_id() {
     let old_out = wasmprinter::print_bytes(old_buff).expect("uh oh");
 
     assert_eq!(out, old_out);
+}
+
+#[test]
+fn test_middle_import_to_local() {
+    let file = "tests/test_inputs/handwritten/modules/add_more_imports.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    builder.i32_const(1);
+    builder.drop();
+    builder.end();
+
+    module.delete_import_func(1);
+
+    // Convert middle one to local
+    module
+        .functions
+        .get_mut(1)
+        .set_kind(Local(builder.local_func(vec![], 1, 0)));
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("err");
+
+    // This function must have been added to the end of the local fns
+    assert_eq!(m.imports.len(), 2);
+    assert_eq!(m.functions.len(), 6);
+    assert!(m.functions.is_local(5));
+}
+
+#[test]
+fn test_first_import_to_local() {
+    let file = "tests/test_inputs/handwritten/modules/add_more_imports.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    builder.i32_const(1);
+    builder.drop();
+    builder.end();
+
+    module.delete_import_func(0);
+
+    // Convert first one to local
+    module
+        .functions
+        .get_mut(0)
+        .set_kind(Local(builder.local_func(vec![], 0, 0)));
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("err");
+
+    // This function must have been added to the end of the local fns
+    assert_eq!(m.imports.len(), 2);
+    assert_eq!(m.functions.len(), 6);
+    assert!(m.functions.is_local(5));
+}
+
+#[test]
+fn test_last_import_to_local() {
+    let file = "tests/test_inputs/handwritten/modules/add_more_imports.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    builder.i32_const(1);
+    builder.drop();
+    builder.end();
+
+    module.delete_import_func(2);
+
+    // Convert last one to local
+    module
+        .functions
+        .get_mut(2)
+        .set_kind(Local(builder.local_func(vec![], 2, 0)));
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("err");
+
+    // This function must have been added to the end of the local fns
+    assert_eq!(m.imports.len(), 2);
+    assert_eq!(m.functions.len(), 6);
+    assert!(m.functions.is_local(5));
+}
+
+#[test]
+fn test_all_import_to_local() {
+    let file = "tests/test_inputs/handwritten/modules/add_more_imports.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // Convert all to local
+    let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    first_builder.i32_const(1);
+    first_builder.drop();
+    first_builder.end();
+    module.delete_import_func(0);
+    module
+        .functions
+        .get_mut(0)
+        .set_kind(Local(first_builder.local_func(vec![], 0, 0)));
+
+    let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    second_builder.i32_const(2);
+    second_builder.drop();
+    second_builder.end();
+    module.delete_import_func(1);
+    module
+        .functions
+        .get_mut(1)
+        .set_kind(Local(second_builder.local_func(vec![], 1, 0)));
+
+    let mut third_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    third_builder.i32_const(3);
+    third_builder.drop();
+    third_builder.end();
+    module.delete_import_func(2);
+    module
+        .functions
+        .get_mut(2)
+        .set_kind(Local(third_builder.local_func(vec![], 2, 0)));
+
+    let result = module.encode();
+
+    let m = Module::parse(&result, false).expect("err");
+
+    // All functions must have been added to the end of the local fns
+    assert_eq!(m.imports.len(), 0);
+    assert_eq!(m.functions.len(), 6);
+    assert!(m.functions.is_local(3));
+    assert!(m.functions.is_local(4));
+    assert!(m.functions.is_local(5));
 }

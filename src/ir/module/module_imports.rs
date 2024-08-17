@@ -40,6 +40,8 @@ impl Import<'_> {
 pub struct ModuleImports<'a> {
     imports: Vec<Import<'a>>,
 
+    pub(crate) num_funcs: u32,
+
     // Variables representing functions added/deleted
     pub(crate) deleted_imports: u32,
     pub(crate) added_imports: u32,
@@ -50,6 +52,7 @@ impl<'a> ModuleImports<'a> {
     pub fn new(imports: Vec<Import<'a>>) -> Self {
         ModuleImports {
             imports,
+            num_funcs: 0,
             deleted_imports: 0,
             added_imports: 0,
             first_deleted_import: u32::MAX,
@@ -75,6 +78,11 @@ impl<'a> ModuleImports<'a> {
     pub(crate) fn add(&mut self, import: Import<'a>) {
         self.imports.push(import);
         self.added_imports += 1;
+    }
+
+    pub(crate) fn add_func(&mut self, import: Import<'a>) {
+        self.add(import);
+        self.num_funcs += 1;
     }
 
     pub(crate) fn delete(&mut self, imports_id: ImportsID) {

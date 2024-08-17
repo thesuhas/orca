@@ -1,5 +1,6 @@
 //! Wrapper functions
 
+use std::collections::HashMap;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
@@ -328,18 +329,15 @@ pub(crate) fn is_call(op: &Operator) -> bool {
     }
 }
 
-pub(crate) fn update_call(op: &mut Operator, offsets: &Vec<i32>) {
+pub(crate) fn update_call(op: &mut Operator, mapping: &HashMap<i32, i32>) {
     match op {
         Operator::Call { function_index } => {
-            *function_index = index_lookup(offsets, *function_index);
+            let new_index = *mapping.get(&(*function_index as i32)).unwrap();
+            if new_index == -1 {
+                panic!("Deleted");
+            }
+            *function_index = new_index as u32;
         }
         _ => panic!("Not a call operation!"),
     }
-}
-
-pub(crate) fn index_lookup(offsets: &Vec<i32>, id: u32) -> u32 {
-    if offsets[id as usize] == -1 {
-        panic!("Deleted function");
-    }
-    id - offsets[id as usize] as u32
 }
