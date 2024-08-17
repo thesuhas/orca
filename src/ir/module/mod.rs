@@ -859,7 +859,7 @@ impl<'a> Module<'a> {
                     converted_locals.push((*c, wasm_encoder::ValType::from(ty)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                for (op, instrument) in instructions {
+                for (idx, (op, instrument)) in instructions.iter().enumerate() {
                     if !instrument.has_instr() {
                         function.instruction(
                             &reencode
@@ -879,6 +879,15 @@ impl<'a> Module<'a> {
                         // Check if special instrumentation modes have been resolved!
                         if !semantic_after.is_empty() {
                             error!("BUG: Semantic after instrumentation should be resolved already, please report.");
+                        }
+                        // If we're at the `end` of the function, drop this instrumentation
+                        if idx >= instructions.len() - 1 {
+                            function.instruction(
+                                &reencode
+                                    .instruction(op.clone())
+                                    .expect("Unable to convert Instruction"),
+                            );
+                            continue;
                         }
 
                         // First encode before instructions
