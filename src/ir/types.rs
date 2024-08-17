@@ -554,12 +554,12 @@ impl<'a> InstrumentationFlag<'a> {
 #[derive(Debug, Clone, Copy)]
 pub enum Location {
     Component {
-        mod_idx: usize,
-        func_idx: usize,
+        mod_idx: ModuleID,
+        func_idx: FunctionID,
         instr_idx: usize,
     },
     Module {
-        func_idx: usize,
+        func_idx: FunctionID,
         instr_idx: usize,
     },
 }

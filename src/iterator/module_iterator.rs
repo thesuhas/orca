@@ -1,7 +1,7 @@
 //! Iterator to traverse a Module
 
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
-use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_functions::{FuncKind, LocalFunction};
 use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::types::{DataType, InstrumentationMode, Location};
@@ -10,7 +10,6 @@ use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
-use std::iter::Iterator as StdIterator;
 use wasmparser::Operator;
 
 /// Iterator for a Module.
@@ -25,21 +24,21 @@ pub struct ModuleIterator<'a, 'b> {
 #[allow(dead_code)]
 impl<'a, 'b> ModuleIterator<'a, 'b> {
     /// Creates a new ModuleIterator
-    pub fn new(module: &'a mut Module<'b>, skip_funcs: Vec<usize>) -> Self {
+    pub fn new(module: &'a mut Module<'b>, skip_funcs: &Vec<FunctionID>) -> Self {
         // Creates Function -> Number of Instructions
         let mut metadata = HashMap::new();
-        for (idx, func) in module.functions.iter().enumerate() {
+        for func in module.functions.iter() {
             match &func.kind {
                 FuncKind::Import(_) => {}
-                FuncKind::Local(l) => {
-                    metadata.insert(idx, l.body.num_instructions);
+                FuncKind::Local(LocalFunction { func_id, body, .. }) => {
+                    metadata.insert(*func_id, body.num_instructions);
                 }
             }
         }
         let num_funcs = module.num_functions;
         ModuleIterator {
             module,
-            mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs),
+            mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs.to_owned()),
         }
     }
 
@@ -77,7 +76,7 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     /// // Must use `parse_only_module` here as we are only concerned about a Module and not a module that is inside a Component
     /// let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    /// let mut module_it = ModuleIterator::new(&mut module, vec![]);
+    /// let mut module_it = ModuleIterator::new(&mut module, &vec![]);
     ///
     /// // Everytime there is a `call 1` instruction we want to inject an `i32.const 0`
     /// let interested = Operator::Call { function_index: 1 };
@@ -237,7 +236,7 @@ impl<'a, 'b> AddLocal for ModuleIterator<'a, 'b> {
             instr_idx: _,
         } = curr_loc
         {
-            self.module.functions.add_local(func_idx as u32, val_type)
+            self.module.functions.add_local(func_idx, val_type)
         } else {
             panic!("Should have gotten Module Location!")
         }

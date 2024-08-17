@@ -1,5 +1,6 @@
 //! SubIterator for a Component
 
+use crate::ir::id::{FunctionID, ModuleID};
 use crate::ir::types::Location;
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
@@ -7,24 +8,24 @@ use std::collections::HashMap;
 /// Sub-iterator for a Component. Keeps track of current location in a Component.
 pub struct ComponentSubIterator {
     /// The current module the SubIterator is at.
-    curr_mod: usize,
+    curr_mod: ModuleID,
     /// The total number of modules in the component.
     num_mods: usize,
     /// The module iterator used to keep track of the location in the module.
     mod_iterator: ModuleSubIterator,
     /// Metadata that maps Module Index -> Function Index -> Instruction Index
-    metadata: HashMap<usize, HashMap<usize, usize>>,
+    metadata: HashMap<ModuleID, HashMap<FunctionID, usize>>,
     /// Map of Module -> Functions to skip in that module. Provide an empty HashMap if no functions are to be skipped.
-    skip_funcs: HashMap<usize, Vec<usize>>,
+    skip_funcs: HashMap<ModuleID, Vec<FunctionID>>,
 }
 
 impl ComponentSubIterator {
     /// Creates a new ComponentSubIterator
     pub fn new(
-        curr_mod: usize,
+        curr_mod: ModuleID,
         num_mods: usize,
-        metadata: HashMap<usize, HashMap<usize, usize>>,
-        skip_funcs: HashMap<usize, Vec<usize>>,
+        metadata: HashMap<ModuleID, HashMap<FunctionID, usize>>,
+        skip_funcs: HashMap<ModuleID, Vec<FunctionID>>,
     ) -> Self {
         // Get current skip func
         // initializes to the first module
@@ -54,7 +55,7 @@ impl ComponentSubIterator {
     /// Goes to the next module enclosed by the component
     fn next_module(&mut self) -> bool {
         self.curr_mod += 1;
-        if self.curr_mod < self.num_mods {
+        if self.curr_mod < self.num_mods as u32 {
             let num_funcs = self.metadata.get(&self.curr_mod).unwrap().keys().len();
             let met = self.metadata.get(&self.curr_mod).unwrap().clone();
             // If we're defining a new module, we have to reset function
@@ -73,12 +74,12 @@ impl ComponentSubIterator {
     }
 
     /// Gets the index of the current module in the component
-    pub fn curr_mod_idx(&self) -> usize {
+    pub fn curr_mod_idx(&self) -> ModuleID {
         self.curr_mod
     }
 
     /// Gets the index of the current function in the current module
-    pub fn curr_func_idx(&self) -> usize {
+    pub fn curr_func_idx(&self) -> FunctionID {
         self.mod_iterator.curr_func
     }
 
@@ -89,7 +90,7 @@ impl ComponentSubIterator {
 
     /// Checks if the SubIterator has finished traversing all the modules
     pub fn end(&self) -> bool {
-        self.curr_mod == self.num_mods
+        self.curr_mod as usize == self.num_mods
     }
 
     /// Returns the Current Location as a Location
