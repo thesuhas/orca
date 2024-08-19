@@ -661,49 +661,51 @@ impl<'a> Module<'a> {
     pub(crate) fn reorganise_functions(&mut self) {
         // Location where we may have to move an import (converted from local) to
         let mut new_imported_funcs = self.num_imported_functions;
+        let mut num_deleted = 0;
         // Iterate over cloned functions list
         for (idx, func) in self.functions.clone().iter().enumerate() {
             // If the index is less than < imported funcs
             if idx < self.num_imported_functions {
                 // If it is a local function, that means it was an import before
                 if func.is_local() {
-                    let f = self.functions.remove(idx as FunctionID);
+                    let f = self.functions.remove((idx - num_deleted) as FunctionID);
                     self.functions.push(f);
                     // decrement as this is the place where we might have to move an import to
                     new_imported_funcs -= 1;
+                    num_deleted += 1;
+                // If function was import but was deleted
+                } else if func.deleted {
+                    self.functions.remove((idx - num_deleted) as FunctionID);
+                    new_imported_funcs -= 1;
+                    num_deleted += 1;
                 }
             } else {
                 // If it's an import, was a local before
                 if func.is_import() {
-                    let f = self.functions.remove(idx as FunctionID);
+                    let f = self.functions.remove((idx - num_deleted) as FunctionID);
                     self.functions.insert(new_imported_funcs as FunctionID, f);
-                    // decrement as this is the place where we might have to move an import to
+                    // increment as this is the place where we might have to move an import to
                     new_imported_funcs += 1;
+                    num_deleted += 1;
+                }
+                // If function was local but was deleted
+                else if func.deleted {
+                    self.functions.remove((idx - num_deleted) as FunctionID);
+                    num_deleted += 1;
                 }
             }
         }
     }
 
     pub(crate) fn get_function_mapping(&self) -> HashMap<i32, i32> {
-        let mut num_deleted = 0;
         let mut mapping = HashMap::new();
         for (idx, func) in self.functions.iter().enumerate() {
             match &func.kind {
                 FuncKind::Import(i) => {
-                    if func.deleted {
-                        mapping.insert(i.import_fn_id as i32, -1);
-                        num_deleted += 1;
-                    } else {
-                        mapping.insert(i.import_fn_id as i32, idx as i32 - num_deleted);
-                    }
+                    mapping.insert(i.import_fn_id as i32, idx as i32);
                 }
                 FuncKind::Local(l) => {
-                    if func.deleted {
-                        mapping.insert(l.func_id as i32, -1);
-                        num_deleted += 1;
-                    } else {
-                        mapping.insert(l.func_id as i32, idx as i32 - num_deleted);
-                    }
+                    mapping.insert(l.func_id as i32, idx as i32);
                 }
             }
         }
@@ -1014,8 +1016,7 @@ impl<'a> Module<'a> {
                     }
                 }
                 if let Some(name) = name {
-                    let new_loc = func_mapping.get(&(rel_func_idx as i32)).unwrap();
-                    function_names.append(*new_loc as u32, name.as_str());
+                    function_names.append(rel_func_idx as u32, name.as_str());
                 }
                 code.function(&function);
             }
