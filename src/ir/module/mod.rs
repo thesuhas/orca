@@ -1147,6 +1147,7 @@ impl<'a> Module<'a> {
             .set_kind(FuncKind::Local(local_function));
     }
 
+    // TODO: Fix this
     // /// Convert a local function to imported
     // pub fn convert_local_fn_to_import(
     //     &mut self,

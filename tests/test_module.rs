@@ -295,3 +295,61 @@ fn test_some_import_to_local() {
         )
     }
 }
+
+#[test]
+fn test_middle_import_to_local_import_delete() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/middle_import_to_local_import_delete.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    builder.i32_const(1);
+    builder.drop();
+    builder.end();
+
+    module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
+
+    module.delete_import_func(2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+
+}
+
+#[test]
+fn test_middle_import_to_local_local_delete() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/middle_import_to_local_local_delete.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    builder.i32_const(1);
+    builder.drop();
+    builder.end();
+
+    module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
+
+    module.delete_import_func(2);
+    module.functions.delete(3);
+
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+
+}
