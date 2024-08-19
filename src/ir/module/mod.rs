@@ -1147,21 +1147,21 @@ impl<'a> Module<'a> {
             .set_kind(FuncKind::Local(local_function));
     }
 
-    /// Convert a local function to imported
-    pub fn convert_local_fn_to_import(
-        &mut self,
-        imports_id: ImportsID,
-        imported_function: ImportedFunction,
-    ) {
-        match self.functions.get_kind(imports_id as FunctionID) {
-            FuncKind::Import(_) => panic!("This is an imported function!"),
-            _ => {}
-        }
-        self.delete_import_func(imports_id);
-        self.functions
-            .get_mut(imports_id as FunctionID)
-            .set_kind(FuncKind::Import(imported_function));
-    }
+    // /// Convert a local function to imported
+    // pub fn convert_local_fn_to_import(
+    //     &mut self,
+    //     import: Import,
+    //     imported_function: ImportedFunction,
+    // ) {
+    //     match self.functions.get_kind(imports_id as FunctionID) {
+    //         FuncKind::Import(_) => panic!("This is an imported function!"),
+    //         _ => {}
+    //     }
+    //     self.add_import_func(impo);
+    //     self.functions
+    //         .get_mut(imports_id as FunctionID)
+    //         .set_kind(FuncKind::Import(imported_function));
+    // }
 
     /// Count number of imported function
     pub fn num_import_func(&self) -> u32 {
