@@ -30,7 +30,7 @@ impl<'a> Function<'a> {
     }
 
     /// Change the kind of the Function
-    pub fn set_kind(&mut self, kind: FuncKind<'a>) {
+    pub(crate) fn set_kind(&mut self, kind: FuncKind<'a>) {
         self.kind = kind;
         // Resets deletion
         self.deleted = false;

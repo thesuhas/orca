@@ -161,13 +161,7 @@ fn test_middle_import_to_local() {
     builder.drop();
     builder.end();
 
-    module.delete_import_func(1);
-
-    // Convert middle one to local
-    module
-        .functions
-        .get_mut(1)
-        .set_kind(Local(builder.local_func(vec![], 1, 0)));
+    module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
     let result = module.encode();
 
@@ -193,13 +187,7 @@ fn test_first_import_to_local() {
     builder.drop();
     builder.end();
 
-    module.delete_import_func(0);
-
-    // Convert first one to local
-    module
-        .functions
-        .get_mut(0)
-        .set_kind(Local(builder.local_func(vec![], 0, 0)));
+    module.convert_import_fn_to_local(0, builder.local_func(vec![], 0, 0));
 
     let result = module.encode();
 
@@ -225,13 +213,7 @@ fn test_last_import_to_local() {
     builder.drop();
     builder.end();
 
-    module.delete_import_func(2);
-
-    // Convert last one to local
-    module
-        .functions
-        .get_mut(2)
-        .set_kind(Local(builder.local_func(vec![], 2, 0)));
+    module.convert_import_fn_to_local(2, builder.local_func(vec![], 2, 0));
 
     let result = module.encode();
 
@@ -257,31 +239,51 @@ fn test_all_import_to_local() {
     first_builder.i32_const(1);
     first_builder.drop();
     first_builder.end();
-    module.delete_import_func(0);
-    module
-        .functions
-        .get_mut(0)
-        .set_kind(Local(first_builder.local_func(vec![], 0, 0)));
+    module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     second_builder.i32_const(2);
     second_builder.drop();
     second_builder.end();
-    module.delete_import_func(1);
-    module
-        .functions
-        .get_mut(1)
-        .set_kind(Local(second_builder.local_func(vec![], 1, 0)));
+    module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
 
     let mut third_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     third_builder.i32_const(3);
     third_builder.drop();
     third_builder.end();
-    module.delete_import_func(2);
-    module
-        .functions
-        .get_mut(2)
-        .set_kind(Local(third_builder.local_func(vec![], 2, 0)));
+    module.convert_import_fn_to_local(2, third_builder.local_func(vec![], 2, 0));
+
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_some_import_to_local() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/some_import_to_local.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // Convert all to local
+    let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    first_builder.i32_const(1);
+    first_builder.drop();
+    first_builder.end();
+    module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
+
+    let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    second_builder.i32_const(2);
+    second_builder.drop();
+    second_builder.end();
+    module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
 
     let result = module.encode();
 
