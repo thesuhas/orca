@@ -445,6 +445,107 @@ impl ElementItems<'_> {
 }
 
 #[derive(Debug, Clone)]
+/// Mode of Function in case the function is mark as instrumented
+pub enum FuncInstrMode {
+    Entry,
+    Exit,
+}
+
+#[derive(Default, Debug, Clone)]
+/// Instrumentation Data that is stored with every function
+pub struct FuncInstrFlag<'a> {
+    /// boolean flag to say whether there are special instrumentation
+    /// modes to resolve for this function (see InstrumentationMode variants)
+    pub has_special_instr: bool,
+    pub current_mode: Option<FuncInstrMode>,
+    pub entry: Vec<Operator<'a>>,
+    pub exit: Vec<Operator<'a>>,
+}
+
+impl fmt::Display for FuncInstrFlag<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let FuncInstrFlag {
+            has_special_instr,
+            entry,
+            exit,
+            current_mode: _,
+        } = self;
+        if !self.has_instr() {
+            write!(f, "Not Instrumented")?;
+        }
+        write!(
+            f,
+            "Has special instrumentation: {}\n \
+             Func Entry: {:?} instructions\n \
+             Func Exit: {:?} instructions",
+            has_special_instr,
+            entry.len(),
+            exit.len()
+        )
+    }
+}
+
+impl PartialEq for FuncInstrFlag<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            has_special_instr,
+            entry,
+            exit,
+            current_mode,
+        } = self;
+        let mut result = *has_special_instr == other.has_special_instr;
+        result &= entry.eq(&other.entry);
+        result &= exit.eq(&other.exit);
+        result &= discriminant(current_mode) == discriminant(&other.current_mode);
+
+        result
+    }
+}
+
+impl Eq for FuncInstrFlag<'_> {}
+
+impl<'a> FuncInstrFlag<'a> {
+    pub fn has_instr(&self) -> bool {
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            entry,
+            exit,
+            has_special_instr: _,
+            current_mode: _,
+        } = self;
+        !entry.is_empty() || !exit.is_empty()
+    }
+
+    pub fn has_special_instr(&self) -> bool {
+        self.has_special_instr
+    }
+
+    /// Add an instruction to the current FuncInstrMode's list
+    pub fn add_instr(&mut self, val: Operator<'a>) {
+        self.has_special_instr = true;
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot inject instructions!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.push(val),
+            Some(FuncInstrMode::Exit) => self.exit.push(val),
+        }
+    }
+
+    /// Get an instruction to the current FuncInstrMode's list
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot grab instruction without context!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.get(idx).unwrap(),
+            Some(FuncInstrMode::Exit) => self.exit.get(idx).unwrap(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 /// Mode of Instruction in case the instruction is marked as Instrumented
 pub enum InstrumentationMode {
     Before,
@@ -453,6 +554,9 @@ pub enum InstrumentationMode {
 
     // special modes
     SemanticAfter,
+    BlockEntry,
+    BlockExit,
+    BlockAlt,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -461,10 +565,19 @@ pub struct InstrumentationFlag<'a> {
     pub current_mode: Option<InstrumentationMode>,
     pub before: Vec<Operator<'a>>,
     pub after: Vec<Operator<'a>>,
-    pub alternate: Vec<Operator<'a>>,
+    /// None means to replace with no instructions (effectively removing the original)
+    /// Some(vec) means to replace with the vec of instructions
+    /// Some(empty vec) means there is no alt instrumentation
+    pub alternate: Option<Vec<Operator<'a>>>,
 
     // special modes
     pub semantic_after: Vec<Operator<'a>>,
+    pub block_entry: Vec<Operator<'a>>,
+    pub block_exit: Vec<Operator<'a>>,
+    /// None means to replace with no instructions (effectively removing the original)
+    /// Some(vec) means to replace with the vec of instructions
+    /// Some(empty vec) means there is no alt instrumentation
+    pub block_alt: Option<Vec<Operator<'a>>>,
 }
 
 impl fmt::Display for InstrumentationFlag<'_> {
@@ -474,7 +587,10 @@ impl fmt::Display for InstrumentationFlag<'_> {
             after,
             alternate,
             semantic_after,
-            ..
+            block_entry,
+            block_exit,
+            block_alt,
+            current_mode: _,
         } = self;
         if !self.has_instr() {
             write!(f, "Not Instrumented")?;
@@ -484,22 +600,44 @@ impl fmt::Display for InstrumentationFlag<'_> {
             "Before: {:?} instructions\n \
                    After: {:?} instructions\n \
                    Alternate: {:?} instructions\n \
-                   Semantic After: {:?} instructions",
+                   Semantic After: {:?} instructions\n \
+                   Block Entry: {:?} instructions\n \
+                   Block Exit: {:?} instructions\n \
+                   Block Alt: {:?} instructions",
             before.len(),
             after.len(),
-            alternate.len(),
-            semantic_after.len()
+            alternate.as_ref().unwrap().len(),
+            semantic_after.len(),
+            block_entry.len(),
+            block_exit.len(),
+            block_alt.as_ref().unwrap().len()
         )
     }
 }
 
 impl PartialEq for InstrumentationFlag<'_> {
     fn eq(&self, other: &Self) -> bool {
-        let mut result = self.before.eq(&other.before);
-        result &= self.after.eq(&other.after);
-        result &= self.alternate.eq(&other.alternate);
-        result &= self.semantic_after.eq(&other.semantic_after);
-        result &= discriminant(&self.current_mode) == discriminant(&other.current_mode);
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            before,
+            after,
+            alternate,
+            semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
+            current_mode,
+        } = self;
+        let mut result = before.eq(&other.before);
+        result &= after.eq(&other.after);
+        // TODO -- unwrap here!
+        result &= alternate.eq(&other.alternate);
+        result &= semantic_after.eq(&other.semantic_after);
+        result &= block_entry.eq(&other.block_entry);
+        result &= block_exit.eq(&other.block_exit);
+        result &= block_alt.eq(&other.block_alt);
+        // TODO -- unwrap here!
+        result &= discriminant(current_mode) == discriminant(&other.current_mode);
 
         result
     }
@@ -515,24 +653,61 @@ impl<'a> InstrumentationFlag<'a> {
             after,
             alternate,
             semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
             current_mode: _,
         } = self;
         !before.is_empty()
             || !after.is_empty()
-            || !alternate.is_empty()
+            || (!alternate.is_none() && !alternate.as_ref().unwrap().is_empty())
             || !semantic_after.is_empty()
+            || !block_entry.is_empty()
+            || !block_exit.is_empty()
+            || (!block_alt.is_none() && !block_alt.as_ref().unwrap().is_empty())
     }
 
     /// Add an instruction to the current InstrumentationMode's list
-    pub fn add_instr(&mut self, val: Operator<'a>) {
+    /// Returns whether the instrumentation was a 'special' mode
+    pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
         match self.current_mode {
             None => {
                 panic!("Current mode is not set...cannot inject instructions!")
             }
-            Some(InstrumentationMode::Before) => self.before.push(val),
-            Some(InstrumentationMode::After) => self.after.push(val),
-            Some(InstrumentationMode::Alternate) => self.alternate.push(val),
-            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.push(val),
+            Some(InstrumentationMode::Before) => {
+                self.before.push(val);
+                false
+            }
+            Some(InstrumentationMode::After) => {
+                self.after.push(val);
+                false
+            }
+            Some(InstrumentationMode::Alternate) => {
+                match &mut self.alternate {
+                    None => self.alternate = Some(vec![val]),
+                    Some(alternate) => alternate.push(val),
+                }
+                false
+            }
+            Some(InstrumentationMode::SemanticAfter) => {
+                self.semantic_after.push(val);
+                true
+            }
+            Some(InstrumentationMode::BlockEntry) => {
+                self.block_entry.push(val);
+                true
+            }
+            Some(InstrumentationMode::BlockExit) => {
+                self.block_exit.push(val);
+                true
+            }
+            Some(InstrumentationMode::BlockAlt) => {
+                match &mut self.block_alt {
+                    None => self.block_alt = Some(vec![val]),
+                    Some(block_alt) => block_alt.push(val),
+                }
+                true
+            }
         }
     }
 
@@ -544,8 +719,17 @@ impl<'a> InstrumentationFlag<'a> {
             }
             Some(InstrumentationMode::Before) => self.before.get(idx).unwrap(),
             Some(InstrumentationMode::After) => self.after.get(idx).unwrap(),
-            Some(InstrumentationMode::Alternate) => self.alternate.get(idx).unwrap(),
+            Some(InstrumentationMode::Alternate) => match &self.alternate {
+                None => panic!("No alternate instructions to pull idx '{}' from", idx),
+                Some(alternate) => alternate.get(idx).unwrap(),
+            },
             Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockAlt) => match &self.block_alt {
+                None => panic!("No block alt instructions to pull idx '{}' from", idx),
+                Some(block_alt) => block_alt.get(idx).unwrap(),
+            },
         }
     }
 }

@@ -2,8 +2,9 @@
 
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
-use crate::ir::types::Body;
+use crate::ir::types::{Body, FuncInstrFlag};
 use crate::DataType;
+use wasmparser::Operator;
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
 #[derive(Clone, Debug)]
@@ -89,6 +90,7 @@ impl Eq for FuncKind<'_> {}
 pub struct LocalFunction<'a> {
     pub ty_id: TypeID,
     pub func_id: FunctionID,
+    pub instr_flag: FuncInstrFlag<'a>,
     pub body: Body<'a>,
     pub args: Vec<LocalID>,
 }
@@ -104,6 +106,7 @@ impl<'a> LocalFunction<'a> {
         LocalFunction {
             ty_id: type_id,
             func_id: function_id,
+            instr_flag: FuncInstrFlag::default(),
             body,
             args,
         }
@@ -115,6 +118,18 @@ impl<'a> LocalFunction<'a> {
             &mut self.body.num_locals,
             &mut self.body.locals,
         )
+    }
+
+    pub fn add_instr(&mut self, instr: Operator<'a>, instr_idx: usize) {
+        if self.instr_flag.current_mode.is_some() {
+            // inject at function level
+            self.instr_flag.add_instr(instr);
+        } else {
+            // inject at instruction level
+            let is_special = self.body.instructions[instr_idx].1.add_instr(instr);
+            // remember if we injected a special instrumentation (to be resolved before encoding)
+            self.instr_flag.has_special_instr |= is_special;
+        }
     }
 }
 
@@ -234,6 +249,11 @@ impl<'a> Functions<'a> {
     /// Get kind of function
     pub fn get_kind(&self, function_id: FunctionID) -> &FuncKind<'a> {
         &self.functions[function_id as usize].kind
+    }
+
+    /// Get kind of function
+    pub fn get_kind_mut(&mut self, function_id: FunctionID) -> &mut FuncKind<'a> {
+        &mut self.functions[function_id as usize].kind
     }
 
     /// Get a function modifier from a function index

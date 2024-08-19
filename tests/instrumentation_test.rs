@@ -1,9 +1,9 @@
 use log::{error, trace};
 use orca::iterator::component_iterator::ComponentIterator;
-use orca::iterator::iterator_trait::{Instrumenter, Iterator};
+use orca::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::module_builder::AddLocal;
-use orca::opcode::Inject;
+use orca::opcode::{Inject, Instrumenter};
 use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
 use std::fs::File;
@@ -222,6 +222,102 @@ fn test_inject_locals() {
 
         is_first = false;
     }
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+// ==== FUNCTION ENTRY ====
+
+#[test]
+fn test_fn_entry_one_func() {
+    let file = "tests/test_inputs/instr_testing/modules/fn_entry/one_func.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut fn_entry_body = vec![];
+    fn_entry_body.push(Operator::I32Const { value: 1 });
+    fn_entry_body.push(Operator::Drop);
+
+    inject_function_entry(&mut mod_it, fn_entry_body);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_fn_entry_two_funcs() {
+    let file = "tests/test_inputs/instr_testing/modules/fn_entry/two_funcs.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut fn_entry_body = vec![];
+    fn_entry_body.push(Operator::I32Const { value: 1 });
+    fn_entry_body.push(Operator::Drop);
+
+    inject_function_entry(&mut mod_it, fn_entry_body);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+// ==== FUNCTION EXIT ====
+
+#[test]
+fn test_fn_exit_one_func() {
+    let file = "tests/test_inputs/instr_testing/modules/fn_exit/one_func.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut fn_entry_body = vec![];
+    fn_entry_body.push(Operator::I32Const { value: 1 });
+    fn_entry_body.push(Operator::Drop);
+
+    inject_function_exit(&mut mod_it, fn_entry_body);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_fn_exit_two_funcs() {
+    let file = "tests/test_inputs/instr_testing/modules/fn_exit/two_funcs.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut fn_entry_body = vec![];
+    fn_entry_body.push(Operator::I32Const { value: 1 });
+    fn_entry_body.push(Operator::Drop);
+
+    inject_function_exit(&mut mod_it, fn_entry_body);
 
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
@@ -874,9 +970,7 @@ fn inject_semantic_after<'a, 'b, 'c>(
                 };
                 if matches {
                     mod_it.semantic_after();
-                    for op in body.iter() {
-                        mod_it.inject(op.clone());
-                    }
+                    mod_it.inject_all(body);
                 }
             }
 
@@ -886,6 +980,48 @@ fn inject_semantic_after<'a, 'b, 'c>(
         } else {
             panic!("Should've gotten Module Location!");
         }
+    }
+}
+
+fn inject_function_entry<'a, 'b, 'c>(mod_it: &mut ModuleIterator<'a, 'b>, body: Vec<Operator<'c>>)
+where
+    'c: 'b,
+{
+    let mut curr_func = None;
+    loop {
+        if let Location::Module { func_idx, .. } = mod_it.curr_loc() {
+            if curr_func != Some(func_idx) {
+                // visiting a new function, instrument it!
+                mod_it.func_entry();
+                mod_it.inject_all(&body);
+            }
+            curr_func = Some(func_idx);
+        }
+
+        if mod_it.next().is_none() {
+            break;
+        };
+    }
+}
+
+fn inject_function_exit<'a, 'b, 'c>(mod_it: &mut ModuleIterator<'a, 'b>, body: Vec<Operator<'c>>)
+where
+    'c: 'b,
+{
+    let mut curr_func = None;
+    loop {
+        if let Location::Module { func_idx, .. } = mod_it.curr_loc() {
+            if curr_func != Some(func_idx) {
+                // visiting a new function, instrument it!
+                mod_it.func_exit();
+                mod_it.inject_all(&body);
+            }
+            curr_func = Some(func_idx);
+        }
+
+        if mod_it.next().is_none() {
+            break;
+        };
     }
 }
 

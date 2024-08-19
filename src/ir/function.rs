@@ -4,12 +4,12 @@ use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::FuncKind::Local;
 use crate::ir::module::module_functions::{add_local, Function, LocalFunction};
 use crate::ir::module::Module;
-use crate::ir::types::Body;
 use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
+use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
 use crate::module_builder::AddLocal;
-use crate::opcode::{Inject, MacroOpcode, Opcode};
-use crate::Component;
+use crate::opcode::{Inject, Instrumenter, MacroOpcode, Opcode};
+use crate::{Component, Location};
 use wasmparser::Operator;
 
 // TODO: probably need better reasoning with lifetime here
@@ -133,6 +133,15 @@ impl<'a> Inject<'a> for FunctionBuilder<'a> {
     fn inject(&mut self, instr: Operator<'a>) {
         self.body.push_instr(instr)
     }
+
+    fn inject_at(&mut self, _idx: usize, _mode: InstrumentationMode, _instr: Operator<'a>) {
+        // self.set_instrument_mode_at(mode, Location::Module {
+        //     func_idx: 0, // not used
+        //     instr_idx: idx
+        // });
+        // self.body.instructions[idx].1.add_instr(instr);
+        unreachable!()
+    }
 }
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {}
 impl<'a> MacroOpcode<'a> for FunctionBuilder<'a> {}
@@ -155,6 +164,7 @@ impl AddLocal for FunctionBuilder<'_> {
 /// FunctionBuilder since FunctionModifier does side effect to operators at encoding
 /// (it only modifies the Instrument type)
 pub struct FunctionModifier<'a, 'b> {
+    pub instr_flag: FuncInstrFlag<'a>,
     pub body: &'a mut Body<'b>,
     pub args: &'a mut Vec<LocalID>,
     pub(crate) instr_idx: Option<usize>,
@@ -166,53 +176,16 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
     pub fn init(body: &'a mut Body<'b>, args: &'a mut Vec<LocalID>) -> Self {
         let instr_idx = body.instructions.len() - 1;
         let mut func_modifier = FunctionModifier {
+            instr_flag: FuncInstrFlag::default(),
             body,
             args,
             instr_idx: None,
         };
-        func_modifier.before_at(instr_idx);
-        func_modifier
-    }
-
-    /// adding instructions before the specified instruction
-    pub fn before_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_mode(idx, InstrumentationMode::Before);
-        self
-    }
-
-    /// adding instructions after the specified instruction
-    pub fn after_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_mode(idx, InstrumentationMode::After);
-        self
-    }
-
-    /// adding instructions alternate to the specified instruction
-    pub fn alternate_at(&mut self, idx: usize) -> &mut Self {
-        self.set_instrument_mode(idx, InstrumentationMode::Alternate);
-        self
-    }
-
-    pub fn inject_at(
-        &mut self,
-        idx: usize,
-        mode: InstrumentationMode,
-        instr: Operator<'b>,
-    ) -> &mut Self {
-        self.set_instrument_mode(idx, mode);
-        self.body.instructions[idx].1.add_instr(instr);
-        self
-    }
-
-    pub fn inject_all(&mut self, instrs: &[Operator<'b>]) -> &mut Self {
-        instrs.iter().for_each(|instr| {
-            self.inject(instr.to_owned());
+        func_modifier.before_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx,
         });
-        self
-    }
-
-    fn set_instrument_mode(&mut self, idx: usize, mode: InstrumentationMode) {
-        self.instr_idx = Some(idx);
-        self.body.instructions[idx].1.current_mode = Some(mode);
+        func_modifier
     }
 
     /// add a local and return local index
@@ -229,12 +202,68 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
 impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
     // TODO: refactor the inject the function to return a Result rather than panicking?
     fn inject(&mut self, instr: Operator<'b>) {
-        if let Some(idx) = self.instr_idx {
-            self.body.instructions[idx].1.add_instr(instr);
+        if self.instr_flag.current_mode.is_some() {
+            // inject at the function level
+            self.instr_flag.add_instr(instr);
         } else {
-            panic!("Instruction index not set");
+            // inject at instruction level
+            if let Some(idx) = self.instr_idx {
+                let is_special = self.body.instructions[idx].1.add_instr(instr);
+                // remember if we injected a special instrumentation (to be resolved before encoding)
+                self.instr_flag.has_special_instr |= is_special;
+            } else {
+                panic!("Instruction index not set");
+            }
         }
+    }
+
+    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
+        let loc = Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        };
+        self.set_instrument_mode_at(mode, loc);
+        self.add_instr_at(loc, instr);
     }
 }
 impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {}
 impl<'a, 'b> MacroOpcode<'b> for FunctionModifier<'a, 'b> {}
+
+impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
+    fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
+        if let Some(idx) = self.instr_idx {
+            &self.body.instructions[idx].1.current_mode
+        } else {
+            panic!("Instruction index not set");
+        }
+    }
+
+    fn set_instrument_mode_at(&mut self, mode: InstrumentationMode, loc: Location) {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.instr_idx = Some(instr_idx);
+            self.body.instructions[instr_idx].1.current_mode = Some(mode);
+        } else {
+            panic!("Should have gotten module location");
+        }
+    }
+
+    fn curr_func_instrument_mode(&self) -> &Option<FuncInstrMode> {
+        &self.instr_flag.current_mode
+    }
+
+    fn set_func_instrument_mode(&mut self, mode: FuncInstrMode) {
+        self.instr_flag.current_mode = Some(mode);
+    }
+
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.body.instructions[instr_idx].1.add_instr(instr);
+        } else {
+            panic!("Should have gotten module location");
+        }
+    }
+
+    fn get_injected_val(&self, idx: usize) -> &Operator {
+        self.body.instructions[idx].1.get_instr(idx)
+    }
+}

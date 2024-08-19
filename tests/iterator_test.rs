@@ -3,9 +3,10 @@ use orca::ir::component::Component;
 use orca::ir::module::Module;
 use orca::ir::types::Location;
 use orca::iterator::component_iterator::ComponentIterator;
-use orca::iterator::iterator_trait::{Instrumenter, Iterator};
+use orca::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
 use orca::module_builder::AddLocal;
+use orca::opcode::Instrumenter;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
