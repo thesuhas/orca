@@ -530,6 +530,8 @@ impl<'a> Module<'a> {
 
                 // initialize with 0 to store the func block!
                 let mut block_stack: Vec<BlockID> = vec![0];
+                let mut delete_block: Option<&BlockID> = None;
+                let mut retain_end = true;
                 let mut resolve_on_else_or_end: HashMap<InstrumentationMode, InstrToInject> =
                     HashMap::new();
                 let mut resolve_on_end: HashMap<
@@ -554,10 +556,34 @@ impl<'a> Module<'a> {
                     }
 
                     // resolve instruction-level instrumentation
+
+                    // Handle block alt
+                    if let Some(block_alt) = &instrumentation.block_alt {
+                        if plan_resolution_block_alt(
+                            block_alt,
+                            &mut builder,
+                            &mut retain_end,
+                            op,
+                            idx,
+                        ) {
+                            // we've got a match, which injected the alt body. continue to the next instruction
+                            delete_block = block_stack.last();
+                        }
+                    }
                     match op {
                         Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                             // The block ID will just be the curr len of the stack!
                             block_stack.push(block_stack.len() as u32);
+
+                            if delete_block.is_some() {
+                                // delete this block and skip all instrumentation handling (like below)
+                                builder.alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                builder.inject(Operator::Nop);
+                                continue;
+                            }
                         }
                         Operator::Else => {
                             // necessary for if statements with block_exit instrumentation
@@ -566,10 +592,40 @@ impl<'a> Module<'a> {
                                 resolve_bodies(&mut builder, mode, instr_to_inject, idx);
                             }
                             resolve_on_else_or_end.clear();
+
+                            if delete_block.is_some() {
+                                // delete this block and skip all instrumentation handling (like below)
+                                builder.alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                builder.inject(Operator::Nop);
+                                continue;
+                            }
                         }
                         Operator::End => {
                             // Pop the stack and check to see if we have instrumentation to inject!
                             if let Some(block_id) = block_stack.pop() {
+                                if let Some(delete_block_id) = delete_block.as_mut() {
+                                    // Delete the block, but don't remove the end if we say not to
+                                    // should still process instrumentation on the end though...
+                                    // (consider if/else where the else has an alt block)
+                                    if *block_id == *delete_block_id {
+                                        if !retain_end {
+                                            // delete this end and skip all instrumentation handling (like below)
+                                            builder.alternate_at(Location::Module {
+                                                func_idx: 0, // not used
+                                                instr_idx: idx,
+                                            });
+                                            builder.inject(Operator::Nop);
+                                        }
+                                        // completed the alt block logic, clear state
+                                        delete_block = None;
+                                        retain_end = true;
+                                    }
+                                }
+
+
                                 // we've reached an end, make sure resolve_on_else is cleared!
                                 // resolve bodies for else OR end
                                 for (mode, instr_to_inject) in resolve_on_else_or_end.iter() {
@@ -578,7 +634,7 @@ impl<'a> Module<'a> {
                                 resolve_on_else_or_end.clear();
 
                                 // remove top of stack! (end of vec)
-                                // remove so we don't try to re-inject!
+                                // remove it, so we don't try to re-inject!
                                 if let Some(to_resolve) = resolve_on_end.remove(&block_id) {
                                     for (mode, instr_to_inject) in to_resolve.iter() {
                                         // resolve bodies at the end
@@ -598,7 +654,7 @@ impl<'a> Module<'a> {
                             semantic_after,
                             block_entry,
                             block_exit,
-                            block_alt,
+                            block_alt: _, // handled before here!
                             before: _,
                             after: _,
                             alternate: _,
@@ -608,7 +664,7 @@ impl<'a> Module<'a> {
 
                         // Handle block entry
                         if !block_entry.is_empty() {
-                            plan_resolution_block_entry(block_entry, &mut builder, op, idx);
+                            resolve_block_entry(block_entry, &mut builder, op, idx);
                         }
 
                         // Handle block exit
@@ -619,18 +675,6 @@ impl<'a> Module<'a> {
                                 &mut resolve_on_else_or_end,
                                 &mut resolve_on_end,
                                 op,
-                            );
-                        }
-
-                        // Handle block alt
-                        if let Some(block_alt) = block_alt {
-                            plan_resolution_block_alt(
-                                block_alt,
-                                &mut builder,
-                                &block_stack,
-                                &mut resolve_on_end,
-                                op,
-                                idx,
                             );
                         }
 
@@ -1150,7 +1194,7 @@ fn resolve_function_exit<'a, 'b, 'c>(
     }
 }
 
-fn plan_resolution_block_entry<'a, 'b, 'c>(
+fn resolve_block_entry<'a, 'b, 'c>(
     block_entry: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     op: &Operator,
@@ -1158,7 +1202,7 @@ fn plan_resolution_block_entry<'a, 'b, 'c>(
 ) where
     'c: 'b,
 {
-    // save instrumentation to be converted to simple before/after/alt
+    // convert instr to simple before/after/alt
     match op {
         Operator::Block { .. }
         | Operator::Loop { .. }
@@ -1191,9 +1235,6 @@ fn plan_resolution_block_exit<'a, 'b, 'c>(
     'c: 'b,
 {
     // save instrumentation to be converted to simple before/after/alt
-    if let Operator::If { .. } = op {
-        // extra thing to save in this case!
-    }
     match op {
         Operator::If { .. } => {
             save_not_flagged_body_to_resolve_inner(
@@ -1219,14 +1260,39 @@ fn plan_resolution_block_exit<'a, 'b, 'c>(
 fn plan_resolution_block_alt<'a, 'b, 'c>(
     block_alt: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
-    block_stack: &[BlockID],
-    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
+    mut retain_end: &mut bool,
     op: &Operator,
     idx: usize,
-) where
+) -> bool where
     'c: 'b,
 {
-    todo!()
+    // convert instr to simple before/after/alt
+    let mut matched = false;
+    match op {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::If { .. }
+        | Operator::Else { .. } => {
+            // just inject immediately after the start of the block
+            builder.alternate_at(Location::Module {
+                func_idx: 0, // not used
+                instr_idx: idx,
+            });
+            builder.inject_all(block_alt);
+
+            // no need to remove the contents of block_alt since we're actually
+            // using a read-only copy!
+
+            matched = true;
+            *retain_end = false;
+        }
+        _ => {}
+    }
+    if let Operator::Else { .. } = op {
+        // We want to keep the end for the module to still be valid (the if will be dangling)
+        *retain_end = true;
+    }
+    matched
 }
 
 fn plan_resolution_semantic_after<'a, 'b, 'c>(
