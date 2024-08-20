@@ -866,11 +866,19 @@ impl<'a> Module<'a> {
         if !self.elements.is_empty() {
             let mut elements = wasm_encoder::ElementSection::new();
             let mut temp_const_exprs = vec![];
+            let mut element_items = vec![];
             for (kind, items) in self.elements.iter() {
                 temp_const_exprs.clear();
+                element_items.clear();
                 let element_items = match &items {
                     // TODO: Update the elements section based on additions/deletion
-                    ElementItems::Functions(funcs) => wasm_encoder::Elements::Functions(funcs),
+                    ElementItems::Functions(funcs) => {
+                        element_items = funcs
+                            .iter()
+                            .map(|f| *func_mapping.get(&(*f as i32)).unwrap() as FunctionID)
+                            .collect();
+                        wasm_encoder::Elements::Functions(&*element_items)
+                    }
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
                         for e in exprs.iter() {
