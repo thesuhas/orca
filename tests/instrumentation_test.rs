@@ -11,6 +11,8 @@ use std::io::{BufRead, BufReader};
 use std::iter::Iterator as StdIter;
 use std::mem::discriminant;
 use wasmparser::Operator;
+mod common;
+use crate::common::check_instrumentation_encoding;
 
 #[test]
 fn no_injection() {
@@ -887,58 +889,4 @@ fn inject_semantic_after<'a, 'b, 'c>(
             panic!("Should've gotten Module Location!");
         }
     }
-}
-
-// ========================
-// ==== TEST FRAMEWORK ====
-// ========================
-
-fn check_instrumentation_encoding(orca_wat: &String, file: &str) -> Result<(), std::io::Error> {
-    let f = File::open(file)?;
-    let mut reader = BufReader::new(f);
-    let wat_with_instr = get_wat_with_inline_instrumentation(&mut reader)?;
-
-    assert_eq!(*orca_wat, wat_with_instr);
-    Ok(())
-}
-
-const INSERT_PREFIX_PATTERN: &str = ";; << ";
-const REPLACE_PREFIX_PATTERN: &str = ";; < ";
-fn get_wat_with_inline_instrumentation(
-    reader: &mut BufReader<File>,
-) -> Result<String, std::io::Error> {
-    let mut wat_with_instr = String::new();
-
-    let mut line = String::new();
-    while reader.read_line(&mut line)? > 0 {
-        if line.contains(INSERT_PREFIX_PATTERN) {
-            // Just insert the code! This should retain indentation
-            let new_line = line.replace(INSERT_PREFIX_PATTERN, "");
-            wat_with_instr += &new_line;
-        } else if line.contains(REPLACE_PREFIX_PATTERN) {
-            // Replace the code! Just remove all non-whitespace before and the pattern itself
-
-            // Find the end of the indentation
-            let mut end_whitespace_idx = 0;
-            for (idx, c) in line.chars().enumerate() {
-                if !c.is_whitespace() {
-                    end_whitespace_idx = idx;
-                    break;
-                }
-            }
-            // Find the beginning of the command
-            let command_start = line.find(REPLACE_PREFIX_PATTERN).unwrap();
-
-            // remove original
-            line.replace_range(end_whitespace_idx..command_start, "");
-            // remove the command
-            let new_line = line.replace(REPLACE_PREFIX_PATTERN, "");
-            wat_with_instr += &new_line;
-        } else {
-            wat_with_instr += &line;
-        }
-
-        line.clear();
-    }
-    Ok(wat_with_instr)
 }

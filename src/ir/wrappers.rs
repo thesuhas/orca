@@ -1,11 +1,13 @@
 //! Wrapper functions
+
+use std::collections::HashMap;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
 };
 use wasmparser::{
     ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
-    InstanceTypeDeclaration, SubType,
+    InstanceTypeDeclaration, Operator, SubType,
 };
 
 // Not added to wasm-tools
@@ -317,5 +319,25 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
     for name in names {
         let naming = name.unwrap();
         namemap.append(naming.index, naming.name);
+    }
+}
+
+pub(crate) fn is_call(op: &Operator) -> bool {
+    match op {
+        Operator::Call { function_index: _ } => true,
+        _ => false,
+    }
+}
+
+pub(crate) fn update_call(op: &mut Operator, mapping: &HashMap<i32, i32>) {
+    match op {
+        Operator::Call { function_index } => {
+            let new_index = *mapping.get(&(*function_index as i32)).unwrap();
+            if new_index == -1 {
+                panic!("Deleted");
+            }
+            *function_index = new_index as u32;
+        }
+        _ => panic!("Not a call operation!"),
     }
 }
