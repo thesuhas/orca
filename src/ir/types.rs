@@ -545,7 +545,7 @@ impl<'a> FuncInstrFlag<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 /// Mode of Instruction in case the instruction is marked as Instrumented
 pub enum InstrumentationMode {
     Before,

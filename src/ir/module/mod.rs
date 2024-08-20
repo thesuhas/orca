@@ -1,6 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::DataType;
+use super::types::{DataType, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
@@ -530,7 +530,12 @@ impl<'a> Module<'a> {
 
                 // initialize with 0 to store the func block!
                 let mut block_stack: Vec<BlockID> = vec![0];
-                let mut to_resolve: HashMap<BlockID, InstrToInject> = HashMap::new();
+                let mut resolve_on_else_or_end: HashMap<InstrumentationMode, InstrToInject> =
+                    HashMap::new();
+                let mut resolve_on_end: HashMap<
+                    BlockID,
+                    HashMap<InstrumentationMode, InstrToInject>,
+                > = HashMap::new();
                 let mut builder = self.functions.get_fn_modifier(func_idx).unwrap();
 
                 // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
@@ -554,59 +559,30 @@ impl<'a> Module<'a> {
                             // The block ID will just be the curr len of the stack!
                             block_stack.push(block_stack.len() as u32);
                         }
+                        Operator::Else => {
+                            // necessary for if statements with block_exit instrumentation
+                            for (mode, instr_to_inject) in resolve_on_else_or_end.iter() {
+                                // resolve bodies at the else
+                                resolve_bodies(&mut builder, mode, instr_to_inject, idx);
+                            }
+                            resolve_on_else_or_end.clear();
+                        }
                         Operator::End => {
                             // Pop the stack and check to see if we have instrumentation to inject!
                             if let Some(block_id) = block_stack.pop() {
+                                // we've reached an end, make sure resolve_on_else is cleared!
+                                // resolve bodies for else OR end
+                                for (mode, instr_to_inject) in resolve_on_else_or_end.iter() {
+                                    resolve_bodies(&mut builder, mode, instr_to_inject, idx);
+                                }
+                                resolve_on_else_or_end.clear();
+
                                 // remove top of stack! (end of vec)
-                                if let Some(InstrToInject {
-                                    flagged,
-                                    not_flagged,
-                                }) = to_resolve.remove(&block_id)
-                                {
-                                    // remove so we don't try to re-inject!
-                                    let mut is_first = true;
-                                    // inject the bodies predicated with the flag
-                                    for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
-                                        // Inject the bodies AFTER the current END opcode
-                                        builder.after_at(Location::Module {
-                                            func_idx: 0, // not used
-                                            instr_idx: idx,
-                                        });
-
-                                        if is_first {
-                                            // inject flag check
-                                            builder.local_get(*bool_flag);
-                                            builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
-                                        } else {
-                                            // injecting multiple, already have an if statement
-                                            builder.else_stmt();
-                                            // inject flag check
-                                            builder.local_get(*bool_flag);
-                                            builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
-                                        }
-
-                                        // inject body
-                                        builder.inject_all(body);
-                                        if !is_first {
-                                            // need to inject end of nested if!
-                                            builder.end();
-                                        }
-                                        is_first = false;
-                                    }
-                                    if !flagged.is_empty() {
-                                        // inject end of flag check (the outer if)
-                                        builder.end();
-                                    }
-
-                                    // handle non-flagged bodies
-                                    // Inject the bodies AFTER the current END opcode
-                                    builder.after_at(Location::Module {
-                                        func_idx: 0, // not used
-                                        instr_idx: idx,
-                                    });
-                                    for body in not_flagged.iter() {
-                                        // inject body
-                                        builder.inject_all(body);
+                                // remove so we don't try to re-inject!
+                                if let Some(to_resolve) = resolve_on_end.remove(&block_id) {
+                                    for (mode, instr_to_inject) in to_resolve.iter() {
+                                        // resolve bodies at the end
+                                        resolve_bodies(&mut builder, mode, instr_to_inject, idx);
                                     }
                                 }
                             }
@@ -639,11 +615,10 @@ impl<'a> Module<'a> {
                         if !block_exit.is_empty() {
                             plan_resolution_block_exit(
                                 block_exit,
-                                &mut builder,
                                 &block_stack,
-                                &mut to_resolve,
+                                &mut resolve_on_else_or_end,
+                                &mut resolve_on_end,
                                 op,
-                                idx,
                             );
                         }
 
@@ -653,7 +628,7 @@ impl<'a> Module<'a> {
                                 block_alt,
                                 &mut builder,
                                 &block_stack,
-                                &mut to_resolve,
+                                &mut resolve_on_end,
                                 op,
                                 idx,
                             );
@@ -665,7 +640,7 @@ impl<'a> Module<'a> {
                                 semantic_after,
                                 &mut builder,
                                 &block_stack,
-                                &mut to_resolve,
+                                &mut resolve_on_end,
                                 op,
                                 idx,
                             );
@@ -1208,22 +1183,44 @@ fn plan_resolution_block_entry<'a, 'b, 'c>(
 
 fn plan_resolution_block_exit<'a, 'b, 'c>(
     block_exit: &InstrBody<'c>,
-    builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'c>>,
+    resolve_on_else_or_end: &mut HashMap<InstrumentationMode, InstrToInject<'c>>,
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
     op: &Operator,
-    idx: usize,
 ) where
     'c: 'b,
 {
-    todo!()
+    // save instrumentation to be converted to simple before/after/alt
+    if let Operator::If { .. } = op {
+        // extra thing to save in this case!
+    }
+    match op {
+        Operator::If { .. } => {
+            save_not_flagged_body_to_resolve_inner(
+                resolve_on_else_or_end,
+                InstrumentationMode::Before,
+                block_exit,
+            );
+        }
+        Operator::Block { .. } | Operator::Loop { .. } | Operator::Else { .. } => {
+            // add body-to-inject as non-flagged
+            let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
+            save_not_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::Before,
+                block_exit,
+                *block_id,
+            );
+        }
+        _ => {} // skip all other opcodes
+    }
 }
 
 fn plan_resolution_block_alt<'a, 'b, 'c>(
     block_alt: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'c>>,
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
     op: &Operator,
     idx: usize,
 ) where
@@ -1236,7 +1233,7 @@ fn plan_resolution_semantic_after<'a, 'b, 'c>(
     semantic_after: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'c>>,
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
     op: &Operator,
     idx: usize,
 ) where
@@ -1250,22 +1247,20 @@ fn plan_resolution_semantic_after<'a, 'b, 'c>(
         | Operator::Else { .. } => {
             // add body-to-inject as non-flagged
             let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
-            to_resolve
-                .entry(*block_id)
-                .and_modify(|instr_to_inject| {
-                    instr_to_inject.not_flagged.push(semantic_after.to_owned());
-                })
-                .or_insert(InstrToInject {
-                    flagged: vec![],
-                    not_flagged: vec![semantic_after.to_owned()],
-                });
+            save_not_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
+                semantic_after,
+                *block_id,
+            );
         }
         Operator::BrTable { targets } => {
             let bool_flag_id = create_bool_flag(builder, idx, op, semantic_after);
             targets.targets().for_each(|target| {
                 if let Ok(relative_depth) = target {
-                    save_body_to_resolve(
-                        to_resolve,
+                    save_flagged_body_to_resolve(
+                        resolve_on_end,
+                        InstrumentationMode::After,
                         semantic_after,
                         bool_flag_id,
                         relative_depth,
@@ -1274,8 +1269,9 @@ fn plan_resolution_semantic_after<'a, 'b, 'c>(
                 }
             });
             // handle the default as well
-            save_body_to_resolve(
-                to_resolve,
+            save_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
                 semantic_after,
                 bool_flag_id,
                 targets.default(),
@@ -1289,8 +1285,9 @@ fn plan_resolution_semantic_after<'a, 'b, 'c>(
         | Operator::BrOnNonNull { relative_depth }
         | Operator::BrOnNull { relative_depth } => {
             let bool_flag_id = create_bool_flag(builder, idx, op, semantic_after);
-            save_body_to_resolve(
-                to_resolve,
+            save_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
                 semantic_after,
                 bool_flag_id,
                 *relative_depth,
@@ -1354,9 +1351,46 @@ where
     bool_flag_id
 }
 
-fn save_body_to_resolve<'a>(
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'a>>,
-    semantic_after: &Vec<Operator<'a>>,
+fn save_not_flagged_body_to_resolve<'a>(
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'a>>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
+    block_id: BlockID,
+) {
+    resolve_on_end
+        .entry(block_id)
+        .and_modify(|mode_to_instrs| {
+            save_not_flagged_body_to_resolve_inner(mode_to_instrs, mode, body);
+        })
+        .or_insert(HashMap::from([(
+            mode,
+            InstrToInject {
+                flagged: vec![],
+                not_flagged: vec![body.to_owned()],
+            },
+        )]));
+}
+
+fn save_not_flagged_body_to_resolve_inner<'a>(
+    inner: &mut HashMap<InstrumentationMode, InstrToInject<'a>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
+) {
+    inner
+        .entry(mode)
+        .and_modify(|instr_to_inject| {
+            instr_to_inject.not_flagged.push(body.to_owned());
+        })
+        .or_insert(InstrToInject {
+            flagged: vec![],
+            not_flagged: vec![body.to_owned()],
+        });
+}
+
+fn save_flagged_body_to_resolve<'a>(
+    to_resolve: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'a>>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
     bool_flag_id: LocalID,
     relative_depth: u32,
     curr_block: BlockID,
@@ -1364,17 +1398,100 @@ fn save_body_to_resolve<'a>(
     let block_id = curr_block - relative_depth;
     to_resolve
         .entry(block_id)
-        .and_modify(|instr_to_inject| {
-            instr_to_inject.flagged.push(InstrBodyFlagged {
-                body: semantic_after.to_owned(),
-                bool_flag: bool_flag_id,
-            });
+        .and_modify(|mode_to_instrs| {
+            mode_to_instrs
+                .entry(mode)
+                .and_modify(|instr_to_inject| {
+                    instr_to_inject.flagged.push(InstrBodyFlagged {
+                        body: body.to_owned(),
+                        bool_flag: bool_flag_id,
+                    });
+                })
+                .or_insert(InstrToInject {
+                    flagged: vec![InstrBodyFlagged {
+                        body: body.to_owned(),
+                        bool_flag: bool_flag_id,
+                    }],
+                    not_flagged: vec![],
+                });
         })
-        .or_insert(InstrToInject {
-            flagged: vec![InstrBodyFlagged {
-                body: semantic_after.to_owned(),
-                bool_flag: bool_flag_id,
-            }],
-            not_flagged: vec![],
-        });
+        .or_insert(HashMap::from([(
+            mode,
+            InstrToInject {
+                flagged: vec![InstrBodyFlagged {
+                    body: body.to_owned(),
+                    bool_flag: bool_flag_id,
+                }],
+                not_flagged: vec![],
+            },
+        )]));
+}
+
+fn resolve_bodies<'a, 'b, 'c>(
+    builder: &mut FunctionModifier<'a, 'b>,
+    mode: &InstrumentationMode,
+    instr_to_inject: &InstrToInject<'c>,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    let InstrToInject {
+        flagged,
+        not_flagged,
+    } = instr_to_inject;
+
+    let mut is_first = true;
+    // inject the bodies predicated with the flag
+    for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
+        // Inject the bodies in the correct mode at the current END opcode
+        let loc = Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        };
+        match mode {
+            InstrumentationMode::Before => builder.before_at(loc),
+            InstrumentationMode::After => builder.after_at(loc),
+            _ => unreachable!(),
+        };
+
+        if is_first {
+            // inject flag check
+            builder.local_get(*bool_flag);
+            builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
+        } else {
+            // injecting multiple, already have an if statement
+            builder.else_stmt();
+            // inject flag check
+            builder.local_get(*bool_flag);
+            builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
+        }
+
+        // inject body
+        builder.inject_all(body);
+        if !is_first {
+            // need to inject end of nested if!
+            builder.end();
+        }
+        is_first = false;
+    }
+    if !flagged.is_empty() {
+        // inject end of flag check (the outer if)
+        builder.end();
+    }
+
+    // handle non-flagged bodies
+    // Inject the bodies AFTER the current END opcode
+    let loc = Location::Module {
+        func_idx: 0, // not used
+        instr_idx: idx,
+    };
+    match mode {
+        InstrumentationMode::Before => builder.before_at(loc),
+        InstrumentationMode::After => builder.after_at(loc),
+        _ => unreachable!(),
+    };
+    for body in not_flagged.iter() {
+        // inject body
+        builder.inject_all(body);
+    }
 }

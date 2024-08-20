@@ -439,6 +439,212 @@ fn test_block_entry_two_funcs_two_blocks() {
     }
 }
 
+// ==== BLOCK EXIT ====
+
+#[test]
+fn test_block_exit_one_func_nested_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/one_func_nested_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 34 });
+    loop_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![
+        (SupportedOperators::Block, block_body),
+        (SupportedOperators::Loop, loop_body),
+    ];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_exit_one_func_one_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/one_func_one_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 34 });
+    loop_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![
+        (SupportedOperators::Block, block_body),
+        (SupportedOperators::Loop, loop_body),
+    ];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_exit_one_func_two_blocks() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/one_func_two_blocks.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 34 });
+    loop_body.push(Operator::Drop);
+
+    let mut if_body = vec![];
+    if_body.push(Operator::I32Const { value: 56 });
+    if_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![
+        (SupportedOperators::Block, block_body),
+        (SupportedOperators::Loop, loop_body),
+        (SupportedOperators::If, if_body),
+    ];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_exit_two_funcs_nested_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/two_funcs_nested_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 34 });
+    loop_body.push(Operator::Drop);
+
+    let mut if_body = vec![];
+    if_body.push(Operator::I32Const { value: 56 });
+    if_body.push(Operator::Drop);
+
+    let mut else_body = vec![];
+    else_body.push(Operator::I32Const { value: 78 });
+    else_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![
+        (SupportedOperators::Block, block_body),
+        (SupportedOperators::Loop, loop_body),
+        (SupportedOperators::If, if_body),
+        (SupportedOperators::Else, else_body),
+    ];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_exit_two_funcs_one_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/two_funcs_one_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 34 });
+    loop_body.push(Operator::Drop);
+
+    let mut if_body = vec![];
+    if_body.push(Operator::I32Const { value: 56 });
+    if_body.push(Operator::Drop);
+
+    let mut else_body = vec![];
+    else_body.push(Operator::I32Const { value: 78 });
+    else_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![
+        (SupportedOperators::Block, block_body),
+        (SupportedOperators::Loop, loop_body),
+        (SupportedOperators::If, if_body),
+        (SupportedOperators::Else, else_body),
+    ];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_exit_two_funcs_two_blocks() {
+    let file = "tests/test_inputs/instr_testing/modules/block_exit/two_funcs_two_blocks.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Block, block_body)];
+    inject_block_exit(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
 // ==== FUNCTION ENTRY ====
 
 #[test]
@@ -1166,6 +1372,52 @@ fn inject_block_entry<'a, 'b, 'c>(
                 };
                 if matches {
                     mod_it.block_entry();
+                    mod_it.inject_all(body);
+                }
+            }
+
+            if mod_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Module Location!");
+        }
+    }
+}
+
+fn inject_block_exit<'a, 'b, 'c>(
+    mod_it: &mut ModuleIterator<'a, 'b>,
+    ops_of_interest: &Vec<(SupportedOperators, Vec<Operator<'c>>)>,
+) where
+    'c: 'b,
+{
+    loop {
+        let op = mod_it.curr_op();
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = mod_it.curr_loc()
+        {
+            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+
+            for (op, body) in ops_of_interest.iter() {
+                let matches = match op {
+                    SupportedOperators::Block => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Block { .. })
+                    }
+                    SupportedOperators::Loop => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Loop { .. })
+                    }
+                    SupportedOperators::If => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::If { .. })
+                    }
+                    SupportedOperators::Else => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Else { .. })
+                    }
+                    _ => panic!("inject_block_entry does not support: {:?}", op),
+                };
+                if matches {
+                    mod_it.block_exit();
                     mod_it.inject_all(body);
                 }
             }
