@@ -4,8 +4,8 @@ use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::types::{Body, FuncInstrFlag};
 use crate::DataType;
-use wasmparser::Operator;
 use std::cmp::min;
+use wasmparser::Operator;
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
 #[derive(Clone, Debug)]
@@ -44,18 +44,12 @@ impl<'a> Function<'a> {
 
     /// Check if it's a local function
     pub fn is_local(&self) -> bool {
-        match &self.kind {
-            FuncKind::Local(_) => true,
-            _ => false,
-        }
+        matches!(&self.kind, FuncKind::Local(_))
     }
 
     /// Check if it's an imported function
     pub fn is_import(&self) -> bool {
-        match &self.kind {
-            FuncKind::Import(_) => true,
-            _ => false,
-        }
+        matches!(&self.kind, FuncKind::Import(_))
     }
 
     /// Unwrap a local function. If it is an imported function, it panics.
@@ -248,9 +242,8 @@ impl<'a> Functions<'a> {
     /// Add a new function
     pub fn push(&mut self, func: Function<'a>) {
         self.functions.push(func.clone());
-        match func.kind {
-            FuncKind::Local(_) => self.added_local_fns += 1,
-            _ => {}
+        if let FuncKind::Local(_) = func.kind {
+            self.added_local_fns += 1;
         }
     }
 
@@ -268,12 +261,9 @@ impl<'a> Functions<'a> {
     pub fn delete(&mut self, id: FunctionID) {
         if id < self.functions.len() as u32 {
             self.functions[id as usize].delete();
-            match self.functions[id as usize].kind {
-                FuncKind::Local(_) => {
-                    self.deleted_local_fns += 1;
-                    self.first_deleted_fn = min(self.first_deleted_fn, id);
-                }
-                _ => {}
+            if let FuncKind::Local(_) = self.functions[id as usize].kind {
+                self.deleted_local_fns += 1;
+                self.first_deleted_fn = min(self.first_deleted_fn, id);
             }
         }
     }

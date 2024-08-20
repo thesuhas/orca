@@ -57,6 +57,8 @@ pub trait Instrumenter<'a>: Inject<'a> {
         self
     }
 
+    fn empty_alternate_at(&mut self, loc: Location) -> &mut Self;
+
     fn semantic_after_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::SemanticAfter, loc);
         self
@@ -76,6 +78,8 @@ pub trait Instrumenter<'a>: Inject<'a> {
         self.set_instrument_mode_at(InstrumentationMode::BlockAlt, loc);
         self
     }
+
+    fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self;
 
     /// Get the instruction injected at index idx
     fn get_injected_val(&self, idx: usize) -> &Operator;

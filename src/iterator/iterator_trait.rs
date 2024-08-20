@@ -40,6 +40,13 @@ pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
         self
     }
 
+    /// Insert an empty alt at the current location
+    /// Effectively removes the instruction
+    fn empty_alternate(&mut self) -> &mut Self {
+        self.empty_alternate_at(self.curr_loc());
+        self
+    }
+
     /// Mark the current location to InstrumentBefore
     fn before(&mut self) -> &mut Self {
         self.set_instrument_mode(InstrumentationMode::Before);
@@ -73,6 +80,13 @@ pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
     /// Mark the current location to InstrumentBlockAlt
     fn block_alt(&mut self) -> &mut Self {
         self.set_instrument_mode(InstrumentationMode::BlockAlt);
+        self
+    }
+
+    /// Insert an empty alt block at the current location
+    /// Effectively removes the block
+    fn empty_block_alt(&mut self) -> &mut Self {
+        self.empty_block_alt_at(self.curr_loc());
         self
     }
 

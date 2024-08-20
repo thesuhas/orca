@@ -6,9 +6,6 @@ use orca::module_builder::AddLocal;
 use orca::opcode::{Inject, Instrumenter};
 use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::iter::Iterator as StdIter;
 use std::mem::discriminant;
 use wasmparser::Operator;
 mod common;
@@ -224,6 +221,263 @@ fn test_inject_locals() {
 
         is_first = false;
     }
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+// ==== BLOCK ALT ====
+
+#[test]
+fn test_block_alt_one_func_nested_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/one_func_nested_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut loop_body = vec![];
+    loop_body.push(Operator::I32Const { value: 12 });
+    loop_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Loop, loop_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_one_func_remove_else() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/one_func_remove_else.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let else_body = vec![];
+
+    let ops_of_interest = vec![(SupportedOperators::Else, else_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_one_func_replace_else() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/one_func_replace_else.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut else_body = vec![];
+    else_body.push(Operator::I32Const { value: 12 });
+    else_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Else, else_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_one_func_two_blocks() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/one_func_two_blocks.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Block, block_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_remove_else_nested_if() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/remove_else_nested_if.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let else_body = vec![];
+
+    let ops_of_interest = vec![(SupportedOperators::Else, else_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_remove_entire_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/remove_entire_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let block_body = vec![];
+
+    let ops_of_interest = vec![(SupportedOperators::Block, block_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_remove_if_with_else() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/remove_if_with_else.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let if_body = vec![];
+
+    let ops_of_interest = vec![(SupportedOperators::If, if_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_remove_nested_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/remove_nested_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let block_body = vec![];
+
+    let ops_of_interest = vec![(SupportedOperators::Block, block_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_replace_else_nested_if() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/replace_else_nested_if.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut else_body = vec![];
+    else_body.push(Operator::I32Const { value: 12 });
+    else_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Else, else_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_replace_if_with_else() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/replace_if_with_else.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut if_body = vec![];
+    if_body.push(Operator::Drop);
+    if_body.push(Operator::I32Const { value: 12 });
+    if_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::If, if_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_block_alt_replace_nested_block() {
+    let file = "tests/test_inputs/instr_testing/modules/block_alt/replace_nested_block.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+
+    let mut block_body = vec![];
+    block_body.push(Operator::I32Const { value: 12 });
+    block_body.push(Operator::Drop);
+
+    let ops_of_interest = vec![(SupportedOperators::Block, block_body)];
+    inject_block_alt(&mut mod_it, &ops_of_interest);
 
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
@@ -1387,6 +1641,58 @@ fn inject_block_entry<'a, 'b, 'c>(
     }
 }
 
+fn inject_block_alt<'a, 'b, 'c>(
+    mod_it: &mut ModuleIterator<'a, 'b>,
+    ops_of_interest: &Vec<(SupportedOperators, Vec<Operator<'c>>)>,
+) where
+    'c: 'b,
+{
+    loop {
+        let op = mod_it.curr_op();
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+        } = mod_it.curr_loc()
+        {
+            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+
+            for (op, body) in ops_of_interest.iter() {
+                let matches = match op {
+                    SupportedOperators::Block => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Block { .. })
+                    }
+                    SupportedOperators::Loop => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Loop { .. })
+                    }
+                    SupportedOperators::If => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::If { .. })
+                    }
+                    SupportedOperators::Else => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::Else { .. })
+                    }
+                    _ => panic!("inject_block_entry does not support: {:?}", op),
+                };
+                if matches {
+                    if body.len() > 0 {
+                        // has body
+                        mod_it.block_alt();
+                        mod_it.inject_all(body);
+                    } else {
+                        // has no body...effectively removing
+                        mod_it.empty_block_alt();
+                    }
+                }
+            }
+
+            if mod_it.next().is_none() {
+                break;
+            };
+        } else {
+            panic!("Should've gotten Module Location!");
+        }
+    }
+}
+
 fn inject_block_exit<'a, 'b, 'c>(
     mod_it: &mut ModuleIterator<'a, 'b>,
     ops_of_interest: &Vec<(SupportedOperators, Vec<Operator<'c>>)>,
@@ -1536,52 +1842,52 @@ where
 // ==== TEST FRAMEWORK ====
 // ========================
 
-fn check_instrumentation_encoding(orca_wat: &String, file: &str) -> Result<(), std::io::Error> {
-    let f = File::open(file)?;
-    let mut reader = BufReader::new(f);
-    let wat_with_instr = get_wat_with_inline_instrumentation(&mut reader)?;
+// fn check_instrumentation_encoding(orca_wat: &String, file: &str) -> Result<(), std::io::Error> {
+//     let f = File::open(file)?;
+//     let mut reader = BufReader::new(f);
+//     let wat_with_instr = get_wat_with_inline_instrumentation(&mut reader)?;
+//
+//     assert_eq!(*orca_wat, wat_with_instr);
+//     Ok(())
+// }
 
-    assert_eq!(*orca_wat, wat_with_instr);
-    Ok(())
-}
-
-const INSERT_PREFIX_PATTERN: &str = ";; << ";
-const REPLACE_PREFIX_PATTERN: &str = ";; < ";
-fn get_wat_with_inline_instrumentation(
-    reader: &mut BufReader<File>,
-) -> Result<String, std::io::Error> {
-    let mut wat_with_instr = String::new();
-
-    let mut line = String::new();
-    while reader.read_line(&mut line)? > 0 {
-        if line.contains(INSERT_PREFIX_PATTERN) {
-            // Just insert the code! This should retain indentation
-            let new_line = line.replace(INSERT_PREFIX_PATTERN, "");
-            wat_with_instr += &new_line;
-        } else if line.contains(REPLACE_PREFIX_PATTERN) {
-            // Replace the code! Just remove all non-whitespace before and the pattern itself
-
-            // Find the end of the indentation
-            let mut end_whitespace_idx = 0;
-            for (idx, c) in line.chars().enumerate() {
-                if !c.is_whitespace() {
-                    end_whitespace_idx = idx;
-                    break;
-                }
-            }
-            // Find the beginning of the command
-            let command_start = line.find(REPLACE_PREFIX_PATTERN).unwrap();
-
-            // remove original
-            line.replace_range(end_whitespace_idx..command_start, "");
-            // remove the command
-            let new_line = line.replace(REPLACE_PREFIX_PATTERN, "");
-            wat_with_instr += &new_line;
-        } else {
-            wat_with_instr += &line;
-        }
-
-        line.clear();
-    }
-    Ok(wat_with_instr)
-}
+// const INSERT_PREFIX_PATTERN: &str = ";; << ";
+// const REPLACE_PREFIX_PATTERN: &str = ";; < ";
+// fn get_wat_with_inline_instrumentation(
+//     reader: &mut BufReader<File>,
+// ) -> Result<String, std::io::Error> {
+//     let mut wat_with_instr = String::new();
+//
+//     let mut line = String::new();
+//     while reader.read_line(&mut line)? > 0 {
+//         if line.contains(INSERT_PREFIX_PATTERN) {
+//             // Just insert the code! This should retain indentation
+//             let new_line = line.replace(INSERT_PREFIX_PATTERN, "");
+//             wat_with_instr += &new_line;
+//         } else if line.contains(REPLACE_PREFIX_PATTERN) {
+//             // Replace the code! Just remove all non-whitespace before and the pattern itself
+//
+//             // Find the end of the indentation
+//             let mut end_whitespace_idx = 0;
+//             for (idx, c) in line.chars().enumerate() {
+//                 if !c.is_whitespace() {
+//                     end_whitespace_idx = idx;
+//                     break;
+//                 }
+//             }
+//             // Find the beginning of the command
+//             let command_start = line.find(REPLACE_PREFIX_PATTERN).unwrap();
+//
+//             // remove original
+//             line.replace_range(end_whitespace_idx..command_start, "");
+//             // remove the command
+//             let new_line = line.replace(REPLACE_PREFIX_PATTERN, "");
+//             wat_with_instr += &new_line;
+//         } else {
+//             wat_with_instr += &line;
+//         }
+//
+//         line.clear();
+//     }
+//     Ok(wat_with_instr)
+// }

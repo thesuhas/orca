@@ -23,7 +23,7 @@ use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
-use wasm_encoder::reencode::Reencode;
+use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
 pub mod module_exports;
@@ -534,7 +534,7 @@ impl<'a> Module<'a> {
 
                 // initialize with 0 to store the func block!
                 let mut block_stack: Vec<BlockID> = vec![0];
-                let mut delete_block: Option<&BlockID> = None;
+                let mut delete_block: Option<BlockID> = None;
                 let mut retain_end = true;
                 let mut resolve_on_else_or_end: HashMap<InstrumentationMode, InstrToInject> =
                     HashMap::new();
@@ -560,32 +560,35 @@ impl<'a> Module<'a> {
                     }
 
                     // resolve instruction-level instrumentation
-
-                    // Handle block alt
-                    if let Some(block_alt) = &instrumentation.block_alt {
-                        if plan_resolution_block_alt(
-                            block_alt,
-                            &mut builder,
-                            &mut retain_end,
-                            op,
-                            idx,
-                        ) {
-                            // we've got a match, which injected the alt body. continue to the next instruction
-                            delete_block = block_stack.last();
-                        }
-                    }
                     match op {
                         Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                             // The block ID will just be the curr len of the stack!
                             block_stack.push(block_stack.len() as u32);
 
+                            // Handle block alt
+                            if let Some(block_alt) = &instrumentation.block_alt {
+                                // only plan to handle if we're not already removing the block this instr is in
+                                if delete_block.is_none()
+                                    && plan_resolution_block_alt(
+                                        block_alt,
+                                        &mut builder,
+                                        &mut retain_end,
+                                        op,
+                                        idx,
+                                    )
+                                {
+                                    // we've got a match, which injected the alt body. continue to the next instruction
+                                    delete_block = Some(*block_stack.last().unwrap());
+                                    continue;
+                                }
+                            }
+
                             if delete_block.is_some() {
                                 // delete this block and skip all instrumentation handling (like below)
-                                builder.alternate_at(Location::Module {
+                                builder.empty_alternate_at(Location::Module {
                                     func_idx: 0, // not used
                                     instr_idx: idx,
                                 });
-                                builder.inject(Operator::Nop);
                                 continue;
                             }
                         }
@@ -599,11 +602,10 @@ impl<'a> Module<'a> {
 
                             if delete_block.is_some() {
                                 // delete this block and skip all instrumentation handling (like below)
-                                builder.alternate_at(Location::Module {
+                                builder.empty_alternate_at(Location::Module {
                                     func_idx: 0, // not used
                                     instr_idx: idx,
                                 });
-                                builder.inject(Operator::Nop);
                                 continue;
                             }
                         }
@@ -614,21 +616,25 @@ impl<'a> Module<'a> {
                                     // Delete the block, but don't remove the end if we say not to
                                     // should still process instrumentation on the end though...
                                     // (consider if/else where the else has an alt block)
-                                    if *block_id == *delete_block_id {
+                                    if (*delete_block_id).eq(&block_id) {
                                         if !retain_end {
                                             // delete this end and skip all instrumentation handling (like below)
-                                            builder.alternate_at(Location::Module {
+                                            builder.empty_alternate_at(Location::Module {
                                                 func_idx: 0, // not used
                                                 instr_idx: idx,
                                             });
-                                            builder.inject(Operator::Nop);
                                         }
                                         // completed the alt block logic, clear state
                                         delete_block = None;
                                         retain_end = true;
                                     }
+                                    // delete this instruction and skip all instrumentation handling (like below)
+                                    builder.empty_alternate_at(Location::Module {
+                                        func_idx: 0, // not used
+                                        instr_idx: idx,
+                                    });
+                                    continue;
                                 }
-
 
                                 // we've reached an end, make sure resolve_on_else is cleared!
                                 // resolve bodies for else OR end
@@ -647,7 +653,17 @@ impl<'a> Module<'a> {
                                 }
                             }
                         }
-                        _ => {} // skip non block-structured opcodes
+                        _ => {
+                            // non block-structured opcodes
+                            if delete_block.is_some() {
+                                // delete this instruction and skip all instrumentation handling (like below)
+                                builder.empty_alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                continue;
+                            }
+                        }
                     }
 
                     // plan instruction-level instrumentation resolution
@@ -812,7 +828,7 @@ impl<'a> Module<'a> {
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            for (_old_idx, func) in self.functions.iter().enumerate() {
+            for func in self.functions.iter() {
                 if !func.deleted {
                     if let FuncKind::Local(l) = func.kind() {
                         functions.function(l.ty_id);
@@ -987,17 +1003,13 @@ impl<'a> Module<'a> {
                     converted_locals.push((*c, wasm_encoder::ValType::from(&*ty)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                let l = instructions.len() - 1;
+                let instr_len = instructions.len() - 1;
                 for (idx, (op, instrument)) in instructions.iter_mut().enumerate() {
                     if is_call(op) {
                         update_call(op, &func_mapping);
                     }
                     if !instrument.has_instr() {
-                        function.instruction(
-                            &reencode
-                                .instruction(op.clone())
-                                .expect("Unable to convert Instruction"),
-                        );
+                        encode(&op.clone(), &mut function, &mut reencode);
                     } else {
                         // this instruction has instrumentation, handle it!
                         let InstrumentationFlag {
@@ -1025,53 +1037,59 @@ impl<'a> Module<'a> {
                             error!("BUG: Block alt instrumentation should be resolved already, please report.");
                         }
                         // If we're at the `end` of the function, drop this instrumentation
-                        let at_end = idx >= instructions.len() - 1;
+                        let at_end = idx >= instr_len;
 
                         // First encode before instructions
-                        for instr in before {
-                            if is_call(instr) {
-                                update_call(instr, &func_mapping);
-                            }
-                            function.instruction(
-                                &reencode
-                                    .instruction(instr.clone())
-                                    .expect("Unable to convert Instruction"),
-                            );
-                        }
+                        update_call_and_encode(before, &func_mapping, &mut function, &mut reencode);
 
                         // If there are any alternate, encode the alternate
-                        if !at_end && !alternate.is_empty() {
-                            for instr in alternate {
-                                if is_call(instr) {
-                                    update_call(instr, &func_mapping);
-                                }
-                                function.instruction(
-                                    &reencode
-                                        .instruction(instr.clone())
-                                        .expect("Unable to convert Instruction"),
+                        if !at_end && !alternate.is_none() {
+                            if let Some(alt) = alternate {
+                                update_call_and_encode(
+                                    alt,
+                                    &func_mapping,
+                                    &mut function,
+                                    &mut reencode,
                                 );
                             }
                         } else {
-                            function.instruction(
-                                &reencode
-                                    .instruction(op.clone())
-                                    .expect("Unable to convert Instruction"),
-                            );
+                            encode(&op.clone(), &mut function, &mut reencode);
                         }
 
                         // Now encode the after instructions
                         if !at_end {
-                            for instr in after {
-                                if is_call(instr) {
-                                    update_call(instr, &func_mapping);
-                                }
-                                function.instruction(
-                                    &reencode
-                                        .instruction(instr.clone())
-                                        .expect("Unable to convert Instruction"),
-                                );
-                            }
+                            update_call_and_encode(
+                                after,
+                                &func_mapping,
+                                &mut function,
+                                &mut reencode,
+                            );
                         }
+                    }
+
+                    fn update_call_and_encode(
+                        instrs: &mut Vec<Operator>,
+                        func_mapping: &HashMap<i32, i32>,
+                        function: &mut wasm_encoder::Function,
+                        reencode: &mut RoundtripReencoder,
+                    ) {
+                        for instr in instrs {
+                            if is_call(instr) {
+                                update_call(instr, func_mapping);
+                            }
+                            encode(instr, function, reencode);
+                        }
+                    }
+                    fn encode(
+                        instr: &Operator,
+                        function: &mut wasm_encoder::Function,
+                        reencode: &mut RoundtripReencoder,
+                    ) {
+                        function.instruction(
+                            &reencode
+                                .instruction(instr.clone())
+                                .expect("Unable to convert Instruction"),
+                        );
                     }
                 }
                 if let Some(name) = name {
@@ -1196,9 +1214,8 @@ impl<'a> Module<'a> {
         imports_id: ImportsID,
         local_function: LocalFunction<'a>,
     ) {
-        match self.functions.get_kind(imports_id as FunctionID) {
-            FuncKind::Local(_) => panic!("This is a local function!"),
-            _ => {}
+        if let FuncKind::Local(_) = self.functions.get_kind(imports_id as FunctionID) {
+            panic!("This is a local function!");
         }
         self.delete_import_func(imports_id);
         self.functions
@@ -1396,10 +1413,11 @@ fn plan_resolution_block_exit<'a, 'b, 'c>(
 fn plan_resolution_block_alt<'a, 'b, 'c>(
     block_alt: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
-    mut retain_end: &mut bool,
+    retain_end: &mut bool,
     op: &Operator,
     idx: usize,
-) -> bool where
+) -> bool
+where
     'c: 'b,
 {
     // convert instr to simple before/after/alt
@@ -1409,12 +1427,18 @@ fn plan_resolution_block_alt<'a, 'b, 'c>(
         | Operator::Loop { .. }
         | Operator::If { .. }
         | Operator::Else { .. } => {
-            // just inject immediately after the start of the block
-            builder.alternate_at(Location::Module {
+            let loc = Location::Module {
                 func_idx: 0, // not used
                 instr_idx: idx,
-            });
-            builder.inject_all(block_alt);
+            };
+            if !block_alt.is_empty() {
+                // just inject immediately after the start of the block
+                builder.alternate_at(loc);
+                builder.inject_all(block_alt);
+            } else {
+                // remove the instruction!
+                builder.empty_alternate_at(loc);
+            }
 
             // no need to remove the contents of block_alt since we're actually
             // using a read-only copy!

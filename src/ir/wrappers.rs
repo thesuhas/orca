@@ -323,10 +323,7 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
 }
 
 pub(crate) fn is_call(op: &Operator) -> bool {
-    match op {
-        Operator::Call { function_index: _ } => true,
-        _ => false,
-    }
+    matches!(op, Operator::Call { .. })
 }
 
 pub(crate) fn update_call(op: &mut Operator, mapping: &HashMap<i32, i32>) {

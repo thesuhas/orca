@@ -660,11 +660,11 @@ impl<'a> InstrumentationFlag<'a> {
         } = self;
         !before.is_empty()
             || !after.is_empty()
-            || (!alternate.is_none() && !alternate.as_ref().unwrap().is_empty())
+            || !alternate.is_none() // Some(vec![]) means instruction removal!
             || !semantic_after.is_empty()
             || !block_entry.is_empty()
             || !block_exit.is_empty()
-            || (!block_alt.is_none() && !block_alt.as_ref().unwrap().is_empty())
+            || !block_alt.is_none() // Some(vec![]) means block removal!
     }
 
     /// Add an instruction to the current InstrumentationMode's list

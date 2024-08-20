@@ -263,6 +263,27 @@ impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
         }
     }
 
+    fn empty_alternate_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.body.instructions[instr_idx].1.alternate = Some(vec![]);
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+
+        self
+    }
+
+    fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.body.instructions[instr_idx].1.block_alt = Some(vec![]);
+            self.instr_flag.has_special_instr |= true;
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+
+        self
+    }
+
     fn get_injected_val(&self, idx: usize) -> &Operator {
         self.body.instructions[idx].1.get_instr(idx)
     }

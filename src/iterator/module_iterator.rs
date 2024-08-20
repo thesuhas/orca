@@ -206,6 +206,45 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    fn empty_alternate_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
+                FuncKind::Local(ref mut l) => {
+                    l.body.instructions[instr_idx].1.alternate = Some(vec![])
+                }
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+        self
+    }
+
+    fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
+                FuncKind::Local(ref mut l) => {
+                    l.body.instructions[instr_idx].1.block_alt = Some(vec![]);
+                    l.instr_flag.has_special_instr |= true;
+                }
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+        self
+    }
+
     /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
         if let Location::Module {
