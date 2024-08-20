@@ -536,6 +536,7 @@ impl<'a> Module<'a> {
                 // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
                 let readable_copy_of_body = builder.body.instructions.clone();
                 for (idx, (op, instrumentation)) in readable_copy_of_body.iter().enumerate() {
+                    // resolve function-level instrumentation
                     if let Some(on_entry) = &mut instr_func_on_entry {
                         if !on_entry.is_empty() {
                             resolve_function_entry(&mut builder, on_entry, idx);
@@ -546,6 +547,8 @@ impl<'a> Module<'a> {
                             resolve_function_exit(&mut builder, on_exit, idx);
                         }
                     }
+
+                    // resolve instruction-level instrumentation
                     match op {
                         Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                             // The block ID will just be the curr len of the stack!
@@ -611,6 +614,7 @@ impl<'a> Module<'a> {
                         _ => {} // skip non block-structured opcodes
                     }
 
+                    // plan instruction-level instrumentation resolution
                     // this must go after the above logic to ensure the block_id is on the top of the stack!
                     if instrumentation.has_instr() {
                         // this instruction has instrumentation, check if there is any to resolve!
@@ -628,19 +632,12 @@ impl<'a> Module<'a> {
 
                         // Handle block entry
                         if !block_entry.is_empty() {
-                            resolve_block_entry(
-                                block_entry,
-                                &mut builder,
-                                &block_stack,
-                                &mut to_resolve,
-                                op,
-                                idx,
-                            );
+                            plan_resolution_block_entry(block_entry, &mut builder, op, idx);
                         }
 
                         // Handle block exit
                         if !block_exit.is_empty() {
-                            resolve_block_exit(
+                            plan_resolution_block_exit(
                                 block_exit,
                                 &mut builder,
                                 &block_stack,
@@ -652,7 +649,7 @@ impl<'a> Module<'a> {
 
                         // Handle block alt
                         if let Some(block_alt) = block_alt {
-                            resolve_block_alt(
+                            plan_resolution_block_alt(
                                 block_alt,
                                 &mut builder,
                                 &block_stack,
@@ -664,7 +661,7 @@ impl<'a> Module<'a> {
 
                         // Handle semantic_after!
                         if !semantic_after.is_empty() {
-                            resolve_semantic_after(
+                            plan_resolution_semantic_after(
                                 semantic_after,
                                 &mut builder,
                                 &block_stack,
@@ -1178,20 +1175,38 @@ fn resolve_function_exit<'a, 'b, 'c>(
     }
 }
 
-fn resolve_block_entry<'a, 'b, 'c>(
+fn plan_resolution_block_entry<'a, 'b, 'c>(
     block_entry: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
-    block_stack: &[BlockID],
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'c>>,
     op: &Operator,
     idx: usize,
 ) where
     'c: 'b,
 {
-    todo!()
+    // save instrumentation to be converted to simple before/after/alt
+    match op {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::If { .. }
+        | Operator::Else { .. } => {
+            // just inject immediately after the start of the block
+            builder.after_at(Location::Module {
+                func_idx: 0, // not used
+                instr_idx: idx,
+            });
+            builder.inject_all(block_entry);
+
+            // no need to remove the contents of block_entry since we're actually
+            // using a read-only copy!
+        }
+        _ => {
+            // no need to remove the contents of block_entry since we're actually
+            // using a read-only copy!
+        }
+    }
 }
 
-fn resolve_block_exit<'a, 'b, 'c>(
+fn plan_resolution_block_exit<'a, 'b, 'c>(
     block_exit: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
@@ -1204,7 +1219,7 @@ fn resolve_block_exit<'a, 'b, 'c>(
     todo!()
 }
 
-fn resolve_block_alt<'a, 'b, 'c>(
+fn plan_resolution_block_alt<'a, 'b, 'c>(
     block_alt: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
@@ -1217,7 +1232,7 @@ fn resolve_block_alt<'a, 'b, 'c>(
     todo!()
 }
 
-fn resolve_semantic_after<'a, 'b, 'c>(
+fn plan_resolution_semantic_after<'a, 'b, 'c>(
     semantic_after: &InstrBody<'c>,
     builder: &mut FunctionModifier<'a, 'b>,
     block_stack: &[BlockID],
