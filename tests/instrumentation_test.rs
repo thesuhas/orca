@@ -2,6 +2,7 @@ use log::{error, trace};
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
+use orca::module_builder::AddLocal;
 use orca::opcode::Inject;
 use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
@@ -196,7 +197,7 @@ fn test_inject_locals() {
     let file = "tests/test_inputs/instr_testing/modules/add-inject_locals.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut is_first = true;
     while is_first || mod_it.next().is_some() {
@@ -240,7 +241,7 @@ fn test_semantic_after_complex_mult_nested_diff_opcodes() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/complex_mult_nested_diff_opcodes.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -296,7 +297,7 @@ fn test_semantic_after_medium_1br() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -327,7 +328,7 @@ fn test_semantic_after_medium_1br_if() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_1br_if.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -358,7 +359,7 @@ fn test_semantic_after_medium_1br_table() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_1br_table.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -389,7 +390,7 @@ fn test_semantic_after_medium_2br() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_2br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -420,7 +421,7 @@ fn test_semantic_after_medium_2br_if() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_2br_if.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -451,7 +452,7 @@ fn test_semantic_after_medium_2br_table() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_2br_table.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -482,7 +483,7 @@ fn test_semantic_after_medium_blocks() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_blocks.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -513,7 +514,7 @@ fn test_semantic_after_medium_ifelse() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_ifelse.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -559,7 +560,7 @@ fn test_semantic_after_medium_ifs() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_ifs.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut block_body = vec![];
     block_body.push(Operator::I32Const { value: 12 });
@@ -600,7 +601,7 @@ fn test_semantic_after_medium_multiple() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_multiple.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_if_body = vec![];
     br_if_body.push(Operator::I32Const { value: 1234 });
@@ -628,7 +629,7 @@ fn test_semantic_after_medium_multiple() {
 
 #[test]
 fn test_semantic_after_medium_other_operators() {
-    let file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_other_operators.wat";
+    let _file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_other_operators.wat";
     // todo -- test the other operators (when I know how to write wat using them)
     assert!(true);
 }
@@ -638,7 +639,7 @@ fn test_semantic_after_simple_1br() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_1br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_body = vec![];
     br_body.push(Operator::I32Const { value: 1234 });
@@ -662,7 +663,7 @@ fn test_semantic_after_simple_1br_if() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_1br_if.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_if_body = vec![];
     br_if_body.push(Operator::I32Const { value: 1234 });
@@ -686,7 +687,7 @@ fn test_semantic_after_simple_1br_table() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_1br_table.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_table_body = vec![];
     br_table_body.push(Operator::I32Const { value: 1234 });
@@ -710,7 +711,7 @@ fn test_semantic_after_simple_1if() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_1if.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut if_body = vec![];
     if_body.push(Operator::I32Const { value: 12 });
@@ -741,7 +742,7 @@ fn test_semantic_after_simple_2br() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_2br.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_body = vec![];
     br_body.push(Operator::I32Const { value: 1234 });
@@ -765,7 +766,7 @@ fn test_semantic_after_simple_2br_if() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_2br_if.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_if_body = vec![];
     br_if_body.push(Operator::I32Const { value: 1234 });
@@ -789,7 +790,7 @@ fn test_semantic_after_simple_2br_table() {
     let file = "tests/test_inputs/instr_testing/modules/semantic_after/simple_2br_table.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let mut br_table_body = vec![];
     br_table_body.push(Operator::I32Const { value: 1234 });

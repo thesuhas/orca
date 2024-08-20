@@ -5,6 +5,7 @@ use orca::ir::types::Location;
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{Instrumenter, Iterator};
 use orca::iterator::module_iterator::ModuleIterator;
+use orca::module_builder::AddLocal;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
@@ -31,7 +32,7 @@ fn test_mod_iterator_count() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
     iterate_module_and_count(&mut mod_it, 1, 9);
 }
 
@@ -43,7 +44,7 @@ fn test_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 0);
 
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
     iterate_module_and_count(&mut mod_it, 0, 10);
 }
 
@@ -54,7 +55,7 @@ fn test_it_instr_at() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let loc = Location::Module {
         func_idx: 1,
@@ -90,7 +91,7 @@ fn test_it_dup_instr() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     loop {
         let op = mod_it.curr_op();
@@ -123,7 +124,7 @@ fn test_it_add_local_diff_type() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     mod_it.add_local(orca::ir::types::DataType::I64);
     mod_it.add_local(orca::ir::types::DataType::I32);
@@ -139,7 +140,7 @@ fn test_imports() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(module.num_import_func(), 2);
 
-    let mut mod_it = ModuleIterator::new(&mut module, vec![]);
+    let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
     iterate_module_and_count(&mut mod_it, 2, 2);
 
     let a = module.encode();
@@ -153,8 +154,8 @@ fn test_function_skipping_module() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let functions_skip = vec![1usize];
-    let mut mod_it = ModuleIterator::new(&mut module, functions_skip);
+    let functions_skip = vec![1];
+    let mut mod_it = ModuleIterator::new(&mut module, &functions_skip);
 
     let mut set = HashSet::new();
 
@@ -174,7 +175,7 @@ fn test_function_skipping_module() {
     }
 
     assert_eq!(set.len(), 1);
-    assert!(set.contains(&2usize));
+    assert!(set.contains(&2));
 }
 
 #[test]
@@ -183,9 +184,9 @@ fn test_function_skipping_component() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut comp = Component::parse(&buff, false).expect("Unable to parse");
-    let functions_skip = vec![0usize];
+    let functions_skip = vec![0];
     let mut mapping = HashMap::new();
-    mapping.insert(0usize, functions_skip);
+    mapping.insert(0, functions_skip);
     let mut comp_it = ComponentIterator::new(&mut comp, mapping);
 
     let mut set = HashSet::new();
@@ -202,7 +203,7 @@ fn test_function_skipping_component() {
     }
 
     assert_eq!(set.len(), 1);
-    assert!(set.contains(&1usize));
+    assert!(set.contains(&1));
 }
 
 #[test]
@@ -259,12 +260,7 @@ fn iterate_module_and_count(mod_it: &mut ModuleIterator, num_imports: u32, exp_c
             instr_idx,
         } = mod_it.curr_loc()
         {
-            trace!(
-                "Func: {}, {}: {:?},",
-                num_imports as usize + func_idx,
-                instr_idx,
-                op
-            );
+            trace!("Func: {}, {}: {:?},", num_imports + func_idx, instr_idx, op);
         } else {
             panic!("Should've gotten Module Location!");
         }

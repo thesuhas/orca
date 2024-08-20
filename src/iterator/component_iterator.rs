@@ -2,13 +2,13 @@
 
 use crate::ir::component::Component;
 use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
-use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_functions::{FuncKind, LocalFunction};
 use crate::ir::module::module_globals::Global;
 use crate::ir::types::{DataType, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{Instrumenter, Iterator};
+use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, MacroOpcode, Opcode};
 use crate::subiterator::component_subiterator::ComponentSubIterator;
-use crate::ModuleBuilder;
 use std::collections::HashMap;
 use std::iter::Iterator as StdIter;
 use wasmparser::Operator;
@@ -21,7 +21,7 @@ pub struct ComponentIterator<'a, 'b> {
     comp_iterator: ComponentSubIterator,
 }
 
-fn print_metadata(metadata: &HashMap<usize, HashMap<usize, usize>>) {
+fn print_metadata(metadata: &HashMap<ModuleID, HashMap<FunctionID, usize>>) {
     for c in metadata.keys() {
         println!("Module: {:?}", c);
         for (m, i) in metadata.get(c).unwrap().iter() {
@@ -33,20 +33,23 @@ fn print_metadata(metadata: &HashMap<usize, HashMap<usize, usize>>) {
 #[allow(dead_code)]
 impl<'a, 'b> ComponentIterator<'a, 'b> {
     /// Creates a new Component Iterator
-    pub fn new(comp: &'a mut Component<'b>, skip_funcs: HashMap<usize, Vec<usize>>) -> Self {
+    pub fn new(
+        comp: &'a mut Component<'b>,
+        skip_funcs: HashMap<ModuleID, Vec<FunctionID>>,
+    ) -> Self {
         // Creates Module -> Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (mod_idx, m) in comp.modules.iter().enumerate() {
             let mut mod_metadata = HashMap::new();
-            for (idx, func) in m.functions.iter().enumerate() {
+            for func in m.functions.iter() {
                 match &func.kind {
                     FuncKind::Import(_) => {}
-                    FuncKind::Local(l) => {
-                        mod_metadata.insert(idx, l.body.num_instructions);
+                    FuncKind::Local(LocalFunction { func_id, body, .. }) => {
+                        mod_metadata.insert(*func_id, body.num_instructions);
                     }
                 }
             }
-            metadata.insert(mod_idx, mod_metadata);
+            metadata.insert(mod_idx as ModuleID, mod_metadata);
         }
         print_metadata(&metadata);
         let num_modules = comp.num_modules;
@@ -64,7 +67,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             instr_idx: _instr_idx,
         } = self.curr_loc()
         {
-            mod_idx as u32
+            mod_idx
         } else {
             panic!("Should have gotten component location");
         }
@@ -79,7 +82,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx]
+            match &self.comp.modules[mod_idx as usize]
                 .functions
                 .get(func_idx as FunctionID)
                 .kind
@@ -89,24 +92,6 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             }
         } else {
             panic!("Should have gotten Component Location!")
-        }
-    }
-
-    pub fn add_local(&mut self, val_type: DataType) -> LocalID {
-        let curr_loc = self.curr_loc();
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx: _,
-        } = curr_loc
-        {
-            {
-                self.comp.modules[mod_idx]
-                    .functions
-                    .add_local(func_idx as FunctionID, val_type)
-            }
-        } else {
-            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 }
@@ -161,7 +146,7 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.curr_loc()
         {
-            match self.comp.modules[mod_idx]
+            match self.comp.modules[mod_idx as usize]
                 .functions
                 .get_mut(func_idx as FunctionID)
                 .kind
@@ -185,7 +170,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx]
+            match &self.comp.modules[mod_idx as usize]
                 .functions
                 .get(func_idx as FunctionID)
                 .kind
@@ -221,7 +206,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = loc
         {
-            match self.comp.modules[mod_idx]
+            match self.comp.modules[mod_idx as usize]
                 .functions
                 .get_mut(func_idx as FunctionID)
                 .kind
@@ -243,7 +228,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = loc
         {
-            match self.comp.modules[mod_idx]
+            match self.comp.modules[mod_idx as usize]
                 .functions
                 .get_mut(func_idx as FunctionID)
                 .kind
@@ -300,7 +285,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx]
+            match &self.comp.modules[mod_idx as usize]
                 .functions
                 .get(func_idx as FunctionID)
                 .kind
@@ -349,7 +334,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
             instr_idx,
         } = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx]
+            match &self.comp.modules[mod_idx as usize]
                 .functions
                 .get(func_idx as FunctionID)
                 .kind
@@ -363,7 +348,7 @@ impl<'a, 'b> Iterator<'b> for ComponentIterator<'a, 'b> {
     }
 }
 
-impl ModuleBuilder for ComponentIterator<'_, '_> {
+impl AddLocal for ComponentIterator<'_, '_> {
     fn add_local(&mut self, val_type: DataType) -> LocalID {
         let curr_loc = self.curr_loc();
         if let Location::Component {
@@ -371,7 +356,7 @@ impl ModuleBuilder for ComponentIterator<'_, '_> {
         } = curr_loc
         {
             {
-                self.comp.modules[mod_idx]
+                self.comp.modules[mod_idx as usize]
                     .functions
                     .add_local(func_idx as FunctionID, val_type)
             }

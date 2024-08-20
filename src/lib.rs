@@ -11,7 +11,6 @@ pub mod module_builder;
 pub mod opcode;
 pub mod subiterator;
 
-pub use crate::module_builder::ModuleBuilder;
 pub use crate::opcode::Opcode;
 
 pub use crate::ir::component::Component;
