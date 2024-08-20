@@ -11,6 +11,8 @@ use std::io::{BufRead, BufReader};
 use std::iter::Iterator as StdIter;
 use std::mem::discriminant;
 use wasmparser::Operator;
+mod common;
+use crate::common::check_instrumentation_encoding;
 
 #[test]
 fn no_injection() {

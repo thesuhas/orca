@@ -5,18 +5,24 @@ use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::types::{Body, FuncInstrFlag};
 use crate::DataType;
 use wasmparser::Operator;
+use std::cmp::min;
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
 #[derive(Clone, Debug)]
 pub struct Function<'a> {
     pub(crate) kind: FuncKind<'a>,
     name: Option<String>,
+    pub(crate) deleted: bool,
 }
 
 impl<'a> Function<'a> {
     /// Create a new function
     pub fn new(kind: FuncKind<'a>, name: Option<String>) -> Self {
-        Function { kind, name }
+        Function {
+            kind,
+            name,
+            deleted: false,
+        }
     }
 
     /// Get the TypeID of the function
@@ -25,8 +31,10 @@ impl<'a> Function<'a> {
     }
 
     /// Change the kind of the Function
-    pub fn set_kind(&mut self, kind: FuncKind<'a>) {
-        self.kind = kind
+    pub(crate) fn set_kind(&mut self, kind: FuncKind<'a>) {
+        self.kind = kind;
+        // Resets deletion
+        self.deleted = false;
     }
 
     /// Get the kind of the function
@@ -34,9 +42,29 @@ impl<'a> Function<'a> {
         &self.kind
     }
 
+    /// Check if it's a local function
+    pub fn is_local(&self) -> bool {
+        match &self.kind {
+            FuncKind::Local(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Check if it's an imported function
+    pub fn is_import(&self) -> bool {
+        match &self.kind {
+            FuncKind::Import(_) => true,
+            _ => false,
+        }
+    }
+
     /// Unwrap a local function. If it is an imported function, it panics.
     pub fn unwrap_local(&'a self) -> &LocalFunction<'a> {
         self.kind.unwrap_local()
+    }
+
+    pub(crate) fn delete(&mut self) {
+        self.deleted = true;
     }
 
     /// Unwrap a local function as mutable. If it is an imported function, it panics.
@@ -163,16 +191,18 @@ pub(crate) fn add_local(
 /// Intermediate representation of an Imported Function. The actual Import is stored in the Imports field of the module.
 #[derive(Clone, Debug)]
 pub struct ImportedFunction {
-    pub import_id: ImportsID,
+    pub import_id: ImportsID,            // Maps to location in a modules imports
+    pub(crate) import_fn_id: FunctionID, // Maps to location in a modules imported functions
     pub ty_id: TypeID,
 }
 
 impl ImportedFunction {
     /// Create a new imported function
-    pub fn new(id: ImportsID, type_id: TypeID) -> Self {
+    pub fn new(id: ImportsID, type_id: TypeID, function_id: FunctionID) -> Self {
         ImportedFunction {
             import_id: id,
             ty_id: type_id,
+            import_fn_id: function_id,
         }
     }
 }
@@ -184,6 +214,9 @@ pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
     num_import_fns: usize,
     num_local_fns: usize,
+    added_local_fns: u32,
+    pub(crate) deleted_local_fns: u32,
+    pub(crate) first_deleted_fn: u32,
 }
 
 impl<'a> Functions<'a> {
@@ -193,6 +226,9 @@ impl<'a> Functions<'a> {
             functions,
             num_import_fns,
             num_local_fns,
+            deleted_local_fns: 0,
+            added_local_fns: 0,
+            first_deleted_fn: u32::MAX,
         }
     }
 
@@ -211,7 +247,11 @@ impl<'a> Functions<'a> {
 
     /// Add a new function
     pub fn push(&mut self, func: Function<'a>) {
-        self.functions.push(func);
+        self.functions.push(func.clone());
+        match func.kind {
+            FuncKind::Local(_) => self.added_local_fns += 1,
+            _ => {}
+        }
     }
 
     /// Checks if there are no functions
@@ -227,7 +267,14 @@ impl<'a> Functions<'a> {
     /// Delete a function
     pub fn delete(&mut self, id: FunctionID) {
         if id < self.functions.len() as u32 {
-            self.functions.remove(id as usize);
+            self.functions[id as usize].delete();
+            match self.functions[id as usize].kind {
+                FuncKind::Local(_) => {
+                    self.deleted_local_fns += 1;
+                    self.first_deleted_fn = min(self.first_deleted_fn, id);
+                }
+                _ => {}
+            }
         }
     }
 
@@ -250,7 +297,17 @@ impl<'a> Functions<'a> {
     pub fn get_kind(&self, function_id: FunctionID) -> &FuncKind<'a> {
         &self.functions[function_id as usize].kind
     }
+    /// Check if a function is a local
+    pub fn is_local(&self, function_id: FunctionID) -> bool {
+        self.functions[function_id as usize].is_local()
+    }
 
+    /// Check if a function is an import
+    pub fn is_import(&self, function_id: FunctionID) -> bool {
+        self.functions[function_id as usize].is_import()
+    }
+
+    /// TODO -- can this be removed?
     /// Get kind of function
     pub fn get_kind_mut(&mut self, function_id: FunctionID) -> &mut FuncKind<'a> {
         &mut self.functions[function_id as usize].kind
@@ -300,13 +357,14 @@ impl<'a> Functions<'a> {
         imp_id: ImportsID,
         ty_id: TypeID,
         name: Option<String>,
+        imp_fn_id: u32,
     ) -> FunctionID {
         if self.num_local_fns > 0 {
             panic!("Cannot add an imported function after local functions!")
         }
 
         self.functions.push(Function::new(
-            FuncKind::Import(ImportedFunction::new(imp_id, ty_id)),
+            FuncKind::Import(ImportedFunction::new(imp_id, ty_id, imp_fn_id)),
             name,
         ));
         (self.functions.len() - 1) as FunctionID
@@ -334,5 +392,19 @@ impl<'a> Functions<'a> {
     /// Get the name of a function
     pub fn get_name(&self, function_id: FunctionID) -> Option<String> {
         self.functions[function_id as usize].name.clone()
+    }
+
+    /// Check if it's deleted
+    pub fn is_deleted(&self, function_id: FunctionID) -> bool {
+        self.functions[function_id as usize].deleted
+    }
+
+    // Helper functions for rearrange
+    pub(crate) fn remove(&mut self, function_id: FunctionID) -> Function<'a> {
+        self.functions.remove(function_id as usize)
+    }
+
+    pub(crate) fn insert(&mut self, function_id: FunctionID, func: Function<'a>) {
+        self.functions.insert(function_id as usize, func);
     }
 }
