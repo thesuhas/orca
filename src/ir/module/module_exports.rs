@@ -84,13 +84,8 @@ impl ModuleExports {
     /// Get the Export ID from its function ID
     pub fn get_func_by_id(&self, id: FunctionID) -> Option<ExportsID> {
         for (export_id, exp) in self.exports.iter().enumerate() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.index == id {
-                        return Some(export_id as ExportsID);
-                    }
-                }
-                _ => {}
+            if matches!(exp.kind, ExternalKind::Func) && exp.index == id {
+                return Some(export_id as ExportsID);
             }
         }
         None
@@ -99,13 +94,8 @@ impl ModuleExports {
     /// Get the function ID of an exported function
     pub fn get_func_by_name(&self, name: String) -> Option<FunctionID> {
         for exp in self.exports.iter() {
-            match exp.kind {
-                ExternalKind::Func => {
-                    if exp.name.to_string() == name {
-                        return Some(exp.index);
-                    }
-                }
-                _ => {}
+            if matches!(exp.kind, ExternalKind::Func) && exp.name == name {
+                return Some(exp.index);
             }
         }
         None

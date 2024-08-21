@@ -323,10 +323,7 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
 }
 
 pub(crate) fn refers_to_func(op: &Operator) -> bool {
-    match op {
-        Operator::Call { function_index: _ } | Operator::RefFunc { function_index: _ } => true,
-        _ => false,
-    }
+    matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
 }
 
 pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<i32, i32>) {

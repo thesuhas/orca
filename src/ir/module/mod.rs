@@ -1,6 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::DataType;
+use super::types::{DataType, Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
@@ -19,10 +19,11 @@ use crate::ir::types::{
 use crate::ir::wrappers::{
     indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, update_fn_instr,
 };
-use crate::Opcode;
+use crate::opcode::{Inject, Instrumenter};
+use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
-use wasm_encoder::reencode::Reencode;
+use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
 pub mod module_exports;
@@ -266,10 +267,8 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool: Vec<_> = instructions
-                        .into_iter()
-                        .map(|op| (op, InstrumentationFlag::default()))
-                        .collect();
+                    let instructions_bool: Vec<_> =
+                        instructions.into_iter().map(Instruction::new).collect();
                     code_sections.push(Body {
                         locals,
                         num_locals,
@@ -509,81 +508,203 @@ impl<'a> Module<'a> {
             for rel_func_idx in self.num_imported_functions..self.functions.len() {
                 let func_idx = rel_func_idx as FunctionID;
                 if let FuncKind::Import(..) = &self.functions.get_kind(func_idx as FunctionID) {
+                    // skip imports
                     continue;
+                }
+
+                let mut instr_func_on_entry = None;
+                let mut instr_func_on_exit = None;
+                if let FuncKind::Local(LocalFunction { instr_flag, .. }) =
+                    self.functions.get_kind_mut(func_idx as FunctionID)
+                {
+                    if !instr_flag.has_special_instr {
+                        // skip functions without special instrumentation!
+                        continue;
+                    }
+
+                    // save off the function entry/exit special mode bodies
+                    if !instr_flag.entry.is_empty() {
+                        instr_func_on_entry = Some(instr_flag.entry.to_owned());
+                        instr_flag.entry = vec![];
+                    }
+                    if !instr_flag.exit.is_empty() {
+                        instr_func_on_exit = Some(instr_flag.exit.to_owned());
+                        instr_flag.exit = vec![];
+                    }
                 }
 
                 // initialize with 0 to store the func block!
                 let mut block_stack: Vec<BlockID> = vec![0];
-                let mut to_resolve: HashMap<BlockID, InstrToInject> = HashMap::new();
+                let mut delete_block: Option<BlockID> = None;
+                let mut retain_end = true;
+                let mut resolve_on_else_or_end: HashMap<InstrumentationMode, InstrToInject> =
+                    HashMap::new();
+                let mut resolve_on_end: HashMap<
+                    BlockID,
+                    HashMap<InstrumentationMode, InstrToInject>,
+                > = HashMap::new();
                 let mut builder = self.functions.get_fn_modifier(func_idx).unwrap();
 
                 // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
                 let readable_copy_of_body = builder.body.instructions.clone();
-                for (idx, (op, instrumentation)) in readable_copy_of_body.iter().enumerate() {
+                for (
+                    idx,
+                    Instruction {
+                        op,
+                        instr_flag: instrumentation,
+                    },
+                ) in readable_copy_of_body.iter().enumerate()
+                {
+                    // resolve function-level instrumentation
+                    if let Some(on_entry) = &mut instr_func_on_entry {
+                        if !on_entry.is_empty() {
+                            resolve_function_entry(&mut builder, on_entry, idx);
+                        }
+                    }
+                    if let Some(on_exit) = &mut instr_func_on_exit {
+                        if !on_exit.is_empty() {
+                            resolve_function_exit(&mut builder, on_exit, idx);
+                        }
+                    }
+
+                    // resolve instruction-level instrumentation
                     match op {
                         Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                             // The block ID will just be the curr len of the stack!
                             block_stack.push(block_stack.len() as u32);
+
+                            // Handle block alt
+                            if let Some(block_alt) = &instrumentation.block_alt {
+                                // only plan to handle if we're not already removing the block this instr is in
+                                if delete_block.is_none()
+                                    && plan_resolution_block_alt(
+                                        block_alt,
+                                        &mut builder,
+                                        &mut retain_end,
+                                        op,
+                                        idx,
+                                    )
+                                {
+                                    // we've got a match, which injected the alt body. continue to the next instruction
+                                    delete_block = Some(*block_stack.last().unwrap());
+                                    continue;
+                                }
+                            }
+
+                            if delete_block.is_some() {
+                                // delete this block and skip all instrumentation handling (like below)
+                                builder.empty_alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                continue;
+                            }
+                        }
+                        Operator::Else => {
+                            // necessary for if statements with block_exit instrumentation
+                            for (mode, instr_to_inject) in resolve_on_else_or_end.iter() {
+                                // resolve bodies at the else
+                                resolve_bodies(&mut builder, mode, instr_to_inject, idx);
+                            }
+                            resolve_on_else_or_end.clear();
+
+                            // Handle block alt
+                            if let Some(block_alt) = &instrumentation.block_alt {
+                                // only plan to handle if we're not already removing the block this instr is in
+                                if delete_block.is_none()
+                                    && plan_resolution_block_alt(
+                                        block_alt,
+                                        &mut builder,
+                                        &mut retain_end,
+                                        op,
+                                        idx,
+                                    )
+                                {
+                                    // we've got a match, which injected the alt body. continue to the next instruction
+                                    delete_block = Some(*block_stack.last().unwrap());
+                                    continue;
+                                }
+                            }
+
+                            if delete_block.is_some() {
+                                // delete this block and skip all instrumentation handling (like below)
+                                builder.empty_alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                continue;
+                            }
                         }
                         Operator::End => {
                             // Pop the stack and check to see if we have instrumentation to inject!
                             if let Some(block_id) = block_stack.pop() {
+                                if let Some(delete_block_id) = delete_block.as_mut() {
+                                    // Delete the block, but don't remove the end if we say not to
+                                    // should still process instrumentation on the end though...
+                                    // (consider if/else where the else has an alt block)
+                                    if (*delete_block_id).eq(&block_id) {
+                                        // completing the alt block logic, clear state
+                                        delete_block = None;
+                                        if !retain_end {
+                                            // delete this end and skip all instrumentation handling (like below)
+                                            builder.empty_alternate_at(Location::Module {
+                                                func_idx: 0, // not used
+                                                instr_idx: idx,
+                                            });
+                                            retain_end = true;
+                                            continue;
+                                        }
+                                        // fall through to the instrumentation handling
+                                        retain_end = true;
+                                    } else {
+                                        // delete this instruction and skip all instrumentation handling (like below)
+                                        builder.empty_alternate_at(Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        });
+                                        continue;
+                                    }
+                                }
+
+                                // we've reached an end, make sure resolve_on_else is cleared!
+                                // resolve bodies for else OR end
+                                for (mode, instr_to_inject) in resolve_on_else_or_end.iter() {
+                                    resolve_bodies(&mut builder, mode, instr_to_inject, idx);
+                                }
+                                resolve_on_else_or_end.clear();
+
                                 // remove top of stack! (end of vec)
-                                if let Some(InstrToInject {
-                                    flagged,
-                                    not_flagged,
-                                }) = to_resolve.remove(&block_id)
-                                {
-                                    // remove so we don't try to re-inject!
-                                    let mut is_first = true;
-                                    // inject the bodies predicated with the flag
-                                    for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
-                                        // Inject the bodies AFTER the current END opcode
-                                        builder.after_at(idx);
-
-                                        if is_first {
-                                            // inject flag check
-                                            builder.local_get(*bool_flag);
-                                            builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
-                                        } else {
-                                            // injecting multiple, already have an if statement
-                                            builder.else_stmt();
-                                            // inject flag check
-                                            builder.local_get(*bool_flag);
-                                            builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
-                                        }
-
-                                        // inject body
-                                        builder.inject_all(body);
-                                        if !is_first {
-                                            // need to inject end of nested if!
-                                            builder.end();
-                                        }
-                                        is_first = false;
-                                    }
-                                    if !flagged.is_empty() {
-                                        // inject end of flag check (the outer if)
-                                        builder.end();
-                                    }
-
-                                    // handle non-flagged bodies
-                                    // Inject the bodies AFTER the current END opcode
-                                    builder.after_at(idx);
-                                    for body in not_flagged.iter() {
-                                        // inject body
-                                        builder.inject_all(body);
+                                // remove it, so we don't try to re-inject!
+                                if let Some(to_resolve) = resolve_on_end.remove(&block_id) {
+                                    for (mode, instr_to_inject) in to_resolve.iter() {
+                                        // resolve bodies at the end
+                                        resolve_bodies(&mut builder, mode, instr_to_inject, idx);
                                     }
                                 }
                             }
                         }
-                        _ => {} // skip non block-structured opcodes
+                        _ => {
+                            // non block-structured opcodes
+                            if delete_block.is_some() {
+                                // delete this instruction and skip all instrumentation handling (like below)
+                                builder.empty_alternate_at(Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                });
+                                continue;
+                            }
+                        }
                     }
 
+                    // plan instruction-level instrumentation resolution
                     // this must go after the above logic to ensure the block_id is on the top of the stack!
                     if instrumentation.has_instr() {
                         // this instruction has instrumentation, check if there is any to resolve!
                         let InstrumentationFlag {
                             semantic_after,
+                            block_entry,
+                            block_exit,
+                            block_alt: _, // handled before here!
                             before: _,
                             after: _,
                             alternate: _,
@@ -591,69 +712,32 @@ impl<'a> Module<'a> {
                             // exhaustive to help identify where to add code to handle other special modes.
                         } = instrumentation;
 
+                        // Handle block entry
+                        if !block_entry.is_empty() {
+                            resolve_block_entry(block_entry, &mut builder, op, idx);
+                        }
+
+                        // Handle block exit
+                        if !block_exit.is_empty() {
+                            plan_resolution_block_exit(
+                                block_exit,
+                                &block_stack,
+                                &mut resolve_on_else_or_end,
+                                &mut resolve_on_end,
+                                op,
+                            );
+                        }
+
                         // Handle semantic_after!
                         if !semantic_after.is_empty() {
-                            // save instrumentation to be converted to simple before/after/alt
-                            match op {
-                                Operator::Block { .. }
-                                | Operator::Loop { .. }
-                                | Operator::If { .. }
-                                | Operator::Else { .. } => {
-                                    // add body-to-inject as non-flagged
-                                    let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
-                                    to_resolve
-                                        .entry(*block_id)
-                                        .and_modify(|instr_to_inject| {
-                                            instr_to_inject
-                                                .not_flagged
-                                                .push(semantic_after.to_owned());
-                                        })
-                                        .or_insert(InstrToInject {
-                                            flagged: vec![],
-                                            not_flagged: vec![semantic_after.to_owned()],
-                                        });
-                                }
-                                Operator::BrTable { targets } => {
-                                    let bool_flag_id =
-                                        create_bool_flag(&mut builder, idx, op, semantic_after);
-                                    targets.targets().for_each(|target| {
-                                        if let Ok(relative_depth) = target {
-                                            save_body_to_resolve(
-                                                &mut to_resolve,
-                                                semantic_after,
-                                                bool_flag_id,
-                                                relative_depth,
-                                                *block_stack.last().unwrap(),
-                                            );
-                                        }
-                                    });
-                                    // handle the default as well
-                                    save_body_to_resolve(
-                                        &mut to_resolve,
-                                        semantic_after,
-                                        bool_flag_id,
-                                        targets.default(),
-                                        *block_stack.last().unwrap(),
-                                    );
-                                }
-                                Operator::Br { relative_depth }
-                                | Operator::BrIf { relative_depth }
-                                | Operator::BrOnCast { relative_depth, .. }
-                                | Operator::BrOnCastFail { relative_depth, .. }
-                                | Operator::BrOnNonNull { relative_depth }
-                                | Operator::BrOnNull { relative_depth } => {
-                                    let bool_flag_id =
-                                        create_bool_flag(&mut builder, idx, op, semantic_after);
-                                    save_body_to_resolve(
-                                        &mut to_resolve,
-                                        semantic_after,
-                                        bool_flag_id,
-                                        *relative_depth,
-                                        *block_stack.last().unwrap(),
-                                    );
-                                }
-                                _ => {} // skip all other opcodes
-                            }
+                            plan_resolution_semantic_after(
+                                semantic_after,
+                                &mut builder,
+                                &block_stack,
+                                &mut resolve_on_end,
+                                op,
+                                idx,
+                            );
                         }
                     }
                 }
@@ -727,7 +811,7 @@ impl<'a> Module<'a> {
         assert_eq!(self.functions.len(), func_mapping.len());
 
         let mut module = wasm_encoder::Module::new();
-        let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
+        let mut reencode = RoundtripReencoder;
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
@@ -774,7 +858,7 @@ impl<'a> Module<'a> {
 
         if !self.functions.is_empty() {
             let mut functions = wasm_encoder::FunctionSection::new();
-            for (_old_idx, func) in self.functions.iter().enumerate() {
+            for func in self.functions.iter() {
                 if !func.deleted {
                     if let FuncKind::Local(l) = func.kind() {
                         functions.function(l.ty_id);
@@ -880,7 +964,7 @@ impl<'a> Module<'a> {
                             .iter()
                             .map(|f| *func_mapping.get(&(*f as i32)).unwrap() as FunctionID)
                             .collect();
-                        wasm_encoder::Elements::Functions(&*element_items)
+                        wasm_encoder::Elements::Functions(&element_items)
                     }
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
@@ -957,83 +1041,100 @@ impl<'a> Module<'a> {
                     converted_locals.push((*c, wasm_encoder::ValType::from(&*ty)));
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
-                let l = instructions.len() - 1;
-                for (idx, (op, instrument)) in instructions.iter_mut().enumerate() {
+                let instr_len = instructions.len() - 1;
+                for (
+                    idx,
+                    Instruction {
+                        op,
+                        instr_flag: instrument,
+                    },
+                ) in instructions.iter_mut().enumerate()
+                {
                     if refers_to_func(op) {
                         update_fn_instr(op, &func_mapping);
                     }
                     if !instrument.has_instr() {
-                        function.instruction(
-                            &reencode
-                                .instruction(op.clone())
-                                .expect("Unable to convert Instruction"),
-                        );
+                        encode(&op.clone(), &mut function, &mut reencode);
                     } else {
                         // this instruction has instrumentation, handle it!
                         let InstrumentationFlag {
+                            current_mode: _current_mode,
                             before,
                             after,
                             alternate,
                             semantic_after,
-                            ..
+                            block_entry,
+                            block_exit,
+                            block_alt,
                         } = instrument;
 
                         // Check if special instrumentation modes have been resolved!
                         if !semantic_after.is_empty() {
                             error!("BUG: Semantic after instrumentation should be resolved already, please report.");
                         }
-                        // If we're at the `end` of the function, drop this instrumentation
-                        if idx >= l {
-                            function.instruction(
-                                &reencode
-                                    .instruction(op.clone())
-                                    .expect("Unable to convert Instruction"),
-                            );
-                            continue;
+                        if !block_entry.is_empty() {
+                            error!("BUG: Block entry instrumentation should be resolved already, please report.");
                         }
+                        if !block_exit.is_empty() {
+                            error!("BUG: Block exit instrumentation should be resolved already, please report.");
+                        }
+                        if !block_alt.is_none() {
+                            error!("BUG: Block alt instrumentation should be resolved already, please report.");
+                        }
+                        // If we're at the `end` of the function, drop this instrumentation
+                        let at_end = idx >= instr_len;
 
                         // First encode before instructions
-                        for instr in before {
-                            if refers_to_func(instr) {
-                                update_fn_instr(instr, &func_mapping);
-                            }
-                            function.instruction(
-                                &reencode
-                                    .instruction(instr.clone())
-                                    .expect("Unable to convert Instruction"),
-                            );
-                        }
+                        update_call_and_encode(before, &func_mapping, &mut function, &mut reencode);
 
                         // If there are any alternate, encode the alternate
-                        if !alternate.is_empty() {
-                            for instr in alternate {
-                                if refers_to_func(instr) {
-                                    update_fn_instr(instr, &func_mapping);
-                                }
-                                function.instruction(
-                                    &reencode
-                                        .instruction(instr.clone())
-                                        .expect("Unable to convert Instruction"),
+                        if !at_end && !alternate.is_none() {
+                            if let Some(alt) = alternate {
+                                update_call_and_encode(
+                                    alt,
+                                    &func_mapping,
+                                    &mut function,
+                                    &mut reencode,
                                 );
                             }
                         } else {
-                            function.instruction(
-                                &reencode
-                                    .instruction(op.clone())
-                                    .expect("Unable to convert Instruction"),
-                            );
+                            encode(&op.clone(), &mut function, &mut reencode);
                         }
+
                         // Now encode the after instructions
-                        for instr in after {
-                            if refers_to_func(instr) {
-                                update_fn_instr(instr, &func_mapping);
-                            }
-                            function.instruction(
-                                &reencode
-                                    .instruction(instr.clone())
-                                    .expect("Unable to convert Instruction"),
+                        if !at_end {
+                            update_call_and_encode(
+                                after,
+                                &func_mapping,
+                                &mut function,
+                                &mut reencode,
                             );
                         }
+                    }
+
+                    fn update_call_and_encode(
+                        instrs: &mut Vec<Operator>,
+                        func_mapping: &HashMap<i32, i32>,
+                        function: &mut wasm_encoder::Function,
+                        reencode: &mut RoundtripReencoder,
+                    ) {
+                        for instr in instrs {
+                            if refers_to_func(instr) {
+                                update_fn_instr(instr, func_mapping);
+                            }
+                            encode(instr, function, reencode);
+                        }
+                    }
+                    fn encode(
+                        instr: &Operator,
+                        function: &mut wasm_encoder::Function,
+                        reencode: &mut RoundtripReencoder,
+                    ) {
+                        function.instruction(
+                            &reencode
+                                .instruction(instr.clone())
+                                .expect("Unable to convert Instruction"),
+                        );
                     }
                 }
                 if let Some(name) = name {
@@ -1125,12 +1226,11 @@ impl<'a> Module<'a> {
             deleted: false,
         };
         self.imports.add_func(import);
-        let imp_fn_id;
-        if self.num_functions > 0 {
-            imp_fn_id = self.functions.len() as u32;
+        let imp_fn_id = if self.num_functions > 0 {
+            self.functions.len() as u32
         } else {
-            imp_fn_id = self.imports.num_funcs - 1;
-        }
+            self.imports.num_funcs - 1
+        };
         imp_fn_id as FunctionID
     }
 
@@ -1167,9 +1267,8 @@ impl<'a> Module<'a> {
         imports_id: ImportsID,
         local_function: LocalFunction<'a>,
     ) {
-        match self.functions.get_kind(imports_id as FunctionID) {
-            FuncKind::Local(_) => panic!("This is a local function!"),
-            _ => {}
+        if let FuncKind::Local(_) = self.functions.get_kind(imports_id as FunctionID) {
+            panic!("This is a local function!");
         }
         self.delete_import_func(imports_id);
         self.functions
@@ -1185,9 +1284,11 @@ impl<'a> Module<'a> {
         name: String,
         type_id: TypeID,
     ) {
-        match self.functions.get_kind(function_id as FunctionID) {
-            FuncKind::Import(_) => panic!("This is an imported function!"),
-            _ => {}
+        if matches!(
+            self.functions.get_kind(function_id as FunctionID),
+            FuncKind::Import(..)
+        ) {
+            panic!("This is an imported function!")
         }
         // Delete the associated function
         self.functions.delete(function_id);
@@ -1273,6 +1374,223 @@ struct InstrToInject<'a> {
     not_flagged: Vec<InstrBody<'a>>,
 }
 
+fn resolve_function_entry<'a, 'b, 'c>(
+    builder: &mut FunctionModifier<'a, 'b>,
+    instr_func_on_entry: &mut InstrBody<'c>,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    if idx == 0 {
+        // we're at the function entry!
+        builder.before_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        });
+        builder.inject_all(instr_func_on_entry);
+
+        // remove the contents of the body now that it's been resolved
+        instr_func_on_entry.clear();
+    }
+}
+
+fn resolve_function_exit<'a, 'b, 'c>(
+    builder: &mut FunctionModifier<'a, 'b>,
+    instr_func_on_entry: &mut InstrBody<'c>,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    if idx == builder.body.instructions.len() - 1 {
+        // we're at the end of the function!
+        builder.before_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        });
+        builder.inject_all(instr_func_on_entry);
+
+        // remove the contents of the body now that it's been resolved
+        instr_func_on_entry.clear();
+    }
+}
+
+fn resolve_block_entry<'a, 'b, 'c>(
+    block_entry: &InstrBody<'c>,
+    builder: &mut FunctionModifier<'a, 'b>,
+    op: &Operator,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    // convert instr to simple before/after/alt
+    match op {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::If { .. }
+        | Operator::Else { .. } => {
+            // just inject immediately after the start of the block
+            builder.after_at(Location::Module {
+                func_idx: 0, // not used
+                instr_idx: idx,
+            });
+            builder.inject_all(block_entry);
+
+            // no need to remove the contents of block_entry since we're actually
+            // using a read-only copy!
+        }
+        _ => {
+            // no need to remove the contents of block_entry since we're actually
+            // using a read-only copy!
+        }
+    }
+}
+
+fn plan_resolution_block_exit<'a, 'b, 'c>(
+    block_exit: &InstrBody<'c>,
+    block_stack: &[BlockID],
+    resolve_on_else_or_end: &mut HashMap<InstrumentationMode, InstrToInject<'c>>,
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
+    op: &Operator,
+) where
+    'c: 'b,
+{
+    // save instrumentation to be converted to simple before/after/alt
+    match op {
+        Operator::If { .. } => {
+            save_not_flagged_body_to_resolve_inner(
+                resolve_on_else_or_end,
+                InstrumentationMode::Before,
+                block_exit,
+            );
+        }
+        Operator::Block { .. } | Operator::Loop { .. } | Operator::Else { .. } => {
+            // add body-to-inject as non-flagged
+            let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
+            save_not_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::Before,
+                block_exit,
+                *block_id,
+            );
+        }
+        _ => {} // skip all other opcodes
+    }
+}
+
+fn plan_resolution_block_alt<'a, 'b, 'c>(
+    block_alt: &InstrBody<'c>,
+    builder: &mut FunctionModifier<'a, 'b>,
+    retain_end: &mut bool,
+    op: &Operator,
+    idx: usize,
+) -> bool
+where
+    'c: 'b,
+{
+    // convert instr to simple before/after/alt
+    let mut matched = false;
+    match op {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::If { .. }
+        | Operator::Else { .. } => {
+            let loc = Location::Module {
+                func_idx: 0, // not used
+                instr_idx: idx,
+            };
+            if !block_alt.is_empty() {
+                // just inject immediately after the start of the block
+                builder.alternate_at(loc);
+                builder.inject_all(block_alt);
+            } else {
+                // remove the instruction!
+                builder.empty_alternate_at(loc);
+            }
+
+            // no need to remove the contents of block_alt since we're actually
+            // using a read-only copy!
+
+            matched = true;
+            *retain_end = false;
+        }
+        _ => {}
+    }
+    if let Operator::Else { .. } = op {
+        // We want to keep the end for the module to still be valid (the if will be dangling)
+        *retain_end = true;
+    }
+    matched
+}
+
+fn plan_resolution_semantic_after<'a, 'b, 'c>(
+    semantic_after: &InstrBody<'c>,
+    builder: &mut FunctionModifier<'a, 'b>,
+    block_stack: &[BlockID],
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'c>>>,
+    op: &Operator,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    // save instrumentation to be converted to simple before/after/alt
+    match op {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::If { .. }
+        | Operator::Else { .. } => {
+            // add body-to-inject as non-flagged
+            let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
+            save_not_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
+                semantic_after,
+                *block_id,
+            );
+        }
+        Operator::BrTable { targets } => {
+            let bool_flag_id = create_bool_flag(builder, idx, op, semantic_after);
+            targets.targets().for_each(|target| {
+                if let Ok(relative_depth) = target {
+                    save_flagged_body_to_resolve(
+                        resolve_on_end,
+                        InstrumentationMode::After,
+                        semantic_after,
+                        bool_flag_id,
+                        relative_depth,
+                        *block_stack.last().unwrap(),
+                    );
+                }
+            });
+            // handle the default as well
+            save_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
+                semantic_after,
+                bool_flag_id,
+                targets.default(),
+                *block_stack.last().unwrap(),
+            );
+        }
+        Operator::Br { relative_depth }
+        | Operator::BrIf { relative_depth }
+        | Operator::BrOnCast { relative_depth, .. }
+        | Operator::BrOnCastFail { relative_depth, .. }
+        | Operator::BrOnNonNull { relative_depth }
+        | Operator::BrOnNull { relative_depth } => {
+            let bool_flag_id = create_bool_flag(builder, idx, op, semantic_after);
+            save_flagged_body_to_resolve(
+                resolve_on_end,
+                InstrumentationMode::After,
+                semantic_after,
+                bool_flag_id,
+                *relative_depth,
+                *block_stack.last().unwrap(),
+            );
+        }
+        _ => {} // skip all other opcodes
+    }
+}
+
 fn create_bool_flag<'a, 'b, 'c>(
     builder: &mut FunctionModifier<'a, 'b>,
     idx: usize,
@@ -1291,10 +1609,22 @@ where
     );
 
     // set flag to true before the opcode
-    builder.before_at(idx).i32_const(1).local_set(bool_flag_id);
+    builder
+        .before_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        })
+        .i32_const(1)
+        .local_set(bool_flag_id);
 
     // set flag to false after the opcode
-    builder.after_at(idx).i32_const(0).local_set(bool_flag_id);
+    builder
+        .after_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        })
+        .i32_const(0)
+        .local_set(bool_flag_id);
 
     // BrIf, BrOnCast, BrOnNonNull, BrOnNull
     // the bodies should be inserted immediately after too!
@@ -1314,9 +1644,46 @@ where
     bool_flag_id
 }
 
-fn save_body_to_resolve<'a>(
-    to_resolve: &mut HashMap<BlockID, InstrToInject<'a>>,
-    semantic_after: &Vec<Operator<'a>>,
+fn save_not_flagged_body_to_resolve<'a>(
+    resolve_on_end: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'a>>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
+    block_id: BlockID,
+) {
+    resolve_on_end
+        .entry(block_id)
+        .and_modify(|mode_to_instrs| {
+            save_not_flagged_body_to_resolve_inner(mode_to_instrs, mode, body);
+        })
+        .or_insert(HashMap::from([(
+            mode,
+            InstrToInject {
+                flagged: vec![],
+                not_flagged: vec![body.to_owned()],
+            },
+        )]));
+}
+
+fn save_not_flagged_body_to_resolve_inner<'a>(
+    inner: &mut HashMap<InstrumentationMode, InstrToInject<'a>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
+) {
+    inner
+        .entry(mode)
+        .and_modify(|instr_to_inject| {
+            instr_to_inject.not_flagged.push(body.to_owned());
+        })
+        .or_insert(InstrToInject {
+            flagged: vec![],
+            not_flagged: vec![body.to_owned()],
+        });
+}
+
+fn save_flagged_body_to_resolve<'a>(
+    to_resolve: &mut HashMap<BlockID, HashMap<InstrumentationMode, InstrToInject<'a>>>,
+    mode: InstrumentationMode,
+    body: &Vec<Operator<'a>>,
     bool_flag_id: LocalID,
     relative_depth: u32,
     curr_block: BlockID,
@@ -1324,17 +1691,100 @@ fn save_body_to_resolve<'a>(
     let block_id = curr_block - relative_depth;
     to_resolve
         .entry(block_id)
-        .and_modify(|instr_to_inject| {
-            instr_to_inject.flagged.push(InstrBodyFlagged {
-                body: semantic_after.to_owned(),
-                bool_flag: bool_flag_id,
-            });
+        .and_modify(|mode_to_instrs| {
+            mode_to_instrs
+                .entry(mode)
+                .and_modify(|instr_to_inject| {
+                    instr_to_inject.flagged.push(InstrBodyFlagged {
+                        body: body.to_owned(),
+                        bool_flag: bool_flag_id,
+                    });
+                })
+                .or_insert(InstrToInject {
+                    flagged: vec![InstrBodyFlagged {
+                        body: body.to_owned(),
+                        bool_flag: bool_flag_id,
+                    }],
+                    not_flagged: vec![],
+                });
         })
-        .or_insert(InstrToInject {
-            flagged: vec![InstrBodyFlagged {
-                body: semantic_after.to_owned(),
-                bool_flag: bool_flag_id,
-            }],
-            not_flagged: vec![],
-        });
+        .or_insert(HashMap::from([(
+            mode,
+            InstrToInject {
+                flagged: vec![InstrBodyFlagged {
+                    body: body.to_owned(),
+                    bool_flag: bool_flag_id,
+                }],
+                not_flagged: vec![],
+            },
+        )]));
+}
+
+fn resolve_bodies<'a, 'b, 'c>(
+    builder: &mut FunctionModifier<'a, 'b>,
+    mode: &InstrumentationMode,
+    instr_to_inject: &InstrToInject<'c>,
+    idx: usize,
+) where
+    'c: 'b,
+{
+    let InstrToInject {
+        flagged,
+        not_flagged,
+    } = instr_to_inject;
+
+    let mut is_first = true;
+    // inject the bodies predicated with the flag
+    for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
+        // Inject the bodies in the correct mode at the current END opcode
+        let loc = Location::Module {
+            func_idx: 0, // not used
+            instr_idx: idx,
+        };
+        match mode {
+            InstrumentationMode::Before => builder.before_at(loc),
+            InstrumentationMode::After => builder.after_at(loc),
+            _ => unreachable!(),
+        };
+
+        if is_first {
+            // inject flag check
+            builder.local_get(*bool_flag);
+            builder.if_stmt(BlockType::Empty); // TODO -- This will break for instrumentation that returns stuff...
+        } else {
+            // injecting multiple, already have an if statement
+            builder.else_stmt();
+            // inject flag check
+            builder.local_get(*bool_flag);
+            builder.if_stmt(BlockType::Empty); // nested if for the if/else flow
+        }
+
+        // inject body
+        builder.inject_all(body);
+        if !is_first {
+            // need to inject end of nested if!
+            builder.end();
+        }
+        is_first = false;
+    }
+    if !flagged.is_empty() {
+        // inject end of flag check (the outer if)
+        builder.end();
+    }
+
+    // handle non-flagged bodies
+    // Inject the bodies AFTER the current END opcode
+    let loc = Location::Module {
+        func_idx: 0, // not used
+        instr_idx: idx,
+    };
+    match mode {
+        InstrumentationMode::Before => builder.before_at(loc),
+        InstrumentationMode::After => builder.after_at(loc),
+        _ => unreachable!(),
+    };
+    for body in not_flagged.iter() {
+        // inject body
+        builder.inject_all(body);
+    }
 }

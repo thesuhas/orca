@@ -1,5 +1,6 @@
-use orca::Module;
+use orca::opcode::Instrumenter;
 use orca::Opcode;
+use orca::{Location, Module};
 use std::process::Command;
 
 // #[test]
@@ -28,7 +29,12 @@ fn run_start_orca() {
     let start_fun_id = module.start.unwrap();
     let mut function_builder = module.functions.get_fn_modifier(start_fun_id).unwrap();
 
-    function_builder.before_at(0).i32_const(1);
+    function_builder
+        .before_at(Location::Module {
+            func_idx: 0, // not used
+            instr_idx: 0,
+        })
+        .i32_const(1);
 
     let result = module.encode();
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
