@@ -351,3 +351,171 @@ fn test_middle_import_to_local_local_delete() {
         )
     }
 }
+
+#[test]
+fn test_add_import() {
+    let file = "tests/test_inputs/instr_testing/modules/function_modification/add_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.add_import_func("orca".to_string(), "better".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_middle_local_to_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/middle_local_to_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.convert_local_fn_to_import(2, "orca".to_string(), "better".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_first_local_to_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/first_local_to_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.convert_local_fn_to_import(1, "orca".to_string(), "better".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_last_local_to_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/last_local_to_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.convert_local_fn_to_import(3, "orca".to_string(), "better".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_all_local_to_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
+    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
+    module.convert_local_fn_to_import(5, "please".to_string(), "work".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_some_local_to_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/some_local_to_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
+    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn test_all_local_to_import_all_import_to_local() {
+    let file = "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import_all_import_to_local.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // Convert all to local
+    let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    first_builder.i32_const(4);
+    first_builder.drop();
+    first_builder.end();
+    module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
+
+    let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    second_builder.i32_const(5);
+    second_builder.drop();
+    second_builder.end();
+    module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
+
+    let mut third_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    third_builder.i32_const(6);
+    third_builder.drop();
+    third_builder.end();
+    module.convert_import_fn_to_local(2, third_builder.local_func(vec![], 2, 0));
+
+    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
+    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
+    module.convert_local_fn_to_import(5, "please".to_string(), "work".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
