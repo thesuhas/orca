@@ -17,7 +17,7 @@ use crate::ir::types::{
     InstrumentationFlag,
 };
 use crate::ir::wrappers::{
-    indirect_namemap_parser2encoder, is_call, namemap_parser2encoder, update_call,
+    indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, update_fn_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
@@ -68,6 +68,8 @@ pub struct Module<'a> {
     pub num_imported_functions: usize,
     /// name of module
     pub module_name: Option<String>,
+
+    pub(crate) num_imports_added: usize,
 
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -471,6 +473,7 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
+            num_imports_added: 0,
         })
     }
 
@@ -950,11 +953,19 @@ impl<'a> Module<'a> {
         if !self.elements.is_empty() {
             let mut elements = wasm_encoder::ElementSection::new();
             let mut temp_const_exprs = vec![];
+            let mut element_items = vec![];
             for (kind, items) in self.elements.iter() {
                 temp_const_exprs.clear();
+                element_items.clear();
                 let element_items = match &items {
                     // TODO: Update the elements section based on additions/deletion
-                    ElementItems::Functions(funcs) => wasm_encoder::Elements::Functions(funcs),
+                    ElementItems::Functions(funcs) => {
+                        element_items = funcs
+                            .iter()
+                            .map(|f| *func_mapping.get(&(*f as i32)).unwrap() as FunctionID)
+                            .collect();
+                        wasm_encoder::Elements::Functions(&element_items)
+                    }
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
                         for e in exprs.iter() {
@@ -1039,8 +1050,8 @@ impl<'a> Module<'a> {
                     },
                 ) in instructions.iter_mut().enumerate()
                 {
-                    if is_call(op) {
-                        update_call(op, &func_mapping);
+                    if refers_to_func(op) {
+                        update_fn_instr(op, &func_mapping);
                     }
                     if !instrument.has_instr() {
                         encode(&op.clone(), &mut function, &mut reencode);
@@ -1108,8 +1119,8 @@ impl<'a> Module<'a> {
                         reencode: &mut RoundtripReencoder,
                     ) {
                         for instr in instrs {
-                            if is_call(instr) {
-                                update_call(instr, func_mapping);
+                            if refers_to_func(instr) {
+                                update_fn_instr(instr, func_mapping);
                             }
                             encode(instr, function, reencode);
                         }
@@ -1205,13 +1216,8 @@ impl<'a> Module<'a> {
         None
     }
 
-    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
-    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        if self.num_functions > 0 {
-            panic!("Cannot add import function after adding a local function");
-        }
-
-        let index = self.imports.len();
+    // Adds an imported function and returns the position in the module.functions
+    pub(crate) fn add_import(&mut self, module: String, name: String, ty_id: TypeID) -> FunctionID {
         let import = Import {
             module: module.leak(),
             name: name.clone().leak(),
@@ -1220,14 +1226,27 @@ impl<'a> Module<'a> {
             deleted: false,
         };
         self.imports.add_func(import);
+        let imp_fn_id = if self.num_functions > 0 {
+            self.functions.len() as u32
+        } else {
+            self.imports.num_funcs - 1
+        };
+        imp_fn_id as FunctionID
+    }
+
+    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
+    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
+        let index = self.imports.len();
+        let imp_fn_id = self.add_import(module, name.clone(), ty_id);
+
         // Add to function as well as it has imported functions
         self.functions.add_import_func(
             (self.imports.len() - 1) as ImportsID,
             ty_id,
             Some(name),
-            self.imports.num_funcs - 1,
+            imp_fn_id,
         );
-        self.num_imported_functions += 1;
+        self.num_imports_added += 1;
         index as ImportsID
     }
 
@@ -1257,22 +1276,35 @@ impl<'a> Module<'a> {
             .set_kind(FuncKind::Local(local_function));
     }
 
-    // TODO: Fix this
-    // /// Convert a local function to imported
-    // pub fn convert_local_fn_to_import(
-    //     &mut self,
-    //     import: Import,
-    //     imported_function: ImportedFunction,
-    // ) {
-    //     match self.functions.get_kind(imports_id as FunctionID) {
-    //         FuncKind::Import(_) => panic!("This is an imported function!"),
-    //         _ => {}
-    //     }
-    //     self.add_import_func(impo);
-    //     self.functions
-    //         .get_mut(imports_id as FunctionID)
-    //         .set_kind(FuncKind::Import(imported_function));
-    // }
+    /// Convert a local function to imported
+    pub fn convert_local_fn_to_import(
+        &mut self,
+        function_id: FunctionID,
+        module: String,
+        name: String,
+        type_id: TypeID,
+    ) {
+        if matches!(
+            self.functions.get_kind(function_id as FunctionID),
+            FuncKind::Import(..)
+        ) {
+            panic!("This is an imported function!")
+        }
+        // Delete the associated function
+        self.functions.delete(function_id);
+        // Add import function to imports
+        self.add_import(module, name.clone(), type_id);
+        let imported_function = ImportedFunction {
+            import_id: (self.imports.len() - 1) as ImportsID,
+            import_fn_id: function_id,
+            ty_id: type_id,
+        };
+
+        self.functions
+            .get_mut(function_id as FunctionID)
+            .set_kind(FuncKind::Import(imported_function));
+        self.functions.set_imported_fn_name(function_id, name);
+    }
 
     /// Count number of imported function
     pub fn num_import_func(&self) -> u32 {
@@ -1316,6 +1348,7 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
+            num_imports_added: 0,
         }
     }
 }

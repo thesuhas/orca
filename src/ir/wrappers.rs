@@ -322,18 +322,19 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
     }
 }
 
-pub(crate) fn is_call(op: &Operator) -> bool {
-    matches!(op, Operator::Call { .. })
+pub(crate) fn refers_to_func(op: &Operator) -> bool {
+    matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
 }
 
-pub(crate) fn update_call(op: &mut Operator, mapping: &HashMap<i32, i32>) {
+pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<i32, i32>) {
     match op {
-        Operator::Call { function_index } => {
-            let new_index = *mapping.get(&(*function_index as i32)).unwrap();
-            if new_index == -1 {
-                panic!("Deleted");
+        Operator::Call { function_index } | Operator::RefFunc { function_index } => {
+            match mapping.get(&(*function_index as i32)) {
+                Some(new_index) => {
+                    *function_index = *new_index as u32;
+                }
+                None => panic!("Deleted function!"),
             }
-            *function_index = new_index as u32;
         }
         _ => panic!("Not a call operation!"),
     }
