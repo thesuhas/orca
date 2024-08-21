@@ -365,8 +365,18 @@ impl<'a> Functions<'a> {
     pub fn set_local_fn_name(&mut self, func_idx: FunctionID, name: String) {
         match &mut self.functions[func_idx as usize].kind {
             FuncKind::Import(_) => panic!("is an imported function!"),
-            FuncKind::Local(ref mut l) => l.body.name = Some(name),
+            FuncKind::Local(ref mut l) => l.body.name = Some(name.clone()),
         }
+        self.functions[func_idx as usize].name = Some(name);
+    }
+
+    /// Set the name for an imported function
+    pub fn set_imported_fn_name(&mut self, func_idx: FunctionID, name: String) {
+        match &mut self.functions[func_idx as usize].kind {
+            FuncKind::Local(_) => panic!("is an imported function!"),
+            FuncKind::Import(_) => { }
+        }
+        self.functions[func_idx as usize].name = Some(name);
     }
 
     /// Get the name of a function

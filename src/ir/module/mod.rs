@@ -474,7 +474,7 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
-            num_imports_added: 0
+            num_imports_added: 0,
         })
     }
 
@@ -1115,10 +1115,8 @@ impl<'a> Module<'a> {
         None
     }
 
-    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
-    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-
-        let index = self.imports.len();
+    // Adds an imported function and returns the position in the module.functions
+    pub(crate) fn add_import(&mut self, module: String, name: String, ty_id: TypeID) -> FunctionID {
         let import = Import {
             module: module.leak(),
             name: name.clone().leak(),
@@ -1133,6 +1131,13 @@ impl<'a> Module<'a> {
         } else {
             imp_fn_id = self.imports.num_funcs - 1;
         }
+        imp_fn_id as FunctionID
+    }
+
+    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
+    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
+        let index = self.imports.len();
+        let imp_fn_id = self.add_import(module, name.clone(), ty_id);
 
         // Add to function as well as it has imported functions
         self.functions.add_import_func(
@@ -1172,22 +1177,33 @@ impl<'a> Module<'a> {
             .set_kind(FuncKind::Local(local_function));
     }
 
-    // TODO: Fix this
-    // /// Convert a local function to imported
-    // pub fn convert_local_fn_to_import(
-    //     &mut self,
-    //     import: Import,
-    //     imported_function: ImportedFunction,
-    // ) {
-    //     match self.functions.get_kind(imports_id as FunctionID) {
-    //         FuncKind::Import(_) => panic!("This is an imported function!"),
-    //         _ => {}
-    //     }
-    //     self.add_import_func(impo);
-    //     self.functions
-    //         .get_mut(imports_id as FunctionID)
-    //         .set_kind(FuncKind::Import(imported_function));
-    // }
+    /// Convert a local function to imported
+    pub fn convert_local_fn_to_import(
+        &mut self,
+        function_id: FunctionID,
+        module: String,
+        name: String,
+        type_id: TypeID,
+    ) {
+        match self.functions.get_kind(function_id as FunctionID) {
+            FuncKind::Import(_) => panic!("This is an imported function!"),
+            _ => {}
+        }
+        // Delete the associated function
+        self.functions.delete(function_id);
+        // Add import function to imports
+        self.add_import(module, name.clone(), type_id);
+        let imported_function = ImportedFunction {
+            import_id: (self.imports.len() - 1) as ImportsID,
+            import_fn_id: function_id,
+            ty_id: type_id,
+        };
+
+        self.functions
+            .get_mut(function_id as FunctionID)
+            .set_kind(FuncKind::Import(imported_function));
+        self.functions.set_imported_fn_name(function_id, name);
+    }
 
     /// Count number of imported function
     pub fn num_import_func(&self) -> u32 {
@@ -1231,7 +1247,7 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
-            num_imports_added: 0
+            num_imports_added: 0,
         }
     }
 }
