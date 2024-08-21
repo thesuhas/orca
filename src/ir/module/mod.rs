@@ -600,6 +600,24 @@ impl<'a> Module<'a> {
                             }
                             resolve_on_else_or_end.clear();
 
+                            // Handle block alt
+                            if let Some(block_alt) = &instrumentation.block_alt {
+                                // only plan to handle if we're not already removing the block this instr is in
+                                if delete_block.is_none()
+                                    && plan_resolution_block_alt(
+                                        block_alt,
+                                        &mut builder,
+                                        &mut retain_end,
+                                        op,
+                                        idx,
+                                    )
+                                {
+                                    // we've got a match, which injected the alt body. continue to the next instruction
+                                    delete_block = Some(*block_stack.last().unwrap());
+                                    continue;
+                                }
+                            }
+
                             if delete_block.is_some() {
                                 // delete this block and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
@@ -617,23 +635,27 @@ impl<'a> Module<'a> {
                                     // should still process instrumentation on the end though...
                                     // (consider if/else where the else has an alt block)
                                     if (*delete_block_id).eq(&block_id) {
+                                        // completing the alt block logic, clear state
+                                        delete_block = None;
                                         if !retain_end {
                                             // delete this end and skip all instrumentation handling (like below)
                                             builder.empty_alternate_at(Location::Module {
                                                 func_idx: 0, // not used
                                                 instr_idx: idx,
                                             });
+                                            retain_end = true;
+                                            continue;
                                         }
-                                        // completed the alt block logic, clear state
-                                        delete_block = None;
+                                        // fall through to the instrumentation handling
                                         retain_end = true;
+                                    } else {
+                                        // delete this instruction and skip all instrumentation handling (like below)
+                                        builder.empty_alternate_at(Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        });
+                                        continue;
                                     }
-                                    // delete this instruction and skip all instrumentation handling (like below)
-                                    builder.empty_alternate_at(Location::Module {
-                                        func_idx: 0, // not used
-                                        instr_idx: idx,
-                                    });
-                                    continue;
                                 }
 
                                 // we've reached an end, make sure resolve_on_else is cleared!
@@ -781,7 +803,7 @@ impl<'a> Module<'a> {
         assert_eq!(self.functions.len(), func_mapping.len());
 
         let mut module = wasm_encoder::Module::new();
-        let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
+        let mut reencode = RoundtripReencoder;
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
