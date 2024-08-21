@@ -373,7 +373,8 @@ fn test_add_import() {
 
 #[test]
 fn test_middle_local_to_import() {
-    let file = "tests/test_inputs/instr_testing/modules/function_modification/middle_local_to_import.wat";
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/middle_local_to_import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -393,7 +394,8 @@ fn test_middle_local_to_import() {
 
 #[test]
 fn test_first_local_to_import() {
-    let file = "tests/test_inputs/instr_testing/modules/function_modification/first_local_to_import.wat";
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/first_local_to_import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -413,7 +415,8 @@ fn test_first_local_to_import() {
 
 #[test]
 fn test_last_local_to_import() {
-    let file = "tests/test_inputs/instr_testing/modules/function_modification/last_local_to_import.wat";
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/last_local_to_import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -433,7 +436,8 @@ fn test_last_local_to_import() {
 
 #[test]
 fn test_all_local_to_import() {
-    let file = "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import.wat";
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
@@ -455,7 +459,8 @@ fn test_all_local_to_import() {
 
 #[test]
 fn test_some_local_to_import() {
-    let file = "tests/test_inputs/instr_testing/modules/function_modification/some_local_to_import.wat";
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/some_local_to_import.wat";
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
