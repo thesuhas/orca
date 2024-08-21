@@ -17,7 +17,7 @@ use crate::ir::types::{
     InstrumentationFlag,
 };
 use crate::ir::wrappers::{
-    indirect_namemap_parser2encoder, is_call, namemap_parser2encoder, update_call,
+    indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, update_fn_instr,
 };
 use crate::Opcode;
 use log::error;
@@ -956,8 +956,8 @@ impl<'a> Module<'a> {
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 let l = instructions.len() - 1;
                 for (idx, (op, instrument)) in instructions.iter_mut().enumerate() {
-                    if is_call(op) {
-                        update_call(op, &func_mapping);
+                    if refers_to_func(op) {
+                        update_fn_instr(op, &func_mapping);
                     }
                     if !instrument.has_instr() {
                         function.instruction(
@@ -991,8 +991,8 @@ impl<'a> Module<'a> {
 
                         // First encode before instructions
                         for instr in before {
-                            if is_call(instr) {
-                                update_call(instr, &func_mapping);
+                            if refers_to_func(instr) {
+                                update_fn_instr(instr, &func_mapping);
                             }
                             function.instruction(
                                 &reencode
@@ -1004,8 +1004,8 @@ impl<'a> Module<'a> {
                         // If there are any alternate, encode the alternate
                         if !alternate.is_empty() {
                             for instr in alternate {
-                                if is_call(instr) {
-                                    update_call(instr, &func_mapping);
+                                if refers_to_func(instr) {
+                                    update_fn_instr(instr, &func_mapping);
                                 }
                                 function.instruction(
                                     &reencode
@@ -1022,8 +1022,8 @@ impl<'a> Module<'a> {
                         }
                         // Now encode the after instructions
                         for instr in after {
-                            if is_call(instr) {
-                                update_call(instr, &func_mapping);
+                            if refers_to_func(instr) {
+                                update_fn_instr(instr, &func_mapping);
                             }
                             function.instruction(
                                 &reencode
