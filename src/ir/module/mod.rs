@@ -675,6 +675,7 @@ impl<'a> Module<'a> {
                     self.functions.push(f);
                     // decrement as this is the place where we might have to move an import to
                     new_imported_funcs -= 1;
+                    // We update it here for the following case. A , B. A is moved to a position later than B, indices will reduce by 1 and we need the offset
                     num_deleted += 1;
                 // If function was import but was deleted
                 } else if func.deleted {
@@ -689,7 +690,8 @@ impl<'a> Module<'a> {
                     self.functions.insert(new_imported_funcs as FunctionID, f);
                     // increment as this is the place where we might have to move an import to
                     new_imported_funcs += 1;
-                    num_deleted += 1;
+                    // We do not update it here for the following case. A , B. A is moved to a position earlier than B, indices will not change and hence no need to update
+                    // num_deleted += 1;
                 }
                 // If function was local but was deleted
                 else if func.deleted {
@@ -1134,7 +1136,7 @@ impl<'a> Module<'a> {
         imp_fn_id as FunctionID
     }
 
-    /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
+    /// Add a new function to the module. Returns the index of the imported function
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
         let index = self.imports.len();
         let imp_fn_id = self.add_import(module, name.clone(), ty_id);
@@ -1147,7 +1149,7 @@ impl<'a> Module<'a> {
             imp_fn_id,
         );
         self.num_imports_added += 1;
-        index as ImportsID
+        imp_fn_id
     }
 
     /// Delete an imported function
