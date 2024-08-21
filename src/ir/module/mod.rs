@@ -68,6 +68,8 @@ pub struct Module<'a> {
     /// name of module
     pub module_name: Option<String>,
 
+    pub(crate) num_imports_added: usize,
+
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
     pub(crate) label_names: wasm_encoder::IndirectNameMap,
@@ -472,6 +474,7 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
+            num_imports_added: 0
         })
     }
 
@@ -1114,9 +1117,6 @@ impl<'a> Module<'a> {
 
     /// Add a new function to the module. Returns the index of the imported function. Panics if local functions are present as imported functions come first in the index space. Upto to the user to ensure imported functions are not added after local functions are already present.
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        if self.num_functions > 0 {
-            panic!("Cannot add import function after adding a local function");
-        }
 
         let index = self.imports.len();
         let import = Import {
@@ -1127,14 +1127,21 @@ impl<'a> Module<'a> {
             deleted: false,
         };
         self.imports.add_func(import);
+        let imp_fn_id;
+        if self.num_functions > 0 {
+            imp_fn_id = self.functions.len() as u32;
+        } else {
+            imp_fn_id = self.imports.num_funcs - 1;
+        }
+
         // Add to function as well as it has imported functions
         self.functions.add_import_func(
             (self.imports.len() - 1) as ImportsID,
             ty_id,
             Some(name),
-            self.imports.num_funcs - 1,
+            imp_fn_id,
         );
-        self.num_imported_functions += 1;
+        self.num_imports_added += 1;
         index as ImportsID
     }
 
@@ -1224,6 +1231,7 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
+            num_imports_added: 0
         }
     }
 }

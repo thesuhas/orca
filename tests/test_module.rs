@@ -351,3 +351,23 @@ fn test_middle_import_to_local_local_delete() {
         )
     }
 }
+
+#[test]
+fn test_add_import() {
+    let file =
+        "tests/test_inputs/instr_testing/modules/function_modification/add_import.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    module.add_import_func("orca".to_string(), "better".to_string(), 2);
+    let result = module.encode();
+
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
