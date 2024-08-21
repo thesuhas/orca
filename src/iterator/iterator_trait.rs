@@ -3,11 +3,12 @@
 use crate::ir::id::GlobalID;
 use crate::ir::module::module_globals::Global;
 use crate::ir::types::{InstrumentationMode, Location};
+use crate::opcode::Instrumenter;
 use wasmparser::Operator;
 
 #[allow(dead_code)]
 /// Iterator trait that must be satisfied by all Iterators to enable code traversal.
-pub trait Iterator<'a> {
+pub trait Iterator {
     /// Reset the Iterator and all Child Iterators and SubIterators
     fn reset(&mut self);
 
@@ -27,21 +28,22 @@ pub trait Iterator<'a> {
 /// Instructions as defined [here].
 ///
 /// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
-pub trait Instrumenter<'a>: Iterator<'a> {
+pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
     // ==== MODES ====
 
-    /// Get the InstrumentType of the current location
-    fn curr_instrument_mode(&self) -> &Option<InstrumentationMode>;
-
     /// Sets the type of Instrumentation Type of the current location
-    fn set_instrument_mode(&mut self, ty: InstrumentationMode);
-
-    /// Sets the type of Instrumentation Type of the specified location
-    fn set_instrument_mode_at(&mut self, ty: InstrumentationMode, loc: Location);
+    fn set_instrument_mode(&mut self, mode: InstrumentationMode);
 
     /// Mark the current location to InstrumentAlternate
     fn alternate(&mut self) -> &mut Self {
         self.set_instrument_mode(InstrumentationMode::Alternate);
+        self
+    }
+
+    /// Insert an empty alt at the current location
+    /// Effectively removes the instruction
+    fn empty_alternate(&mut self) -> &mut Self {
+        self.empty_alternate_at(self.curr_loc());
         self
     }
 
@@ -63,22 +65,30 @@ pub trait Instrumenter<'a>: Iterator<'a> {
         self
     }
 
-    // ==== INSTR INJECTION ====
+    /// Mark the current location to InstrumentBlockEntry
+    fn block_entry(&mut self) -> &mut Self {
+        self.set_instrument_mode(InstrumentationMode::BlockEntry);
+        self
+    }
 
-    /// Splice a new instruction into a specific location
-    fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
+    /// Mark the current location to InstrumentBlockExit
+    fn block_exit(&mut self) -> &mut Self {
+        self.set_instrument_mode(InstrumentationMode::BlockExit);
+        self
+    }
 
-    /// Mark the specified location to InstrumentBefore
-    fn before_at(&mut self, loc: Location) -> &mut Self;
+    /// Mark the current location to InstrumentBlockAlt
+    fn block_alt(&mut self) -> &mut Self {
+        self.set_instrument_mode(InstrumentationMode::BlockAlt);
+        self
+    }
 
-    /// Mark the specified location to InstrumentAfter
-    fn after_at(&mut self, loc: Location) -> &mut Self;
-
-    /// Mark the specified location to InstrumentAlternate
-    fn alternate_at(&mut self, loc: Location) -> &mut Self;
-
-    /// Get the instruction injected at index idx
-    fn get_injected_val(&self, idx: usize) -> &Operator;
+    /// Insert an empty alt block at the current location
+    /// Effectively removes the block
+    fn empty_block_alt(&mut self) -> &mut Self {
+        self.empty_block_alt_at(self.curr_loc());
+        self
+    }
 
     // ==== VAR INJECTION ====
 

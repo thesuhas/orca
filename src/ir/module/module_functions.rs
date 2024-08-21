@@ -2,9 +2,10 @@
 
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
-use crate::ir::types::Body;
+use crate::ir::types::{Body, FuncInstrFlag};
 use crate::DataType;
 use std::cmp::min;
+use wasmparser::Operator;
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
 #[derive(Clone, Debug)]
@@ -43,18 +44,12 @@ impl<'a> Function<'a> {
 
     /// Check if it's a local function
     pub fn is_local(&self) -> bool {
-        match &self.kind {
-            FuncKind::Local(_) => true,
-            _ => false,
-        }
+        matches!(&self.kind, FuncKind::Local(_))
     }
 
     /// Check if it's an imported function
     pub fn is_import(&self) -> bool {
-        match &self.kind {
-            FuncKind::Import(_) => true,
-            _ => false,
-        }
+        matches!(&self.kind, FuncKind::Import(_))
     }
 
     /// Unwrap a local function. If it is an imported function, it panics.
@@ -117,6 +112,7 @@ impl Eq for FuncKind<'_> {}
 pub struct LocalFunction<'a> {
     pub ty_id: TypeID,
     pub func_id: FunctionID,
+    pub instr_flag: FuncInstrFlag<'a>,
     pub body: Body<'a>,
     pub args: Vec<LocalID>,
 }
@@ -132,6 +128,7 @@ impl<'a> LocalFunction<'a> {
         LocalFunction {
             ty_id: type_id,
             func_id: function_id,
+            instr_flag: FuncInstrFlag::default(),
             body,
             args,
         }
@@ -143,6 +140,18 @@ impl<'a> LocalFunction<'a> {
             &mut self.body.num_locals,
             &mut self.body.locals,
         )
+    }
+
+    pub fn add_instr(&mut self, instr: Operator<'a>, instr_idx: usize) {
+        if self.instr_flag.current_mode.is_some() {
+            // inject at function level
+            self.instr_flag.add_instr(instr);
+        } else {
+            // inject at instruction level
+            let is_special = self.body.instructions[instr_idx].add_instr(instr);
+            // remember if we injected a special instrumentation (to be resolved before encoding)
+            self.instr_flag.has_special_instr |= is_special;
+        }
     }
 }
 
@@ -233,9 +242,8 @@ impl<'a> Functions<'a> {
     /// Add a new function
     pub fn push(&mut self, func: Function<'a>) {
         self.functions.push(func.clone());
-        match func.kind {
-            FuncKind::Local(_) => self.added_local_fns += 1,
-            _ => {}
+        if let FuncKind::Local(_) = func.kind {
+            self.added_local_fns += 1;
         }
     }
 
@@ -253,12 +261,9 @@ impl<'a> Functions<'a> {
     pub fn delete(&mut self, id: FunctionID) {
         if id < self.functions.len() as u32 {
             self.functions[id as usize].delete();
-            match self.functions[id as usize].kind {
-                FuncKind::Local(_) => {
-                    self.deleted_local_fns += 1;
-                    self.first_deleted_fn = min(self.first_deleted_fn, id);
-                }
-                _ => {}
+            if let FuncKind::Local(_) = self.functions[id as usize].kind {
+                self.deleted_local_fns += 1;
+                self.first_deleted_fn = min(self.first_deleted_fn, id);
             }
         }
     }
@@ -282,7 +287,6 @@ impl<'a> Functions<'a> {
     pub fn get_kind(&self, function_id: FunctionID) -> &FuncKind<'a> {
         &self.functions[function_id as usize].kind
     }
-
     /// Check if a function is a local
     pub fn is_local(&self, function_id: FunctionID) -> bool {
         self.functions[function_id as usize].is_local()
@@ -291,6 +295,12 @@ impl<'a> Functions<'a> {
     /// Check if a function is an import
     pub fn is_import(&self, function_id: FunctionID) -> bool {
         self.functions[function_id as usize].is_import()
+    }
+
+    /// TODO -- can this be removed?
+    /// Get kind of function
+    pub fn get_kind_mut(&mut self, function_id: FunctionID) -> &mut FuncKind<'a> {
+        &mut self.functions[function_id as usize].kind
     }
 
     /// Get a function modifier from a function index
