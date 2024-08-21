@@ -66,7 +66,7 @@ impl<'a> FunctionBuilder<'a> {
         // assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(
             module.functions.len(),
-            module.num_functions + module.num_imported_functions
+            module.num_functions + module.num_imported_functions + module.num_imports_added
         );
         id as FunctionID
     }
@@ -109,6 +109,7 @@ impl<'a> FunctionBuilder<'a> {
             comp.modules[mod_idx as usize].functions.len(),
             comp.modules[mod_idx as usize].num_functions
                 + comp.modules[mod_idx as usize].num_imported_functions
+                + comp.modules[mod_idx as usize].num_imports_added
         );
         id as FunctionID
     }

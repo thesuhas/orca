@@ -775,6 +775,11 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    fn f64_convert_i32s(&mut self) -> &mut Self {
+        self.inject(Operator::F64ConvertI32S);
+        self
+    }
+
     // Memory Instructions
     /// Inject a memory.init instruction
     fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
