@@ -1,6 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::{DataType, InstrumentationMode};
+use super::types::{DataType, Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
@@ -265,10 +265,8 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool: Vec<_> = instructions
-                        .into_iter()
-                        .map(|op| (op, InstrumentationFlag::default()))
-                        .collect();
+                    let instructions_bool: Vec<_> =
+                        instructions.into_iter().map(Instruction::new).collect();
                     code_sections.push(Body {
                         locals,
                         num_locals,
@@ -546,7 +544,14 @@ impl<'a> Module<'a> {
 
                 // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
                 let readable_copy_of_body = builder.body.instructions.clone();
-                for (idx, (op, instrumentation)) in readable_copy_of_body.iter().enumerate() {
+                for (
+                    idx,
+                    Instruction {
+                        op,
+                        instr_flag: instrumentation,
+                    },
+                ) in readable_copy_of_body.iter().enumerate()
+                {
                     // resolve function-level instrumentation
                     if let Some(on_entry) = &mut instr_func_on_entry {
                         if !on_entry.is_empty() {
@@ -1026,7 +1031,14 @@ impl<'a> Module<'a> {
                 }
                 let mut function = wasm_encoder::Function::new(converted_locals);
                 let instr_len = instructions.len() - 1;
-                for (idx, (op, instrument)) in instructions.iter_mut().enumerate() {
+                for (
+                    idx,
+                    Instruction {
+                        op,
+                        instr_flag: instrument,
+                    },
+                ) in instructions.iter_mut().enumerate()
+                {
                     if is_call(op) {
                         update_call(op, &func_mapping);
                     }

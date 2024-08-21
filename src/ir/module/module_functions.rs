@@ -148,7 +148,9 @@ impl<'a> LocalFunction<'a> {
             self.instr_flag.add_instr(instr);
         } else {
             // inject at instruction level
-            let is_special = self.body.instructions[instr_idx].1.add_instr(instr);
+            let is_special = self.body.instructions[instr_idx]
+                .instr_flag
+                .add_instr(instr);
             // remember if we injected a special instrumentation (to be resolved before encoding)
             self.instr_flag.has_special_instr |= is_special;
         }

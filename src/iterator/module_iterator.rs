@@ -52,7 +52,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
-                FuncKind::Local(l) => Some(l.body.instructions[instr_idx].0.clone()),
+                FuncKind::Local(l) => Some(l.body.instructions[instr_idx].op.clone()),
             }
         } else {
             panic!("Should have gotten Module Location!")
@@ -142,7 +142,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
-                FuncKind::Local(l) => &l.body.instructions[instr_idx].1.current_mode,
+                FuncKind::Local(l) => &l.body.instructions[instr_idx].instr_flag.current_mode,
             }
         } else {
             panic!("Should have gotten Module Location and not Module Location!")
@@ -158,7 +158,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot add an instruction to an imported function"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].1.current_mode = Some(mode)
+                    l.body.instructions[instr_idx].instr_flag.current_mode = Some(mode)
                 }
             }
         } else {
@@ -216,7 +216,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].1.alternate = Some(vec![])
+                    l.body.instructions[instr_idx].instr_flag.alternate = Some(vec![])
                 }
             }
         } else {
@@ -235,7 +235,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].1.block_alt = Some(vec![]);
+                    l.body.instructions[instr_idx].instr_flag.block_alt = Some(vec![]);
                     l.instr_flag.has_special_instr |= true;
                 }
             }
@@ -254,7 +254,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
-                FuncKind::Local(l) => l.body.instructions[instr_idx].1.get_instr(idx),
+                FuncKind::Local(l) => l.body.instructions[instr_idx].instr_flag.get_instr(idx),
             }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
@@ -317,7 +317,7 @@ impl<'a, 'b> Iterator for ModuleIterator<'a, 'b> {
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
-                FuncKind::Local(l) => Some(&l.body.instructions[instr_idx].0),
+                FuncKind::Local(l) => Some(&l.body.instructions[instr_idx].op),
             }
         } else {
             panic!("Should have gotten Module Location!")

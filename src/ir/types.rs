@@ -690,18 +690,22 @@ impl<'a> InstrumentationFlag<'a> {
                 false
             }
             Some(InstrumentationMode::SemanticAfter) => {
+                // TODO -- check applicability of curr_op
                 self.semantic_after.push(val);
                 true
             }
             Some(InstrumentationMode::BlockEntry) => {
+                // TODO -- check applicability of curr_op
                 self.block_entry.push(val);
                 true
             }
             Some(InstrumentationMode::BlockExit) => {
+                // TODO -- check applicability of curr_op
                 self.block_exit.push(val);
                 true
             }
             Some(InstrumentationMode::BlockAlt) => {
+                // TODO -- check applicability of curr_op
                 match &mut self.block_alt {
                     None => self.block_alt = Some(vec![val]),
                     Some(block_alt) => block_alt.push(val),
@@ -759,7 +763,7 @@ pub struct Body<'a> {
     pub locals: Vec<(u32, DataType)>,
     pub num_locals: usize,
     // accessing operators by .0 is not very clear
-    pub instructions: Vec<(Operator<'a>, InstrumentationFlag<'a>)>,
+    pub instructions: Vec<Instruction<'a>>,
     pub num_instructions: usize,
     pub name: Option<String>,
 }
@@ -770,21 +774,37 @@ where
     'b: 'a,
 {
     pub fn push_instr(&mut self, instr: Operator<'b>) {
-        self.instructions
-            .push((instr, InstrumentationFlag::default()));
+        self.instructions.push(Instruction::new(instr));
         self.num_instructions += 1;
     }
 
     pub fn get_instr(&self, idx: usize) -> &Operator {
-        &self.instructions[idx].0
+        &self.instructions[idx].op
     }
 
     pub fn get_instr_flag(&self, idx: usize) -> &InstrumentationFlag {
-        &self.instructions[idx].1
+        &self.instructions[idx].instr_flag
     }
 
     pub fn end(&mut self) {
         self.push_instr(Operator::End);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Instruction<'a> {
+    pub(crate) op: Operator<'a>,
+    pub(crate) instr_flag: InstrumentationFlag<'a>,
+}
+impl<'a, 'b> Instruction<'a>
+where
+    'b: 'a,
+{
+    pub fn new(op: Operator<'b>) -> Self {
+        Self {
+            op,
+            instr_flag: InstrumentationFlag::default(),
+        }
     }
 }
 
