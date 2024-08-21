@@ -130,8 +130,8 @@ impl<'a> FunctionBuilder<'a> {
 impl<'a> Inject<'a> for FunctionBuilder<'a> {
     /// Inject an operator at the end of the function
     // here the location of the injection is always at the end of the function
-    fn inject(&mut self, instr: Operator<'a>) {
-        self.body.push_instr(instr)
+    fn inject(&mut self, op: Operator<'a>) {
+        self.body.push_op(op)
     }
 
     fn inject_at(&mut self, _idx: usize, _mode: InstrumentationMode, _instr: Operator<'a>) {
@@ -208,7 +208,7 @@ impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
         } else {
             // inject at instruction level
             if let Some(idx) = self.instr_idx {
-                let is_special = self.body.instructions[idx].instr_flag.add_instr(instr);
+                let is_special = self.body.instructions[idx].add_instr(instr);
                 // remember if we injected a special instrumentation (to be resolved before encoding)
                 self.instr_flag.has_special_instr |= is_special;
             } else {
@@ -257,9 +257,7 @@ impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
 
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
         if let Location::Module { instr_idx, .. } = loc {
-            self.body.instructions[instr_idx]
-                .instr_flag
-                .add_instr(instr);
+            self.body.instructions[instr_idx].add_instr(instr);
         } else {
             panic!("Should have gotten module location");
         }

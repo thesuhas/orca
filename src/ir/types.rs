@@ -630,14 +630,12 @@ impl PartialEq for InstrumentationFlag<'_> {
         } = self;
         let mut result = before.eq(&other.before);
         result &= after.eq(&other.after);
-        // TODO -- unwrap here!
-        result &= alternate.eq(&other.alternate);
+        result &= *alternate == other.alternate;
         result &= semantic_after.eq(&other.semantic_after);
         result &= block_entry.eq(&other.block_entry);
         result &= block_exit.eq(&other.block_exit);
         result &= block_alt.eq(&other.block_alt);
-        // TODO -- unwrap here!
-        result &= discriminant(current_mode) == discriminant(&other.current_mode);
+        result &= *current_mode == other.current_mode;
 
         result
     }
@@ -669,7 +667,7 @@ impl<'a> InstrumentationFlag<'a> {
 
     /// Add an instruction to the current InstrumentationMode's list
     /// Returns whether the instrumentation was a 'special' mode
-    pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
+    pub fn add_instr(&mut self, op: &Operator, val: Operator<'a>) -> bool {
         match self.current_mode {
             None => {
                 panic!("Current mode is not set...cannot inject instructions!")
@@ -690,29 +688,82 @@ impl<'a> InstrumentationFlag<'a> {
                 false
             }
             Some(InstrumentationMode::SemanticAfter) => {
-                // TODO -- check applicability of curr_op
-                self.semantic_after.push(val);
-                true
+                // self.semantic_after.push(val);
+                // true
+                if Self::is_block_style_op(op) || Self::is_branching_op(op) {
+                    self.semantic_after.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply semantic after instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
             }
             Some(InstrumentationMode::BlockEntry) => {
-                // TODO -- check applicability of curr_op
-                self.block_entry.push(val);
-                true
+                if Self::is_block_style_op(op) {
+                    self.block_entry.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block entry instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
             }
             Some(InstrumentationMode::BlockExit) => {
-                // TODO -- check applicability of curr_op
-                self.block_exit.push(val);
-                true
+                if Self::is_block_style_op(op) {
+                    self.block_exit.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block exit instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
             }
             Some(InstrumentationMode::BlockAlt) => {
-                // TODO -- check applicability of curr_op
-                match &mut self.block_alt {
-                    None => self.block_alt = Some(vec![val]),
-                    Some(block_alt) => block_alt.push(val),
+                if Self::is_block_style_op(op) {
+                    match &mut self.block_alt {
+                        None => self.block_alt = Some(vec![val]),
+                        Some(block_alt) => block_alt.push(val),
+                    }
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block alternate instrumentation mode to op type: {:?}",
+                        op
+                    );
                 }
-                true
             }
         }
+    }
+
+    fn is_block_style_op(op: &Operator) -> bool {
+        matches!(
+            op,
+            Operator::Block { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::Else { .. }
+        )
+    }
+
+    fn is_branching_op(op: &Operator) -> bool {
+        matches!(
+            op,
+            Operator::Br { .. }
+                | Operator::BrIf { .. }
+                | Operator::BrTable { .. }
+                | Operator::BrOnCast { .. }
+                | Operator::BrOnCastFail { .. }
+                | Operator::BrOnNull { .. }
+                | Operator::BrOnNonNull { .. }
+        )
     }
 
     /// Get an instruction to the current InstrumentationMode's list
@@ -773,21 +824,25 @@ impl<'a, 'b> Body<'a>
 where
     'b: 'a,
 {
-    pub fn push_instr(&mut self, instr: Operator<'b>) {
-        self.instructions.push(Instruction::new(instr));
+    /// Push a new operator (instruction) to the end of the body
+    pub fn push_op(&mut self, op: Operator<'b>) {
+        self.instructions.push(Instruction::new(op));
         self.num_instructions += 1;
     }
 
-    pub fn get_instr(&self, idx: usize) -> &Operator {
+    /// Get some operator (instruction) at the specified index of the body
+    pub fn get_op(&self, idx: usize) -> &Operator {
         &self.instructions[idx].op
     }
 
+    /// Get the instrumentation of some operator in the body
     pub fn get_instr_flag(&self, idx: usize) -> &InstrumentationFlag {
         &self.instructions[idx].instr_flag
     }
 
+    /// Push an end operator (instruction) to the end of the body
     pub fn end(&mut self) {
-        self.push_instr(Operator::End);
+        self.push_op(Operator::End);
     }
 }
 
@@ -805,6 +860,10 @@ where
             op,
             instr_flag: InstrumentationFlag::default(),
         }
+    }
+
+    pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
+        self.instr_flag.add_instr(&self.op, val)
     }
 }
 
