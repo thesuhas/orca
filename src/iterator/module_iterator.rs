@@ -7,7 +7,7 @@ use crate::ir::module::Module;
 use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
-use crate::opcode::{Inject, Instrumenter, MacroOpcode, Opcode};
+use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
 use std::collections::HashMap;
 use wasmparser::Operator;
@@ -116,7 +116,8 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
             panic!("Should have gotten Module Location!")
         }
     }
-
+}
+impl<'a, 'b> InjectAt<'b> for ModuleIterator<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         if let Location::Module { func_idx, .. } = self.curr_loc() {
             let loc = Location::Module {

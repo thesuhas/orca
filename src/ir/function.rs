@@ -8,7 +8,7 @@ use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
 use crate::module_builder::AddLocal;
-use crate::opcode::{Inject, Instrumenter, MacroOpcode, Opcode};
+use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::{Component, Location};
 use wasmparser::Operator;
 
@@ -133,15 +133,6 @@ impl<'a> Inject<'a> for FunctionBuilder<'a> {
     fn inject(&mut self, op: Operator<'a>) {
         self.body.push_op(op)
     }
-
-    fn inject_at(&mut self, _idx: usize, _mode: InstrumentationMode, _instr: Operator<'a>) {
-        // self.set_instrument_mode_at(mode, Location::Module {
-        //     func_idx: 0, // not used
-        //     instr_idx: idx
-        // });
-        // self.body.instructions[idx].1.add_instr(instr);
-        unreachable!()
-    }
 }
 impl<'a> Opcode<'a> for FunctionBuilder<'a> {}
 impl<'a> MacroOpcode<'a> for FunctionBuilder<'a> {}
@@ -216,7 +207,8 @@ impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
             }
         }
     }
-
+}
+impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         let loc = Location::Module {
             func_idx: 0, // not used

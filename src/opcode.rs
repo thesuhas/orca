@@ -10,7 +10,7 @@ use crate::Location;
 use wasmparser::MemArg;
 use wasmparser::Operator;
 
-pub trait Instrumenter<'a>: Inject<'a> {
+pub trait Instrumenter<'a> {
     /// Get the InstrumentType of the current location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode>;
 
@@ -88,14 +88,16 @@ pub trait Instrumenter<'a>: Inject<'a> {
 pub trait Inject<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);
-    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'a>);
-
     fn inject_all(&mut self, instrs: &[Operator<'a>]) -> &mut Self {
         instrs.iter().for_each(|instr| {
             self.inject(instr.to_owned());
         });
         self
     }
+}
+
+pub trait InjectAt<'a> {
+    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'a>);
 }
 
 #[allow(dead_code)]

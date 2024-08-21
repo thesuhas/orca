@@ -7,7 +7,7 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
-use crate::opcode::{Inject, Instrumenter, MacroOpcode, Opcode};
+use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::subiterator::component_subiterator::ComponentSubIterator;
 use std::collections::HashMap;
 use std::iter::Iterator as StdIter;
@@ -158,7 +158,8 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten component location!")
         }
     }
-
+}
+impl<'a, 'b> InjectAt<'b> for ComponentIterator<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         if let Location::Component {
             mod_idx, func_idx, ..
