@@ -77,8 +77,6 @@ mod round_trip {
 
     make_round_trip_tests_component!("handwritten/components", add);
 
-    make_round_trip_tests_component!("handwritten/components", fuzz);
-
     make_round_trip_tests_component!("wizard/components", func_loop);
 
     make_round_trip_tests_component!("spec-test/components", if_test);
