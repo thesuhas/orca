@@ -293,7 +293,7 @@ impl<'a> Module<'a> {
                                                 for import in imports.iter_mut() {
                                                     if import.is_function() {
                                                         if import_func_count == abs_idx {
-                                                            import.import_name =
+                                                            import.custom_name =
                                                                 Some(naming.name.to_string());
                                                             break;
                                                         }
@@ -843,7 +843,7 @@ impl<'a> Module<'a> {
             for import in self.imports.iter() {
                 if !import.deleted {
                     if import.is_function() {
-                        if let Some(import_name) = &import.import_name {
+                        if let Some(import_name) = &import.custom_name {
                             function_names.append(import_func_idx as u32, import_name);
                         }
                         import_func_idx += 1;
@@ -1224,7 +1224,7 @@ impl<'a> Module<'a> {
             module: module.leak(),
             name: name.clone().leak(),
             ty: wasmparser::TypeRef::Func(ty_id),
-            import_name: None,
+            custom_name: None,
             deleted: false,
         };
         self.imports.add_func(import);
@@ -1275,6 +1275,14 @@ impl<'a> Module<'a> {
         self.functions
             .get_mut(imports_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
+    }
+
+    pub fn print_import(&self) {
+        for i in self.imports.iter() {
+            if !i.deleted {
+                println!("{:?} {:?}", i.module, i.name);
+            }
+        }
     }
 
     /// Convert a local function to imported
