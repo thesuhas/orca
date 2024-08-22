@@ -13,7 +13,7 @@ pub struct Import<'a> {
     /// The type of the imported item.
     pub ty: wasmparser::TypeRef,
     /// The name (in the custom section) of the imported item.
-    pub import_name: Option<String>,
+    pub custom_name: Option<String>,
     pub(crate) deleted: bool,
 }
 
@@ -23,7 +23,7 @@ impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
             module: import.module,
             name: import.name,
             ty: import.ty,
-            import_name: None,
+            custom_name: None,
             deleted: false,
         }
     }
@@ -68,7 +68,7 @@ impl<'a> ModuleImports<'a> {
     }
 
     pub fn set_name(&mut self, name: String, imports_id: ImportsID) {
-        self.imports[imports_id as usize].import_name = Some(name)
+        self.imports[imports_id as usize].custom_name = Some(name)
     }
 
     pub fn len(&self) -> usize {
@@ -100,11 +100,11 @@ impl<'a> ModuleImports<'a> {
         None
     }
 
-    pub fn get_func(&self, module: String, name: Option<String>) -> Option<FunctionID> {
-        for imp in self.imports.iter() {
-            if let TypeRef::Func(id) = imp.ty {
-                if imp.module == module.as_str() && imp.import_name == name {
-                    return Some(id);
+    pub fn get_func(&self, module: String, name: String) -> Option<FunctionID> {
+        for (idx, imp) in self.imports.iter().enumerate() {
+            if let TypeRef::Func(_) = imp.ty {
+                if imp.module == module.as_str() && imp.name.to_string() == name {
+                    return Some(idx as FunctionID);
                 }
             }
         }
@@ -116,6 +116,6 @@ impl<'a> ModuleImports<'a> {
     }
 
     pub fn get_import_name(&self, imports_id: ImportsID) -> &Option<String> {
-        &self.imports[imports_id as usize].import_name
+        &self.imports[imports_id as usize].custom_name
     }
 }

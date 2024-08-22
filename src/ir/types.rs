@@ -848,8 +848,8 @@ where
 
 #[derive(Debug, Clone)]
 pub struct Instruction<'a> {
-    pub(crate) op: Operator<'a>,
-    pub(crate) instr_flag: InstrumentationFlag<'a>,
+    pub op: Operator<'a>,
+    pub instr_flag: InstrumentationFlag<'a>,
 }
 impl<'a, 'b> Instruction<'a>
 where
