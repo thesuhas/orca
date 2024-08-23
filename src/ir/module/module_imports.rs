@@ -1,3 +1,5 @@
+//! Intermediate Representation of a Module's Imports
+
 use crate::ir::id::{FunctionID, ImportsID};
 use std::cmp::min;
 use wasmparser::TypeRef;
@@ -37,6 +39,7 @@ impl Import<'_> {
 }
 
 #[derive(Clone, Debug)]
+/// Represents the Imports Section of a WASM Module
 pub struct ModuleImports<'a> {
     imports: Vec<Import<'a>>,
 
@@ -49,6 +52,7 @@ pub struct ModuleImports<'a> {
 }
 
 impl<'a> ModuleImports<'a> {
+    /// Creates a new `ModuleImports` struct given a Vec of Imports
     pub fn new(imports: Vec<Import<'a>>) -> Self {
         ModuleImports {
             imports,
@@ -59,6 +63,7 @@ impl<'a> ModuleImports<'a> {
         }
     }
 
+    /// Checks if there are no Imports
     pub fn is_empty(&self) -> bool {
         self.imports.is_empty()
     }
@@ -67,10 +72,12 @@ impl<'a> ModuleImports<'a> {
         self.imports.iter()
     }
 
+    /// Set the name of a given import
     pub fn set_name(&mut self, name: String, imports_id: ImportsID) {
         self.imports[imports_id as usize].custom_name = Some(name)
     }
 
+    /// Returns the number of imports
     pub fn len(&self) -> usize {
         self.imports.len()
     }
@@ -91,6 +98,7 @@ impl<'a> ModuleImports<'a> {
         self.first_deleted_import = min(self.first_deleted_import, imports_id);
     }
 
+    /// Find an import by the `module` and `name` and return its `ImportsID` if found
     pub fn find(&self, module: String, name: String) -> Option<ImportsID> {
         for (id, imp) in self.imports.iter().enumerate() {
             if imp.module == module.as_str() && imp.name == name.as_str() {
@@ -100,6 +108,7 @@ impl<'a> ModuleImports<'a> {
         None
     }
 
+    /// Get the function ID of an Imported Function
     pub fn get_func(&self, module: String, name: String) -> Option<FunctionID> {
         for (idx, imp) in self.imports.iter().enumerate() {
             if let TypeRef::Func(_) = imp.ty {
@@ -111,10 +120,12 @@ impl<'a> ModuleImports<'a> {
         None
     }
 
+    /// Get an Import by its `ImportsID`
     pub fn get(&self, id: ImportsID) -> &Import {
         &self.imports[id as usize]
     }
 
+    /// Get the name of an Import
     pub fn get_import_name(&self, imports_id: ImportsID) -> &Option<String> {
         &self.imports[imports_id as usize].custom_name
     }

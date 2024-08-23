@@ -1,4 +1,4 @@
-//! Trait that defines the injection behaviour for wasm opcodes
+//! Traits that defines the injection behaviour for wasm opcodes
 
 // note: this should be implemented by FunctionBuilder, ModuleIterator, and ComponentIterator
 // note that the location of the injection is handled specific implementation
@@ -10,6 +10,7 @@ use crate::Location;
 use wasmparser::MemArg;
 use wasmparser::Operator;
 
+/// Defines instrumentation behaviour
 pub trait Instrumenter<'a> {
     /// Get the InstrumentType of the current location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode>;
@@ -38,58 +39,70 @@ pub trait Instrumenter<'a> {
     }
 
     // ==== INSTR INJECTION ====
-
+    /// Clears the instruction at a given Location
     fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode);
 
     /// Splice a new instruction into a specific location
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
 
+    /// Injects an Instruction with InstrumentationMode `Before` at a given location
     fn before_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::Before, loc);
         self
     }
 
+    /// Injects an Instruction with InstrumentationMode `After` at a given location
     fn after_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::After, loc);
         self
     }
 
+    /// Injects an Instruction with InstrumentationMode `Alternate` at a given location
     fn alternate_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::Alternate, loc);
         self
     }
 
+    /// Injects an empty InstrumentationMode `Alternate` at a given location
     fn empty_alternate_at(&mut self, loc: Location) -> &mut Self;
 
+    /// Injects a Semantic After at a given location
     fn semantic_after_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::SemanticAfter, loc);
         self
     }
 
+    /// Injects a block entry at a given location
     fn block_entry_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::BlockEntry, loc);
         self
     }
 
+    /// Injects a block exit at a given location
     fn block_exit_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::BlockExit, loc);
         self
     }
 
+    /// Injects a block alternate at a given location
     fn block_alt_at(&mut self, loc: Location) -> &mut Self {
         self.set_instrument_mode_at(InstrumentationMode::BlockAlt, loc);
         self
     }
 
+    /// Injects an empty block alternate at a given location
     fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self;
 
     /// Get the instruction injected at index idx
     fn get_injected_val(&self, idx: usize) -> &Operator;
 }
 
+/// Defines Injection behaviour at the current location of the Iterator
 pub trait Inject<'a> {
     /// Inject an operator at the current location
     fn inject(&mut self, instr: Operator<'a>);
+
+    /// Inject multiple operators at the current location
     fn inject_all(&mut self, instrs: &[Operator<'a>]) -> &mut Self {
         instrs.iter().for_each(|instr| {
             self.inject(instr.to_owned());
@@ -98,7 +111,9 @@ pub trait Inject<'a> {
     }
 }
 
+/// Defines Injection Behaviour at a given location
 pub trait InjectAt<'a> {
+    /// Inject an Instruction at a given Location with a given `InstrumentationMode`
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'a>);
 }
 
@@ -647,11 +662,13 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a f32_convert_i32s instruction
     fn f32_convert_i32s(&mut self) -> &mut Self {
         self.inject(Operator::F32ConvertI32S);
         self
     }
 
+    /// Inject a f32_demote_f64 instruction
     fn f32_demote_f64(&mut self) -> &mut Self {
         self.inject(Operator::F32DemoteF64);
         self
@@ -767,16 +784,19 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a f64_reinterpret_i64 instruction
     fn f64_reinterpret_i64(&mut self) -> &mut Self {
         self.inject(Operator::F64ReinterpretI64);
         self
     }
 
+    /// Inject a f64_promote_f32 instruction
     fn f64_promote_f32(&mut self) -> &mut Self {
         self.inject(Operator::F64PromoteF32);
         self
     }
 
+    /// Inject a f64_convert_i32s instruction
     fn f64_convert_i32s(&mut self) -> &mut Self {
         self.inject(Operator::F64ConvertI32S);
         self
@@ -933,6 +953,7 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject an f64_store instruction
     fn f64_store(&mut self, memarg: MemArg) -> &mut Self {
         self.inject(Operator::F64Store { memarg });
         self
