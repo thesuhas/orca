@@ -45,10 +45,11 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
     pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
         if self.mod_iterator.end() {
             None
-        } else if let Location::Module {
+        } else if let (Location::Module {
             func_idx,
             instr_idx,
-        } = self.mod_iterator.curr_loc()
+            ..
+        }, ..) = self.mod_iterator.curr_loc()
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
@@ -88,7 +89,7 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
     ///     if let Location::Module {
     ///         func_idx,
     ///         instr_idx,
-    ///     } = module_it.curr_loc()
+    ///     } = module_it.curr_loc().0
     ///     {
     ///         if *module_it.curr_op().unwrap() == interested {
     ///             module_it.before().i32_const(1);
@@ -103,10 +104,11 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
     /// }
     /// ```
     fn inject(&mut self, instr: Operator<'b>) {
-        if let Location::Module {
+        if let (Location::Module {
             func_idx,
             instr_idx,
-        } = self.curr_loc()
+            ..
+        }, ..) = self.curr_loc()
         {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
@@ -119,10 +121,10 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
 }
 impl<'a, 'b> InjectAt<'b> for ModuleIterator<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
-        if let Location::Module { func_idx, .. } = self.curr_loc() {
+        if let (Location::Module { func_idx, .. }, ..) = self.curr_loc() {
             let loc = Location::Module {
                 func_idx,
-                instr_idx: idx,
+                instr_idx: idx
             };
             self.set_instrument_mode_at(mode, loc);
             self.add_instr_at(loc, instr);
@@ -136,10 +138,11 @@ impl<'a, 'b> MacroOpcode<'b> for ModuleIterator<'a, 'b> {}
 impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
-        if let Location::Module {
+        if let (Location::Module {
             func_idx,
             instr_idx,
-        } = self.mod_iterator.curr_loc()
+            ..
+        }, ..) = self.mod_iterator.curr_loc()
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
@@ -154,6 +157,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         if let Location::Module {
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
@@ -168,7 +172,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn curr_func_instrument_mode(&self) -> &Option<FuncInstrMode> {
-        if let Location::Module { func_idx, .. } = self.mod_iterator.curr_loc() {
+        if let (Location::Module { func_idx, .. }, ..) = self.mod_iterator.curr_loc() {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
                 FuncKind::Local(l) => &l.instr_flag.current_mode,
@@ -179,7 +183,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 
     fn set_func_instrument_mode(&mut self, mode: FuncInstrMode) {
-        if let Location::Module { func_idx, .. } = self.mod_iterator.curr_loc() {
+        if let (Location::Module { func_idx, .. }, ..) = self.mod_iterator.curr_loc() {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
                 FuncKind::Local(ref mut l) => l.instr_flag.current_mode = Some(mode),
@@ -189,10 +193,30 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot add an instruction to an imported function"),
+                FuncKind::Local(ref mut l) => {
+                    l.clear_instr_at(instr_idx, mode);
+                }
+            }
+            // Only injects if it is an instrumented location
+        } else {
+            panic!("Should have gotten Module Location!")
+        }
+    }
+
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
         if let Location::Module {
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
@@ -248,10 +272,11 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
 
     /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
-        if let Location::Module {
+        if let (Location::Module {
             func_idx,
             instr_idx,
-        } = self.mod_iterator.curr_loc()
+            ..
+        }, ..) = self.mod_iterator.curr_loc()
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
@@ -264,7 +289,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
 }
 impl<'a, 'b> IteratingInstrumenter<'b> for ModuleIterator<'a, 'b> {
     fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
-        self.set_instrument_mode_at(mode, self.curr_loc());
+        self.set_instrument_mode_at(mode, self.curr_loc().0);
     }
 
     fn add_global(&mut self, global: Global) -> GlobalID {
@@ -275,10 +300,10 @@ impl<'a, 'b> IteratingInstrumenter<'b> for ModuleIterator<'a, 'b> {
 impl<'a, 'b> AddLocal for ModuleIterator<'a, 'b> {
     fn add_local(&mut self, val_type: DataType) -> LocalID {
         let curr_loc = self.curr_loc();
-        if let Location::Module {
+        if let (Location::Module {
             func_idx,
-            instr_idx: _,
-        } = curr_loc
+            ..
+        }, ..) = curr_loc
         {
             self.module.functions.add_local(func_idx, val_type)
         } else {
@@ -302,8 +327,9 @@ impl<'a, 'b> Iterator for ModuleIterator<'a, 'b> {
         }
     }
 
-    /// Returns the current Location
-    fn curr_loc(&self) -> Location {
+    /// Returns the Current Location as a Location and a bool value that
+    /// says whether the location is at the end of the function.
+    fn curr_loc(&self) -> (Location, bool) {
         self.mod_iterator.curr_loc()
     }
 
@@ -311,10 +337,11 @@ impl<'a, 'b> Iterator for ModuleIterator<'a, 'b> {
     fn curr_op(&self) -> Option<&Operator<'b>> {
         if self.mod_iterator.end() {
             None
-        } else if let Location::Module {
+        } else if let (Location::Module {
             func_idx,
             instr_idx,
-        } = self.mod_iterator.curr_loc()
+            ..
+        }, ..) = self.mod_iterator.curr_loc()
         {
             match &self.module.functions.get(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),

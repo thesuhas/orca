@@ -12,7 +12,7 @@ pub struct ComponentSubIterator {
     /// The total number of modules in the component.
     num_mods: usize,
     /// The module iterator used to keep track of the location in the module.
-    mod_iterator: ModuleSubIterator,
+    pub(crate) mod_iterator: ModuleSubIterator,
     /// Metadata that maps Module Index -> Function Index -> Instruction Index
     metadata: HashMap<ModuleID, HashMap<FunctionID, usize>>,
     /// Map of Module -> Functions to skip in that module. Provide an empty HashMap if no functions are to be skipped.
@@ -93,18 +93,19 @@ impl ComponentSubIterator {
         self.curr_mod as usize == self.num_mods
     }
 
-    /// Returns the Current Location as a Location
-    pub fn curr_loc(&self) -> Location {
-        if let Location::Module {
+    /// Returns the Current Location as a Location and a bool value that
+    /// says whether the location is at the end of the function.
+    pub fn curr_loc(&self) -> (Location, bool) {
+        if let (Location::Module {
             func_idx,
-            instr_idx,
-        } = self.mod_iterator.curr_loc()
+            instr_idx
+        }, is_end) = self.mod_iterator.curr_loc()
         {
-            Location::Component {
+            (Location::Component {
                 mod_idx: self.curr_mod,
                 func_idx,
-                instr_idx,
-            }
+                instr_idx
+            }, is_end)
         } else {
             panic!("Should have gotten Module Location from Module Iterator and not Component Location!");
         }

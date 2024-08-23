@@ -175,7 +175,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         };
         func_modifier.before_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx,
+            instr_idx
         });
         func_modifier
     }
@@ -213,7 +213,7 @@ impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         let loc = Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx,
+            instr_idx: idx
         };
         self.set_instrument_mode_at(mode, loc);
         self.add_instr_at(loc, instr);
@@ -246,6 +246,14 @@ impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
 
     fn set_func_instrument_mode(&mut self, mode: FuncInstrMode) {
         self.instr_flag.current_mode = Some(mode);
+    }
+
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.body.clear_instr(instr_idx, mode);
+        } else {
+            panic!("Should have gotten module location");
+        }
     }
 
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {

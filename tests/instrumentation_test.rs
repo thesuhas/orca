@@ -30,7 +30,7 @@ fn no_injection() {
             mod_idx,
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = comp_it.curr_loc().0
         {
             trace!(
                 "Mod: {}, Func: {}, +{}: {:?}, {:?}",
@@ -60,7 +60,7 @@ fn no_injection() {
             mod_idx,
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = comp_it.curr_loc().0
         {
             if *comp_it.curr_op().unwrap() == interested {
                 assert_ne!(discriminant(instr_mode), discriminant(&None));
@@ -101,7 +101,7 @@ fn iterator_inject_i32_before() {
             mod_idx,
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = comp_it.curr_loc().0
         {
             trace!(
                 "Mod: {}, Func: {}, +{}: {:?}, {:?}",
@@ -152,7 +152,7 @@ fn iterator_inject_all_variations() {
             mod_idx,
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = comp_it.curr_loc().0
         {
             trace!(
                 "Mod: {}, Func: {}, +{}: {:?}, {:?}",
@@ -204,7 +204,7 @@ fn test_inject_locals() {
         if let Location::Module {
             func_idx,
             instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             println!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
 
@@ -1929,7 +1929,7 @@ fn run_block_injection<'a, 'b, 'c>(
         if let Location::Module {
             func_idx,
             instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
 
@@ -1995,7 +1995,7 @@ where
 {
     let mut curr_func = None;
     loop {
-        if let Location::Module { func_idx, .. } = mod_it.curr_loc() {
+        if let Location::Module { func_idx, .. } = mod_it.curr_loc().0 {
             if curr_func != Some(func_idx) {
                 // visiting a new function, instrument it!
                 mod_it.func_entry();
@@ -2016,7 +2016,7 @@ where
 {
     let mut curr_func = None;
     loop {
-        if let Location::Module { func_idx, .. } = mod_it.curr_loc() {
+        if let Location::Module { func_idx, .. } = mod_it.curr_loc().0 {
             if curr_func != Some(func_idx) {
                 // visiting a new function, instrument it!
                 mod_it.func_exit();

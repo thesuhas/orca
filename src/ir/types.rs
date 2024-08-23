@@ -743,6 +743,32 @@ impl<'a> InstrumentationFlag<'a> {
         }
     }
 
+    pub fn clear_instr(&mut self, mode: InstrumentationMode) {
+        match mode {
+            InstrumentationMode::Before => {
+                self.before.clear();
+            }
+            InstrumentationMode::After => {
+                self.after.clear()
+            }
+            InstrumentationMode::Alternate => {
+                self.alternate = None;
+            }
+            InstrumentationMode::SemanticAfter => {
+                self.semantic_after.clear()
+            }
+            InstrumentationMode::BlockEntry => {
+                self.block_entry.clear()
+            }
+            InstrumentationMode::BlockExit => {
+                self.block_exit.clear()
+            }
+            InstrumentationMode::BlockAlt => {
+                self.block_alt = None;
+            }
+        }
+    }
+
     fn is_block_style_op(op: &Operator) -> bool {
         matches!(
             op,
@@ -795,11 +821,11 @@ pub enum Location {
     Component {
         mod_idx: ModuleID,
         func_idx: FunctionID,
-        instr_idx: usize,
+        instr_idx: usize
     },
     Module {
         func_idx: FunctionID,
-        instr_idx: usize,
+        instr_idx: usize
     },
 }
 
@@ -838,6 +864,11 @@ where
     /// Get the instrumentation of some operator in the body
     pub fn get_instr_flag(&self, idx: usize) -> &InstrumentationFlag {
         &self.instructions[idx].instr_flag
+    }
+
+    /// Get the instrumentation of some operator in the body
+    pub fn clear_instr(&mut self, idx: usize, mode: InstrumentationMode) {
+        self.instructions[idx].instr_flag.clear_instr(mode);
     }
 
     /// Push an end operator (instruction) to the end of the body
