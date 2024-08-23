@@ -1,6 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::{DataType, Instruction, InstrumentationMode};
+use super::types::{Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
@@ -24,16 +24,12 @@ use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
+use gimli::{Dwarf, read};
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
-use gimli::{read, Dwarf, DwarfFileType, EndianSlice, LittleEndian};
-use wasm_encoder::reencode::Reencode;
-use wasmparser::{MemoryType, Operator, Parser, Payload};
-
+use crate::ir::dwarf::ModuleDebugData;
 use super::types::DataType;
-use crate::ir::wrappers::{
-    get_section_id, indirect_namemap_parser2encoder, namemap_parser2encoder,
-};
+use crate::ir::wrappers::get_section_id;
 
 pub mod module_exports;
 pub mod module_functions;
@@ -42,12 +38,6 @@ pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
 
-/// The DWARF debug section in input WebAssembly binary.
-#[derive(Debug, Default)]
-pub struct ModuleDebugData {
-    /// DWARF debug data
-    pub dwarf: read::Dwarf<Vec<u8>>,
-}
 
 #[derive(Clone, Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -424,7 +414,7 @@ impl<'a> Module<'a> {
                 | Payload::End(_) => {}
             }
         }
-        let mut debug_vec = CustomSections::new(debug_sections);
+        let debug_vec = CustomSections::new(debug_sections);
         let debug = Module::parse_debug_sections(debug_vec);
 
         if code_section_count != code_sections.len() || code_section_count != functions.len() {
@@ -541,7 +531,7 @@ impl<'a> Module<'a> {
 
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
-                if let FuncKind::Local(LocalFunction { instr_flag, .. }) =
+                if let FuncKind::Local(LocalFunction { ref mut instr_flag, .. }) =
                     self.functions.get_kind_mut(func_idx as FunctionID)
                 {
                     if !instr_flag.has_special_instr {
@@ -1268,16 +1258,15 @@ impl<'a> Module<'a> {
     }
 
     pub(crate) fn parse_debug_sections(
-        &mut self,
         mut debug_sections: CustomSections,
     ) -> ModuleDebugData {
-        let load_section = |id: gimli::SectionId| -> Vec<u8> {
+        let load_section = |id: gimli::SectionId| -> Result<Vec<u8>, Error> {
             match debug_sections
                 .iter_mut()
                 .find(|section| section.name == id.name())
             {
-                Some(section) => std::mem::take(&mut section.data.to_vec()),
-                None => Vec::new(),
+                Some(section) => Ok(std::mem::take(&mut section.data.to_vec())),
+                None => Ok(Vec::new()),
             }
         };
 

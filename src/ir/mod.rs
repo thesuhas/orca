@@ -10,3 +10,4 @@ pub mod module;
 pub mod section;
 pub mod types;
 pub(crate) mod wrappers;
+mod dwarf;
