@@ -1,6 +1,8 @@
 //! Intermediate representation of sections in a wasm module.
+
 use crate::error::Error;
 use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
+use std::cmp::PartialEq;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
@@ -197,18 +199,18 @@ impl From<&DataType> for wasm_encoder::ValType {
     }
 }
 
-impl From<&DataType> for wasmparser::ValType {
+impl From<&DataType> for ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
-            DataType::I32 => wasmparser::ValType::I32,
-            DataType::I64 => wasmparser::ValType::I64,
-            DataType::F32 => wasmparser::ValType::F32,
-            DataType::F64 => wasmparser::ValType::F64,
-            DataType::V128 => wasmparser::ValType::V128,
-            DataType::FuncRef => wasmparser::ValType::FUNCREF,
-            DataType::ExternRef => wasmparser::ValType::EXTERNREF,
-            DataType::Any => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::I32 => ValType::I32,
+            DataType::I64 => ValType::I64,
+            DataType::F32 => ValType::F32,
+            DataType::F64 => ValType::F64,
+            DataType::V128 => ValType::V128,
+            DataType::FuncRef => ValType::FUNCREF,
+            DataType::ExternRef => ValType::EXTERNREF,
+            DataType::Any => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -217,8 +219,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::None => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::None => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -227,8 +229,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::NoExtern => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::NoExtern => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -237,8 +239,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::NoFunc => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::NoFunc => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -247,8 +249,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Eq => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::Eq => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -257,8 +259,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Struct => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::Struct => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -267,8 +269,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Array => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::Array => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -277,8 +279,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::I31 => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::I31 => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -287,8 +289,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Exn => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::Exn => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -297,8 +299,8 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::NoExn => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::NoExn => ValType::Ref(
+                RefType::new(
                     false,
                     wasmparser::HeapType::Abstract {
                         shared: false,
@@ -307,21 +309,17 @@ impl From<&DataType> for wasmparser::ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Module(idx) => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::Module(idx) => ValType::Ref(
+                RefType::new(
                     false,
-                    wasmparser::HeapType::Concrete {
-                        0: wasmparser::UnpackedIndex::Module(*idx),
-                    },
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(*idx)),
                 )
                 .unwrap(),
             ),
-            DataType::RecGroup(idx) => wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
+            DataType::RecGroup(idx) => ValType::Ref(
+                RefType::new(
                     false,
-                    wasmparser::HeapType::Concrete {
-                        0: wasmparser::UnpackedIndex::RecGroup(*idx),
-                    },
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::RecGroup(*idx)),
                 )
                 .unwrap(),
             ),
@@ -330,10 +328,10 @@ impl From<&DataType> for wasmparser::ValType {
     }
 }
 
-/// Converts [`wasmparser::ValType`] to [`wasm_encoder::ValType`].
+/// Converts [`ValType`] to [`wasm_encoder::ValType`].
 ///
 /// [`wasm_encoder::ValType`]: https://docs.rs/wasm-encoder/0.214.0/wasm_encoder/enum.ValType.html
-/// [`wasmparser::ValType`]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
+/// [`ValType`]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 pub fn valtype_to_wasmencoder_type(val_type: &ValType) -> wasm_encoder::ValType {
     let mut reencoder = wasm_encoder::reencode::RoundtripReencoder;
     reencoder.val_type(*val_type).unwrap()
@@ -447,157 +445,383 @@ impl ElementItems<'_> {
 }
 
 #[derive(Debug, Clone)]
-/// Instrumentation Data that is stored with every instruction
-pub enum Instrument<'a> {
-    NotInstrumented,
-    Instrumented {
-        before: Vec<Operator<'a>>,
-        after: Vec<Operator<'a>>,
-        alternate: Vec<Operator<'a>>,
-        current: InstrumentationMode,
-    },
+/// Mode of Function in case the function is mark as instrumented
+pub enum FuncInstrMode {
+    Entry,
+    Exit,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
+/// Instrumentation Data that is stored with every function
+pub struct FuncInstrFlag<'a> {
+    /// boolean flag to say whether there are special instrumentation
+    /// modes to resolve for this function (see InstrumentationMode variants)
+    pub has_special_instr: bool,
+    pub current_mode: Option<FuncInstrMode>,
+    pub entry: Vec<Operator<'a>>,
+    pub exit: Vec<Operator<'a>>,
+}
+
+impl fmt::Display for FuncInstrFlag<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let FuncInstrFlag {
+            has_special_instr,
+            entry,
+            exit,
+            current_mode: _,
+        } = self;
+        if !self.has_instr() {
+            write!(f, "Not Instrumented")?;
+        }
+        write!(
+            f,
+            "Has special instrumentation: {}\n \
+             Func Entry: {:?} instructions\n \
+             Func Exit: {:?} instructions",
+            has_special_instr,
+            entry.len(),
+            exit.len()
+        )
+    }
+}
+
+impl PartialEq for FuncInstrFlag<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            has_special_instr,
+            entry,
+            exit,
+            current_mode,
+        } = self;
+        let mut result = *has_special_instr == other.has_special_instr;
+        result &= entry.eq(&other.entry);
+        result &= exit.eq(&other.exit);
+        result &= discriminant(current_mode) == discriminant(&other.current_mode);
+
+        result
+    }
+}
+
+impl Eq for FuncInstrFlag<'_> {}
+
+impl<'a> FuncInstrFlag<'a> {
+    pub fn has_instr(&self) -> bool {
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            entry,
+            exit,
+            has_special_instr: _,
+            current_mode: _,
+        } = self;
+        !entry.is_empty() || !exit.is_empty()
+    }
+
+    pub fn has_special_instr(&self) -> bool {
+        self.has_special_instr
+    }
+
+    /// Add an instruction to the current FuncInstrMode's list
+    pub fn add_instr(&mut self, val: Operator<'a>) {
+        self.has_special_instr = true;
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot inject instructions!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.push(val),
+            Some(FuncInstrMode::Exit) => self.exit.push(val),
+        }
+    }
+
+    /// Get an instruction to the current FuncInstrMode's list
+    pub fn get_instr(&self, idx: usize) -> &Operator {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot grab instruction without context!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.get(idx).unwrap(),
+            Some(FuncInstrMode::Exit) => self.exit.get(idx).unwrap(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 /// Mode of Instruction in case the instruction is marked as Instrumented
 pub enum InstrumentationMode {
     Before,
     After,
     Alternate,
+
+    // special modes
+    SemanticAfter,
+    BlockEntry,
+    BlockExit,
+    BlockAlt,
 }
 
-impl fmt::Display for Instrument<'_> {
+#[derive(Default, Debug, Clone)]
+/// Instrumentation Data that is stored with every instruction
+pub struct InstrumentationFlag<'a> {
+    pub current_mode: Option<InstrumentationMode>,
+    pub before: Vec<Operator<'a>>,
+    pub after: Vec<Operator<'a>>,
+    /// None means to replace with no instructions (effectively removing the original)
+    /// Some(vec) means to replace with the vec of instructions
+    /// Some(empty vec) means there is no alt instrumentation
+    pub alternate: Option<Vec<Operator<'a>>>,
+
+    // special modes
+    pub semantic_after: Vec<Operator<'a>>,
+    pub block_entry: Vec<Operator<'a>>,
+    pub block_exit: Vec<Operator<'a>>,
+    /// None means to replace with no instructions (effectively removing the original)
+    /// Some(vec) means to replace with the vec of instructions
+    /// Some(empty vec) means there is no alt instrumentation
+    pub block_alt: Option<Vec<Operator<'a>>>,
+}
+
+impl fmt::Display for InstrumentationFlag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Instrument::NotInstrumented => write!(f, "Not Instrumented"),
-            Instrument::Instrumented {before, after, alternate, current: _current} => write!(f, "Instrumented:\n Before: {:?} instructions\n After: {:?} instructions\n Alternate: {:?} instructions\n", before.len(), after.len(), alternate.len())
+        let InstrumentationFlag {
+            before,
+            after,
+            alternate,
+            semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
+            current_mode: _,
+        } = self;
+        if !self.has_instr() {
+            write!(f, "Not Instrumented")?;
         }
+        write!(
+            f,
+            "Before: {:?} instructions\n \
+                   After: {:?} instructions\n \
+                   Alternate: {:?} instructions\n \
+                   Semantic After: {:?} instructions\n \
+                   Block Entry: {:?} instructions\n \
+                   Block Exit: {:?} instructions\n \
+                   Block Alt: {:?} instructions",
+            before.len(),
+            after.len(),
+            alternate.as_ref().unwrap().len(),
+            semantic_after.len(),
+            block_entry.len(),
+            block_exit.len(),
+            block_alt.as_ref().unwrap().len()
+        )
     }
 }
 
-impl PartialEq for Instrument<'_> {
+impl PartialEq for InstrumentationFlag<'_> {
     fn eq(&self, other: &Self) -> bool {
-        discriminant(self) == discriminant(other)
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            before,
+            after,
+            alternate,
+            semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
+            current_mode,
+        } = self;
+        let mut result = before.eq(&other.before);
+        result &= after.eq(&other.after);
+        result &= *alternate == other.alternate;
+        result &= semantic_after.eq(&other.semantic_after);
+        result &= block_entry.eq(&other.block_entry);
+        result &= block_exit.eq(&other.block_exit);
+        result &= block_alt.eq(&other.block_alt);
+        result &= *current_mode == other.current_mode;
+
+        result
     }
 }
 
-impl Eq for Instrument<'_> {}
+impl Eq for InstrumentationFlag<'_> {}
 
-impl<'a> Instrument<'a> {
+impl<'a> InstrumentationFlag<'a> {
+    pub fn has_instr(&self) -> bool {
+        // Using pattern match to help identify when this function needs to be extended in the future
+        let Self {
+            before,
+            after,
+            alternate,
+            semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
+            current_mode: _,
+        } = self;
+        !before.is_empty()
+            || !after.is_empty()
+            || !alternate.is_none() // Some(vec![]) means instruction removal!
+            || !semantic_after.is_empty()
+            || !block_entry.is_empty()
+            || !block_exit.is_empty()
+            || !block_alt.is_none() // Some(vec![]) means block removal!
+    }
+
     /// Add an instruction to the current InstrumentationMode's list
-    pub fn add_instr(&mut self, val: Operator<'a>) {
-        match self {
-            Instrument::NotInstrumented => {
-                panic!("Cannot inject code into locations that are not instrumented!")
+    /// Returns whether the instrumentation was a 'special' mode
+    pub fn add_instr(&mut self, op: &Operator, val: Operator<'a>) -> bool {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot inject instructions!")
             }
-            Instrument::Instrumented {
-                before,
-                after,
-                alternate,
-                current,
-            } => match current {
-                InstrumentationMode::Before => before.push(val),
-                InstrumentationMode::After => after.push(val),
-                InstrumentationMode::Alternate => alternate.push(val),
-            },
+            Some(InstrumentationMode::Before) => {
+                self.before.push(val);
+                false
+            }
+            Some(InstrumentationMode::After) => {
+                self.after.push(val);
+                false
+            }
+            Some(InstrumentationMode::Alternate) => {
+                match &mut self.alternate {
+                    None => self.alternate = Some(vec![val]),
+                    Some(alternate) => alternate.push(val),
+                }
+                false
+            }
+            Some(InstrumentationMode::SemanticAfter) => {
+                // self.semantic_after.push(val);
+                // true
+                if Self::is_block_style_op(op) || Self::is_branching_op(op) {
+                    self.semantic_after.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply semantic after instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
+            }
+            Some(InstrumentationMode::BlockEntry) => {
+                if Self::is_block_style_op(op) {
+                    self.block_entry.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block entry instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
+            }
+            Some(InstrumentationMode::BlockExit) => {
+                if Self::is_block_style_op(op) {
+                    self.block_exit.push(val);
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block exit instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
+            }
+            Some(InstrumentationMode::BlockAlt) => {
+                if Self::is_block_style_op(op) {
+                    match &mut self.block_alt {
+                        None => self.block_alt = Some(vec![val]),
+                        Some(block_alt) => block_alt.push(val),
+                    }
+                    true
+                } else {
+                    // instrumentation type not applicable!
+                    panic!(
+                        "Cannot apply block alternate instrumentation mode to op type: {:?}",
+                        op
+                    );
+                }
+            }
         }
+    }
+
+    pub fn clear_instr(&mut self, mode: InstrumentationMode) {
+        match mode {
+            InstrumentationMode::Before => {
+                self.before.clear();
+            }
+            InstrumentationMode::After => self.after.clear(),
+            InstrumentationMode::Alternate => {
+                self.alternate = None;
+            }
+            InstrumentationMode::SemanticAfter => self.semantic_after.clear(),
+            InstrumentationMode::BlockEntry => self.block_entry.clear(),
+            InstrumentationMode::BlockExit => self.block_exit.clear(),
+            InstrumentationMode::BlockAlt => {
+                self.block_alt = None;
+            }
+        }
+    }
+
+    fn is_block_style_op(op: &Operator) -> bool {
+        matches!(
+            op,
+            Operator::Block { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::Else { .. }
+        )
+    }
+
+    fn is_branching_op(op: &Operator) -> bool {
+        matches!(
+            op,
+            Operator::Br { .. }
+                | Operator::BrIf { .. }
+                | Operator::BrTable { .. }
+                | Operator::BrOnCast { .. }
+                | Operator::BrOnCastFail { .. }
+                | Operator::BrOnNull { .. }
+                | Operator::BrOnNonNull { .. }
+        )
     }
 
     /// Get an instruction to the current InstrumentationMode's list
     pub fn get_instr(&self, idx: usize) -> &Operator {
-        match self {
-            Instrument::NotInstrumented => {
-                panic!("Cannot retrieve code from Instruction that was not instrumented!")
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot grab instruction without context!")
             }
-            Instrument::Instrumented {
-                before,
-                after,
-                alternate,
-                current,
-            } => match current {
-                InstrumentationMode::Before => before.get(idx).unwrap(),
-                InstrumentationMode::After => after.get(idx).unwrap(),
-                InstrumentationMode::Alternate => alternate.get(idx).unwrap(),
+            Some(InstrumentationMode::Before) => self.before.get(idx).unwrap(),
+            Some(InstrumentationMode::After) => self.after.get(idx).unwrap(),
+            Some(InstrumentationMode::Alternate) => match &self.alternate {
+                None => panic!("No alternate instructions to pull idx '{}' from", idx),
+                Some(alternate) => alternate.get(idx).unwrap(),
             },
-        }
-    }
-
-    /// Set the current Instrumentation Mode on instrumented instructions. Can also be used to switch Instrumentation Modes at the current location
-    pub fn set_curr(&mut self, ty: InstrumentationMode) {
-        match self {
-            Instrument::NotInstrumented => panic!(
-                "Cannot set current instrumentation type on instruction that are not instrumented!"
-            ),
-            Instrument::Instrumented {
-                before: _before,
-                after: _after,
-                alternate: _alternate,
-                current,
-            } => *current = ty,
-        }
-    }
-
-    /// Get the current Instrumentation Mode
-    pub fn get_curr(&self) -> InstrumentType {
-        match self {
-            Instrument::NotInstrumented => InstrumentType::NotInstrumented,
-            Instrument::Instrumented {
-                before: _before,
-                after: _after,
-                alternate: _alternate,
-                current,
-            } => match current {
-                InstrumentationMode::Before => InstrumentType::InstrumentBefore,
-                InstrumentationMode::After => InstrumentType::InstrumentAfter,
-                InstrumentationMode::Alternate => InstrumentType::InstrumentAlternate,
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockAlt) => match &self.block_alt {
+                None => panic!("No block alt instructions to pull idx '{}' from", idx),
+                Some(block_alt) => block_alt.get(idx).unwrap(),
             },
         }
     }
 }
-
-#[derive(Debug, Clone)]
-/// Type of instrumentation to be applied to an instruction.
-pub enum InstrumentType {
-    InstrumentBefore,
-    InstrumentAfter,
-    InstrumentAlternate,
-    NotInstrumented,
-}
-
-impl fmt::Display for InstrumentType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            InstrumentType::InstrumentBefore => write!(f, "Instrument Before"),
-            InstrumentType::InstrumentAfter => write!(f, "Instrument After"),
-            InstrumentType::InstrumentAlternate => write!(f, "Instrument Alternate"),
-            InstrumentType::NotInstrumented => write!(f, "Not Instrumented"),
-        }
-    }
-}
-
-impl PartialEq for InstrumentType {
-    fn eq(&self, other: &Self) -> bool {
-        discriminant(self) == discriminant(other)
-    }
-}
-
-impl Eq for InstrumentType {}
 
 /// Used to represent a unique location in a wasm component or module.
 #[derive(Debug, Clone, Copy)]
 pub enum Location {
     Component {
-        mod_idx: usize,
-        func_idx: usize,
+        mod_idx: ModuleID,
+        func_idx: FunctionID,
         instr_idx: usize,
     },
     Module {
-        func_idx: usize,
+        func_idx: FunctionID,
         instr_idx: usize,
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 /// Body of a function in a wasm module
 pub struct Body<'a> {
     /// Local variables of the function, given as tuples of (# of locals, type).
@@ -608,42 +832,61 @@ pub struct Body<'a> {
     pub locals: Vec<(u32, DataType)>,
     pub num_locals: usize,
     // accessing operators by .0 is not very clear
-    pub instructions: Vec<(Operator<'a>, Instrument<'a>)>,
+    pub instructions: Vec<Instruction<'a>>,
     pub num_instructions: usize,
     pub name: Option<String>,
 }
 
-#[allow(clippy::new_without_default)]
 // 'b should outlive 'a
 impl<'a, 'b> Body<'a>
 where
     'b: 'a,
 {
-    pub fn new() -> Self {
-        Self {
-            locals: Vec::new(),
-            num_locals: 0,
-            instructions: Vec::new(),
-            num_instructions: 0,
-            name: None,
-        }
-    }
-
-    pub fn push_instr(&mut self, instr: Operator<'b>) {
-        self.instructions.push((instr, Instrument::NotInstrumented));
+    /// Push a new operator (instruction) to the end of the body
+    pub fn push_op(&mut self, op: Operator<'b>) {
+        self.instructions.push(Instruction::new(op));
         self.num_instructions += 1;
     }
 
-    pub fn get_instr(&self, idx: usize) -> &Operator {
-        &self.instructions[idx].0
+    /// Get some operator (instruction) at the specified index of the body
+    pub fn get_op(&self, idx: usize) -> &Operator {
+        &self.instructions[idx].op
     }
 
-    pub fn get_instr_type(&self, idx: usize) -> &Instrument {
-        &self.instructions[idx].1
+    /// Get the instrumentation of some operator in the body
+    pub fn get_instr_flag(&self, idx: usize) -> &InstrumentationFlag {
+        &self.instructions[idx].instr_flag
     }
 
+    /// Get the instrumentation of some operator in the body
+    pub fn clear_instr(&mut self, idx: usize, mode: InstrumentationMode) {
+        self.instructions[idx].instr_flag.clear_instr(mode);
+    }
+
+    /// Push an end operator (instruction) to the end of the body
     pub fn end(&mut self) {
-        self.push_instr(Operator::End);
+        self.push_op(Operator::End);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Instruction<'a> {
+    pub op: Operator<'a>,
+    pub instr_flag: InstrumentationFlag<'a>,
+}
+impl<'a, 'b> Instruction<'a>
+where
+    'b: 'a,
+{
+    pub fn new(op: Operator<'b>) -> Self {
+        Self {
+            op,
+            instr_flag: InstrumentationFlag::default(),
+        }
+    }
+
+    pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
+        self.instr_flag.add_instr(&self.op, val)
     }
 }
 
@@ -767,7 +1010,7 @@ impl From<BlockType> for wasmparser::BlockType {
         match ty {
             BlockType::Empty => wasmparser::BlockType::Empty,
             BlockType::FuncType(u) => wasmparser::BlockType::FuncType(u),
-            BlockType::Type(data) => wasmparser::BlockType::Type(wasmparser::ValType::from(&data)),
+            BlockType::Type(data) => wasmparser::BlockType::Type(ValType::from(&data)),
         }
     }
 }

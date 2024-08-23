@@ -1,4 +1,6 @@
 //! Wrapper functions
+
+use std::collections::HashMap;
 use gimli::SectionId;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{
@@ -6,7 +8,7 @@ use wasm_encoder::{
 };
 use wasmparser::{
     ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
-    InstanceTypeDeclaration, SubType,
+    InstanceTypeDeclaration, Operator, SubType,
 };
 
 // Not added to wasm-tools
@@ -344,5 +346,23 @@ pub fn get_section_id(name: &str) -> Option<SectionId> {
         ".eh_frame" => Some(SectionId::EhFrame),
         ".eh_frame_hdr" => Some(SectionId::EhFrameHdr),
         _ => None,
+    }
+}
+
+pub(crate) fn refers_to_func(op: &Operator) -> bool {
+    matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
+}
+
+pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<i32, i32>) {
+    match op {
+        Operator::Call { function_index } | Operator::RefFunc { function_index } => {
+            match mapping.get(&(*function_index as i32)) {
+                Some(new_index) => {
+                    *function_index = *new_index as u32;
+                }
+                None => panic!("Deleted function!"),
+            }
+        }
+        _ => panic!("Not a call operation!"),
     }
 }

@@ -5,19 +5,109 @@
 // for iterators, we inject at the location the iterator is pointing at (curr_loc)
 // for FunctionBuilder, we inject at the end of the function
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
-use crate::ir::types::BlockType;
+use crate::ir::types::{BlockType, FuncInstrMode, InstrumentationMode};
+use crate::Location;
 use wasmparser::MemArg;
 use wasmparser::Operator;
+
+pub trait Instrumenter<'a> {
+    /// Get the InstrumentType of the current location
+    fn curr_instrument_mode(&self) -> &Option<InstrumentationMode>;
+
+    /// Sets the type of Instrumentation Type of the specified location
+    fn set_instrument_mode_at(&mut self, mode: InstrumentationMode, loc: Location);
+
+    /// Get the InstrumentType of the current function
+    fn curr_func_instrument_mode(&self) -> &Option<FuncInstrMode>;
+
+    /// Sets the type of Instrumentation Type of the current function
+    fn set_func_instrument_mode(&mut self, mode: FuncInstrMode);
+
+    // ==== FUNC INSTR INJECTION ====
+
+    /// Mark the current function to InstrumentFuncEntry
+    fn func_entry(&mut self) -> &mut Self {
+        self.set_func_instrument_mode(FuncInstrMode::Entry);
+        self
+    }
+
+    /// Mark the current function to InstrumentFuncExit
+    fn func_exit(&mut self) -> &mut Self {
+        self.set_func_instrument_mode(FuncInstrMode::Exit);
+        self
+    }
+
+    // ==== INSTR INJECTION ====
+
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode);
+
+    /// Splice a new instruction into a specific location
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
+
+    fn before_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::Before, loc);
+        self
+    }
+
+    fn after_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::After, loc);
+        self
+    }
+
+    fn alternate_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::Alternate, loc);
+        self
+    }
+
+    fn empty_alternate_at(&mut self, loc: Location) -> &mut Self;
+
+    fn semantic_after_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::SemanticAfter, loc);
+        self
+    }
+
+    fn block_entry_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::BlockEntry, loc);
+        self
+    }
+
+    fn block_exit_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::BlockExit, loc);
+        self
+    }
+
+    fn block_alt_at(&mut self, loc: Location) -> &mut Self {
+        self.set_instrument_mode_at(InstrumentationMode::BlockAlt, loc);
+        self
+    }
+
+    fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self;
+
+    /// Get the instruction injected at index idx
+    fn get_injected_val(&self, idx: usize) -> &Operator;
+}
+
+pub trait Inject<'a> {
+    /// Inject an operator at the current location
+    fn inject(&mut self, instr: Operator<'a>);
+    fn inject_all(&mut self, instrs: &[Operator<'a>]) -> &mut Self {
+        instrs.iter().for_each(|instr| {
+            self.inject(instr.to_owned());
+        });
+        self
+    }
+}
+
+pub trait InjectAt<'a> {
+    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'a>);
+}
 
 #[allow(dead_code)]
 /// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
 ///
 /// [`wasmparser::Operator`]: https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html
 /// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
-pub trait Opcode<'a> {
-    /// Inject an operator at the current location
-    fn inject(&mut self, instr: Operator<'a>);
-
+pub trait Opcode<'a>: Inject<'a> {
     // Control Flow
     /// Inject a call instruction
     fn call(&mut self, idx: FunctionID) -> &mut Self {
@@ -687,6 +777,11 @@ pub trait Opcode<'a> {
         self
     }
 
+    fn f64_convert_i32s(&mut self) -> &mut Self {
+        self.inject(Operator::F64ConvertI32S);
+        self
+    }
+
     // Memory Instructions
     /// Inject a memory.init instruction
     fn memory_init(&mut self, data_index: u32, mem: u32) -> &mut Self {
@@ -852,6 +947,23 @@ pub trait Opcode<'a> {
     /// Inject a global.set
     fn global_set(&mut self, idx: GlobalID) -> &mut Self {
         self.inject(Operator::GlobalSet { global_index: idx });
+        self
+    }
+}
+
+#[allow(dead_code)]
+/// Defines injection behaviour. Takes a [`wasmparser::Operator`] and instructions are defined [here].
+///
+/// [`wasmparser::Operator`]: https://docs.rs/wasmparser/latest/wasmparser/enum.Operator.html
+/// [here]: https://webassembly.github.io/spec/core/binary/instructions.html
+pub trait MacroOpcode<'a>: Inject<'a> {
+    /// Helper function to reinterpret an u32 as an i32 and inject an i32.const instruction with that reinterpreted value.
+    /// (Useful to emitting memory addresses.)
+    /// We cast using the `as` keyword to accomplish this.
+    /// See https://github.com/thesuhas/orca/issues/133 for an explanation.
+    fn u32_const(&mut self, value: u32) -> &mut Self {
+        let i32_val = value as i32;
+        self.inject(Operator::I32Const { value: i32_val });
         self
     }
 }

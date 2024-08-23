@@ -1,3 +1,4 @@
+#![allow(clippy::mut_range_bound)] // see https://github.com/rust-lang/rust-clippy/issues/6072
 //! Intermediate Representation of a wasm component.
 
 use crate::error::Error;
@@ -343,7 +344,7 @@ impl<'a> Component<'a> {
                         &wasm[unchecked_range.start - start..unchecked_range.end - start],
                         enable_multi_memory,
                         parser,
-                        unchecked_range.start.clone(),
+                        unchecked_range.start,
                         &mut stack,
                     )?;
                     components.push(cmp.clone());
@@ -473,14 +474,14 @@ impl<'a> Component<'a> {
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    /// let comp = Component::parse(&buff, false).unwrap();
+    /// let mut comp = Component::parse(&buff, false).unwrap();
     /// let result = comp.encode();
     /// ```
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode(&mut self) -> Vec<u8> {
         self.encode_comp().finish()
     }
 
-    fn encode_comp(&self) -> wasm_encoder::Component {
+    fn encode_comp(&mut self) -> wasm_encoder::Component {
         let mut component = wasm_encoder::Component::new();
         let mut reencode = wasm_encoder::reencode::RoundtripReencoder;
         // NOTE: All of these are 1-indexed and not 0-indexed
@@ -912,7 +913,7 @@ impl<'a> Component<'a> {
     }
 
     /// Emit the Component into a wasm binary file.
-    pub fn emit_wasm(&self, file_name: &str) -> Result<(), std::io::Error> {
+    pub fn emit_wasm(&mut self, file_name: &str) -> Result<(), std::io::Error> {
         let comp = self.encode_comp();
         let wasm = comp.finish();
         std::fs::write(file_name, wasm)?;
@@ -927,16 +928,15 @@ impl<'a> Component<'a> {
             .iter()
             .enumerate()
         {
-            match &func.kind {
-                FuncKind::Local(l) => match &l.body.name {
+            if let FuncKind::Local(l) = &func.kind {
+                match &l.body.name {
                     Some(n) => {
                         if n == name {
                             return Some(idx as FunctionID);
                         }
                     }
                     None => {}
-                },
-                _ => {}
+                }
             }
         }
         None

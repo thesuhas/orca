@@ -29,6 +29,11 @@ impl FuncSubIterator {
         self.curr_instr + 1 < self.num_instr
     }
 
+    /// Checks if there are instructions left to visit
+    pub(crate) fn is_end(&self, pc: usize) -> bool {
+        pc + 1 >= self.num_instr
+    }
+
     /// Goes to the next instruction
     pub(crate) fn next(&mut self) -> bool {
         if !self.has_next() {

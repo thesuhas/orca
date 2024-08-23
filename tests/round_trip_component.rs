@@ -1,3 +1,6 @@
+mod common;
+
+use crate::common::WASM_OUTPUT_DIR;
 use orca::ir::component::Component;
 use std::fs::File;
 use std::io::Write;
@@ -20,22 +23,28 @@ fn write_to_file(bytes: &Vec<u8>, path: String) {
 
 fn round_trip_component(testname: &str, folder: &str) {
     let filename = format!(
-        "{}/tests/{}/{}.wat",
+        "{}/tests/test_inputs/{}/{}.wat",
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         folder,
         testname
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-    let component = Component::parse(&buff, false).expect("Unable to parse");
+    let mut component = Component::parse(&buff, false).expect("Unable to parse");
     // component.print();
     let result = component.encode();
-    write_to_file(&result, "test.wasm".to_string());
+    write_to_file(
+        &result,
+        format!("{WASM_OUTPUT_DIR}/component_{testname}.wasm"),
+    );
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
     assert_eq!(out, original);
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
-
+        write_to_file(
+            &original.as_bytes().to_vec(),
+            format!("{}_test_original.wat", testname),
+        );
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
 }
