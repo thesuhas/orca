@@ -25,7 +25,7 @@ use wasmparser::{
     Parser, Payload,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 /// Intermediate Representation of a wasm component.
 pub struct Component<'a> {
     /// Modules
@@ -347,7 +347,7 @@ impl<'a> Component<'a> {
                         unchecked_range.start,
                         &mut stack,
                     )?;
-                    components.push(cmp.clone());
+                    components.push(cmp);
                     Self::add_to_sections(
                         &mut sections,
                         ComponentSection::Component,
@@ -433,8 +433,9 @@ impl<'a> Component<'a> {
                 _ => {}
             }
         }
+        let num_modules = modules.len();
         Ok(Component {
-            modules: modules.clone(),
+            modules,
             alias,
             core_types,
             component_types,
@@ -444,7 +445,7 @@ impl<'a> Component<'a> {
             component_instance,
             canons,
             custom_sections: CustomSections::new(custom_sections),
-            num_modules: modules.len(),
+            num_modules,
             sections,
             start_section,
             num_sections,
@@ -460,7 +461,7 @@ impl<'a> Component<'a> {
             instance_names,
             components_names,
             func_names,
-            components: components.clone(),
+            components,
             value_names,
         })
     }

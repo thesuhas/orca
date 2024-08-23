@@ -24,6 +24,7 @@ use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
+use gimli::{Dwarf};
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
@@ -34,7 +35,7 @@ pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
 ///
 /// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
