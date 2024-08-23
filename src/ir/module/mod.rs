@@ -781,6 +781,7 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Reorganises functions (both local and imports) in the correct ordering after any potential modifications
     pub(crate) fn reorganise_functions(&mut self) {
         // Location where we may have to move an import (converted from local) to
         let mut new_imported_funcs = self.num_imported_functions;
@@ -822,6 +823,7 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Get the mapping of old location -> new location in module.functions
     pub(crate) fn get_function_mapping(&self) -> HashMap<i32, i32> {
         let mut mapping = HashMap::new();
         for (idx, func) in self.functions.iter().enumerate() {
@@ -1311,14 +1313,6 @@ impl<'a> Module<'a> {
         self.functions
             .get_mut(imports_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
-    }
-
-    pub fn print_import(&self) {
-        for i in self.imports.iter() {
-            if !i.deleted {
-                println!("{:?} {:?}", i.module, i.name);
-            }
-        }
     }
 
     /// Convert a local function to imported

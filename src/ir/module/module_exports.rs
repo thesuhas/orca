@@ -1,7 +1,10 @@
+//! Intermediate Representation of a Module's Exports
+
 use crate::ir::id::{ExportsID, FunctionID};
 use wasmparser::ExternalKind;
 
 #[derive(Debug, Clone)]
+/// Represents an export in a WebAssembly module.
 pub struct Export {
     /// The name of the exported item.
     pub name: String,
@@ -25,11 +28,13 @@ impl<'a> From<wasmparser::Export<'a>> for Export {
 }
 
 #[derive(Clone, Debug)]
+/// Represents the Exports Section of a WASM Module
 pub struct ModuleExports {
     exports: Vec<Export>,
 }
 
 impl ModuleExports {
+    /// Creates a new `ModuleExports` struct from a Vector of `Exports`
     pub fn new(exports: Vec<Export>) -> Self {
         ModuleExports { exports }
     }
@@ -38,10 +43,12 @@ impl ModuleExports {
         self.exports.iter()
     }
 
+    /// Checks if there are no exports
     pub fn is_empty(&self) -> bool {
         self.exports.is_empty()
     }
 
+    /// Add an exported function
     pub fn add_export_func(&mut self, name: String, func_idx: u32) {
         let export = Export {
             name,
