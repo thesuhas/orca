@@ -175,7 +175,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         };
         func_modifier.before_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx
+            instr_idx,
         });
         func_modifier
     }
@@ -213,7 +213,7 @@ impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         let loc = Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         };
         self.set_instrument_mode_at(mode, loc);
         self.add_instr_at(loc, instr);

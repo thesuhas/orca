@@ -103,7 +103,7 @@ impl<'a> ModuleImports<'a> {
     pub fn get_func(&self, module: String, name: String) -> Option<FunctionID> {
         for (idx, imp) in self.imports.iter().enumerate() {
             if let TypeRef::Func(_) = imp.ty {
-                if imp.module == module.as_str() && imp.name.to_string() == name {
+                if imp.module == module.as_str() && *imp.name == name {
                     return Some(idx as FunctionID);
                 }
             }

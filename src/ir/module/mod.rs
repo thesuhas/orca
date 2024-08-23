@@ -12,6 +12,7 @@ use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
+use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
@@ -25,7 +26,6 @@ use log::error;
 use std::collections::HashMap;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
-use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -586,10 +586,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
-                                    builder.clear_instr_at(Location::Module {
-                                        func_idx: 0, // not used
-                                        instr_idx: idx
-                                    }, BlockAlt);
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -600,7 +603,7 @@ impl<'a> Module<'a> {
                                 // delete this block and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
                                     func_idx: 0, // not used
-                                    instr_idx: idx
+                                    instr_idx: idx,
                                 });
                                 continue;
                             }
@@ -625,10 +628,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
-                                    builder.clear_instr_at(Location::Module {
-                                        func_idx: 0, // not used
-                                        instr_idx: idx
-                                    }, BlockAlt);
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -639,7 +645,7 @@ impl<'a> Module<'a> {
                                 // delete this block and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
                                     func_idx: 0, // not used
-                                    instr_idx: idx
+                                    instr_idx: idx,
                                 });
                                 continue;
                             }
@@ -658,7 +664,7 @@ impl<'a> Module<'a> {
                                             // delete this end and skip all instrumentation handling (like below)
                                             builder.empty_alternate_at(Location::Module {
                                                 func_idx: 0, // not used
-                                                instr_idx: idx
+                                                instr_idx: idx,
                                             });
                                             retain_end = true;
                                             continue;
@@ -669,7 +675,7 @@ impl<'a> Module<'a> {
                                         // delete this instruction and skip all instrumentation handling (like below)
                                         builder.empty_alternate_at(Location::Module {
                                             func_idx: 0, // not used
-                                            instr_idx: idx
+                                            instr_idx: idx,
                                         });
                                         continue;
                                     }
@@ -698,7 +704,7 @@ impl<'a> Module<'a> {
                                 // delete this instruction and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
                                     func_idx: 0, // not used
-                                    instr_idx: idx
+                                    instr_idx: idx,
                                 });
                                 continue;
                             }
@@ -724,10 +730,13 @@ impl<'a> Module<'a> {
                         // Handle block entry
                         if !block_entry.is_empty() {
                             resolve_block_entry(block_entry, &mut builder, op, idx);
-                            builder.clear_instr_at(Location::Module {
-                                func_idx: 0, // not used
-                                instr_idx: idx
-                            }, BlockEntry);
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockEntry,
+                            );
                         }
 
                         // Handle block exit
@@ -739,10 +748,13 @@ impl<'a> Module<'a> {
                                 &mut resolve_on_end,
                                 op,
                             );
-                            builder.clear_instr_at(Location::Module {
-                                func_idx: 0, // not used
-                                instr_idx: idx
-                            }, BlockExit);
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockExit,
+                            );
                         }
 
                         // Handle semantic_after!
@@ -755,10 +767,13 @@ impl<'a> Module<'a> {
                                 op,
                                 idx,
                             );
-                            builder.clear_instr_at(Location::Module {
-                                func_idx: 0, // not used
-                                instr_idx: idx
-                            }, SemanticAfter);
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                SemanticAfter,
+                            );
                         }
                     }
                 }
@@ -1412,7 +1427,7 @@ fn resolve_function_entry<'a, 'b, 'c>(
         // we're at the function entry!
         builder.before_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         });
         builder.inject_all(instr_func_on_entry);
 
@@ -1432,7 +1447,7 @@ fn resolve_function_exit<'a, 'b, 'c>(
         // we're at the end of the function!
         builder.before_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         });
         builder.inject_all(instr_func_on_entry);
 
@@ -1458,7 +1473,7 @@ fn resolve_block_entry<'a, 'b, 'c>(
             // just inject immediately after the start of the block
             builder.after_at(Location::Module {
                 func_idx: 0, // not used
-                instr_idx: idx
+                instr_idx: idx,
             });
             builder.inject_all(block_entry);
 
@@ -1523,7 +1538,7 @@ where
         | Operator::Else { .. } => {
             let loc = Location::Module {
                 func_idx: 0, // not used
-                instr_idx: idx
+                instr_idx: idx,
             };
             if !block_alt.is_empty() {
                 // just inject immediately after the start of the block
@@ -1639,7 +1654,7 @@ where
     builder
         .before_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         })
         .i32_const(1)
         .local_set(bool_flag_id);
@@ -1648,7 +1663,7 @@ where
     builder
         .after_at(Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         })
         .i32_const(0)
         .local_set(bool_flag_id);
@@ -1766,7 +1781,7 @@ fn resolve_bodies<'a, 'b, 'c>(
         // Inject the bodies in the correct mode at the current END opcode
         let loc = Location::Module {
             func_idx: 0, // not used
-            instr_idx: idx
+            instr_idx: idx,
         };
         match mode {
             InstrumentationMode::Before => builder.before_at(loc),
@@ -1803,7 +1818,7 @@ fn resolve_bodies<'a, 'b, 'c>(
     // Inject the bodies AFTER the current END opcode
     let loc = Location::Module {
         func_idx: 0, // not used
-        instr_idx: idx
+        instr_idx: idx,
     };
     match mode {
         InstrumentationMode::Before => builder.before_at(loc),

@@ -60,7 +60,7 @@ fn test_it_instr_at() {
 
     let loc = Location::Module {
         func_idx: 1,
-        instr_idx: 1
+        instr_idx: 1,
     };
     mod_it.before_at(loc.clone());
     mod_it.add_instr_at(loc, Operator::Unreachable);

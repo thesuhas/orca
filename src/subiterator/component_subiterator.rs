@@ -96,16 +96,22 @@ impl ComponentSubIterator {
     /// Returns the Current Location as a Location and a bool value that
     /// says whether the location is at the end of the function.
     pub fn curr_loc(&self) -> (Location, bool) {
-        if let (Location::Module {
-            func_idx,
-            instr_idx
-        }, is_end) = self.mod_iterator.curr_loc()
-        {
-            (Location::Component {
-                mod_idx: self.curr_mod,
+        if let (
+            Location::Module {
                 func_idx,
-                instr_idx
-            }, is_end)
+                instr_idx,
+            },
+            is_end,
+        ) = self.mod_iterator.curr_loc()
+        {
+            (
+                Location::Component {
+                    mod_idx: self.curr_mod,
+                    func_idx,
+                    instr_idx,
+                },
+                is_end,
+            )
         } else {
             panic!("Should have gotten Module Location from Module Iterator and not Component Location!");
         }

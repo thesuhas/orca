@@ -57,10 +57,13 @@ impl ModuleSubIterator {
     /// and a bool value that says whether the location is at the end of the function.
     pub fn curr_loc(&self) -> (Location, bool) {
         let curr_instr = self.func_iterator.curr_instr;
-        (Location::Module {
-            func_idx: self.curr_func,
-            instr_idx: curr_instr
-        }, self.func_iterator.is_end(curr_instr))
+        (
+            Location::Module {
+                func_idx: self.curr_func,
+                instr_idx: curr_instr,
+            },
+            self.func_iterator.is_end(curr_instr),
+        )
     }
 
     /// Resets the ModuleSubIterator when it is a Child SubIterator of a ComponentSubIterator

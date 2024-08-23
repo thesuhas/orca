@@ -748,21 +748,13 @@ impl<'a> InstrumentationFlag<'a> {
             InstrumentationMode::Before => {
                 self.before.clear();
             }
-            InstrumentationMode::After => {
-                self.after.clear()
-            }
+            InstrumentationMode::After => self.after.clear(),
             InstrumentationMode::Alternate => {
                 self.alternate = None;
             }
-            InstrumentationMode::SemanticAfter => {
-                self.semantic_after.clear()
-            }
-            InstrumentationMode::BlockEntry => {
-                self.block_entry.clear()
-            }
-            InstrumentationMode::BlockExit => {
-                self.block_exit.clear()
-            }
+            InstrumentationMode::SemanticAfter => self.semantic_after.clear(),
+            InstrumentationMode::BlockEntry => self.block_entry.clear(),
+            InstrumentationMode::BlockExit => self.block_exit.clear(),
             InstrumentationMode::BlockAlt => {
                 self.block_alt = None;
             }
@@ -821,11 +813,11 @@ pub enum Location {
     Component {
         mod_idx: ModuleID,
         func_idx: FunctionID,
-        instr_idx: usize
+        instr_idx: usize,
     },
     Module {
         func_idx: FunctionID,
-        instr_idx: usize
+        instr_idx: usize,
     },
 }
 
