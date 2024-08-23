@@ -39,6 +39,8 @@ pub trait Instrumenter<'a> {
 
     // ==== INSTR INJECTION ====
 
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode);
+
     /// Splice a new instruction into a specific location
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>);
 

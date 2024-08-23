@@ -248,6 +248,14 @@ impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
         self.instr_flag.current_mode = Some(mode);
     }
 
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
+        if let Location::Module { instr_idx, .. } = loc {
+            self.body.clear_instr(instr_idx, mode);
+        } else {
+            panic!("Should have gotten module location");
+        }
+    }
+
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
         if let Location::Module { instr_idx, .. } = loc {
             self.body.instructions[instr_idx].add_instr(instr);

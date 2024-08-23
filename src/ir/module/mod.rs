@@ -12,6 +12,7 @@ use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
+use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
@@ -585,6 +586,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -620,6 +628,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -715,6 +730,13 @@ impl<'a> Module<'a> {
                         // Handle block entry
                         if !block_entry.is_empty() {
                             resolve_block_entry(block_entry, &mut builder, op, idx);
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockEntry,
+                            );
                         }
 
                         // Handle block exit
@@ -725,6 +747,13 @@ impl<'a> Module<'a> {
                                 &mut resolve_on_else_or_end,
                                 &mut resolve_on_end,
                                 op,
+                            );
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockExit,
                             );
                         }
 
@@ -737,6 +766,13 @@ impl<'a> Module<'a> {
                                 &mut resolve_on_end,
                                 op,
                                 idx,
+                            );
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                SemanticAfter,
                             );
                         }
                     }
