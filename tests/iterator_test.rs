@@ -69,7 +69,7 @@ fn test_it_instr_at() {
         if let Location::Module {
             func_idx,
             instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
         } else {
@@ -99,11 +99,11 @@ fn test_it_dup_instr() {
         if let Location::Module {
             func_idx,
             instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
 
-            let loc = mod_it.curr_loc();
+            let loc = mod_it.curr_loc().0;
             let orig = mod_it.curr_op_owned().unwrap();
             mod_it.before();
             mod_it.add_instr_at(loc, orig);
@@ -164,7 +164,7 @@ fn test_function_skipping_module() {
         if let Location::Module {
             func_idx,
             instr_idx: _instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             set.insert(func_idx);
         } else {
@@ -193,7 +193,7 @@ fn test_function_skipping_component() {
     let mut set = HashSet::new();
 
     loop {
-        if let Location::Component { func_idx, .. } = comp_it.curr_loc() {
+        if let Location::Component { func_idx, .. } = comp_it.curr_loc().0 {
             set.insert(func_idx);
         } else {
             panic!("Should've gotten Component Location!");
@@ -229,7 +229,7 @@ fn iterate_component_and_count(comp_it: &mut ComponentIterator, exp_count: u32) 
             mod_idx,
             func_idx,
             instr_idx,
-        } = comp_it.curr_loc()
+        } = comp_it.curr_loc().0
         {
             trace!(
                 "Mod: {}, Func: {}, {}: {:?},",
@@ -259,7 +259,7 @@ fn iterate_module_and_count(mod_it: &mut ModuleIterator, num_imports: u32, exp_c
         if let Location::Module {
             func_idx,
             instr_idx,
-        } = mod_it.curr_loc()
+        } = mod_it.curr_loc().0
         {
             trace!("Func: {}, {}: {:?},", num_imports + func_idx, instr_idx, op);
         } else {

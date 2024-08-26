@@ -15,8 +15,9 @@ pub trait Iterator {
     /// Go to the next Instruction
     fn next(&mut self) -> Option<&Operator>;
 
-    /// Get the current location
-    fn curr_loc(&self) -> Location;
+    /// Returns the Current Location as a Location and a bool value that
+    /// says whether the location is at the end of the function.
+    fn curr_loc(&self) -> (Location, bool);
 
     /// Get the current instruction
     fn curr_op(&self) -> Option<&Operator>;
@@ -43,7 +44,7 @@ pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
     /// Insert an empty alt at the current location
     /// Effectively removes the instruction
     fn empty_alternate(&mut self) -> &mut Self {
-        self.empty_alternate_at(self.curr_loc());
+        self.empty_alternate_at(self.curr_loc().0);
         self
     }
 
@@ -86,7 +87,7 @@ pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
     /// Insert an empty alt block at the current location
     /// Effectively removes the block
     fn empty_block_alt(&mut self) -> &mut Self {
-        self.empty_block_alt_at(self.curr_loc());
+        self.empty_block_alt_at(self.curr_loc().0);
         self
     }
 

@@ -61,11 +61,15 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
 
     /// Returns the current module the component iterator is in
     pub fn curr_module(&self) -> ModuleID {
-        if let Location::Component {
-            mod_idx,
-            func_idx: _func_idx,
-            instr_idx: _instr_idx,
-        } = self.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx: _func_idx,
+                instr_idx: _instr_idx,
+                ..
+            },
+            ..,
+        ) = self.curr_loc()
         {
             mod_idx
         } else {
@@ -76,11 +80,15 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
     pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
         if self.comp_iterator.end() {
             None
-        } else if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = self.comp_iterator.curr_loc()
+        } else if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
         {
             match &self.comp.modules[mod_idx as usize]
                 .functions
@@ -125,7 +133,8 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
     ///         mod_idx,
     ///         func_idx,
     ///         instr_idx,
-    ///     } = comp_it.curr_loc()
+    ///         ..
+    ///     } = comp_it.curr_loc().0
     ///     {
     ///         if *comp_it.curr_op().unwrap() == interested {
     ///             comp_it.before().i32_const(1);
@@ -140,11 +149,15 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
     /// }
     /// ```
     fn inject(&mut self, instr: Operator<'b>) {
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = self.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.curr_loc()
         {
             match self.comp.modules[mod_idx as usize]
                 .functions
@@ -161,9 +174,12 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
 }
 impl<'a, 'b> InjectAt<'b> for ComponentIterator<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
-        if let Location::Component {
-            mod_idx, func_idx, ..
-        } = self.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx, func_idx, ..
+            },
+            ..,
+        ) = self.curr_loc()
         {
             let loc = Location::Component {
                 mod_idx,
@@ -182,11 +198,15 @@ impl<'a, 'b> MacroOpcode<'b> for ComponentIterator<'a, 'b> {}
 impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = self.comp_iterator.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
         {
             match &self.comp.modules[mod_idx as usize]
                 .functions
@@ -208,6 +228,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             mod_idx,
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.comp.modules[mod_idx as usize]
@@ -226,9 +247,12 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
     }
 
     fn curr_func_instrument_mode(&self) -> &Option<FuncInstrMode> {
-        if let Location::Component {
-            mod_idx, func_idx, ..
-        } = self.comp_iterator.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx, func_idx, ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
         {
             match &self.comp.modules[mod_idx as usize]
                 .functions
@@ -246,9 +270,12 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
     }
 
     fn set_func_instrument_mode(&mut self, mode: FuncInstrMode) {
-        if let Location::Component {
-            mod_idx, func_idx, ..
-        } = self.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx, func_idx, ..
+            },
+            ..,
+        ) = self.curr_loc()
         {
             match self.comp.modules[mod_idx as usize]
                 .functions
@@ -263,11 +290,33 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
         }
     }
 
+    fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.comp.modules[mod_idx as usize]
+                .functions
+                .get_mut(func_idx as FunctionID)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
+                FuncKind::Local(ref mut l) => l.clear_instr_at(instr_idx, mode),
+            }
+        } else {
+            panic!("Should have gotten component location!")
+        }
+    }
+
     fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
         if let Location::Component {
             mod_idx,
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.comp.modules[mod_idx as usize]
@@ -290,6 +339,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             mod_idx,
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.comp.modules[mod_idx as usize]
@@ -314,6 +364,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             mod_idx,
             func_idx,
             instr_idx,
+            ..
         } = loc
         {
             match self.comp.modules[mod_idx as usize]
@@ -336,11 +387,15 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
 
     /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
-        if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = self.comp_iterator.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
         {
             match &self.comp.modules[mod_idx as usize]
                 .functions
@@ -358,13 +413,17 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
 impl<'a, 'b> IteratingInstrumenter<'b> for ComponentIterator<'a, 'b> {
     /// Sets the type of Instrumentation Mode of the current location
     fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
-        if let Location::Component {
-            mod_idx: _mod_idx,
-            func_idx: _func_idx,
-            instr_idx: _instr_idx,
-        } = self.curr_loc()
+        if let (
+            Location::Component {
+                mod_idx: _mod_idx,
+                func_idx: _func_idx,
+                instr_idx: _instr_idx,
+                ..
+            },
+            ..,
+        ) = self.curr_loc()
         {
-            self.set_instrument_mode_at(mode, self.curr_loc());
+            self.set_instrument_mode_at(mode, self.curr_loc().0);
         } else {
             panic!("Should have gotten component location!")
         }
@@ -391,8 +450,9 @@ impl<'a, 'b> Iterator for ComponentIterator<'a, 'b> {
         }
     }
 
-    /// Returns the current location
-    fn curr_loc(&self) -> Location {
+    /// Returns the Current Location as a Location and a bool value that
+    /// says whether the location is at the end of the function.
+    fn curr_loc(&self) -> (Location, bool) {
         self.comp_iterator.curr_loc()
     }
 
@@ -400,11 +460,15 @@ impl<'a, 'b> Iterator for ComponentIterator<'a, 'b> {
     fn curr_op(&self) -> Option<&Operator> {
         if self.comp_iterator.end() {
             None
-        } else if let Location::Component {
-            mod_idx,
-            func_idx,
-            instr_idx,
-        } = self.comp_iterator.curr_loc()
+        } else if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
         {
             match &self.comp.modules[mod_idx as usize]
                 .functions
@@ -422,7 +486,7 @@ impl<'a, 'b> Iterator for ComponentIterator<'a, 'b> {
 
 impl AddLocal for ComponentIterator<'_, '_> {
     fn add_local(&mut self, val_type: DataType) -> LocalID {
-        let curr_loc = self.curr_loc();
+        let curr_loc = self.curr_loc().0;
         if let Location::Component {
             mod_idx, func_idx, ..
         } = curr_loc

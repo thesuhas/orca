@@ -12,6 +12,7 @@ use crate::ir::module::module_globals::{Global, ModuleGlobals};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
+use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
@@ -585,6 +586,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -620,6 +628,13 @@ impl<'a> Module<'a> {
                                         idx,
                                     )
                                 {
+                                    builder.clear_instr_at(
+                                        Location::Module {
+                                            func_idx: 0, // not used
+                                            instr_idx: idx,
+                                        },
+                                        BlockAlt,
+                                    );
                                     // we've got a match, which injected the alt body. continue to the next instruction
                                     delete_block = Some(*block_stack.last().unwrap());
                                     continue;
@@ -715,6 +730,13 @@ impl<'a> Module<'a> {
                         // Handle block entry
                         if !block_entry.is_empty() {
                             resolve_block_entry(block_entry, &mut builder, op, idx);
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockEntry,
+                            );
                         }
 
                         // Handle block exit
@@ -725,6 +747,13 @@ impl<'a> Module<'a> {
                                 &mut resolve_on_else_or_end,
                                 &mut resolve_on_end,
                                 op,
+                            );
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                BlockExit,
                             );
                         }
 
@@ -738,6 +767,13 @@ impl<'a> Module<'a> {
                                 op,
                                 idx,
                             );
+                            builder.clear_instr_at(
+                                Location::Module {
+                                    func_idx: 0, // not used
+                                    instr_idx: idx,
+                                },
+                                SemanticAfter,
+                            );
                         }
                     }
                 }
@@ -745,6 +781,7 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Reorganises functions (both local and imports) in the correct ordering after any potential modifications
     pub(crate) fn reorganise_functions(&mut self) {
         // Location where we may have to move an import (converted from local) to
         let mut new_imported_funcs = self.num_imported_functions;
@@ -786,6 +823,7 @@ impl<'a> Module<'a> {
         }
     }
 
+    /// Get the mapping of old location -> new location in module.functions
     pub(crate) fn get_function_mapping(&self) -> HashMap<i32, i32> {
         let mut mapping = HashMap::new();
         for (idx, func) in self.functions.iter().enumerate() {
@@ -1275,14 +1313,6 @@ impl<'a> Module<'a> {
         self.functions
             .get_mut(imports_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
-    }
-
-    pub fn print_import(&self) {
-        for i in self.imports.iter() {
-            if !i.deleted {
-                println!("{:?} {:?}", i.module, i.name);
-            }
-        }
     }
 
     /// Convert a local function to imported

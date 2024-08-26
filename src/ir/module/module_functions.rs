@@ -2,7 +2,7 @@
 
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
-use crate::ir::types::{Body, FuncInstrFlag};
+use crate::ir::types::{Body, FuncInstrFlag, InstrumentationMode};
 use crate::DataType;
 use std::cmp::min;
 use wasmparser::Operator;
@@ -152,6 +152,10 @@ impl<'a> LocalFunction<'a> {
             // remember if we injected a special instrumentation (to be resolved before encoding)
             self.instr_flag.has_special_instr |= is_special;
         }
+    }
+
+    pub fn clear_instr_at(&mut self, instr_idx: usize, mode: InstrumentationMode) {
+        self.body.clear_instr(instr_idx, mode);
     }
 }
 
@@ -349,10 +353,6 @@ impl<'a> Functions<'a> {
         name: Option<String>,
         imp_fn_id: u32,
     ) -> FunctionID {
-        // if self.num_local_fns > 0 {
-        //     panic!("Cannot add an imported function after local functions!")
-        // }
-
         self.functions.push(Function::new(
             FuncKind::Import(ImportedFunction::new(imp_id, ty_id, imp_fn_id)),
             name,
