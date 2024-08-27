@@ -36,3 +36,19 @@ jobs:
         cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+
+  fuzz:
+    name: Fuzzing
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: |
+        rustup update nightly
+        cargo install cargo-fuzz
+        cargo +nightly fuzz build
+
+    - name: Fuzz
+      run: |
+        cargo +nightly fuzz run module -- -max_total_time=180
+        cargo +nightly fuzz run component -- -max_total_time=180
