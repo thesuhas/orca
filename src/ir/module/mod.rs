@@ -24,6 +24,7 @@ use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
+use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
@@ -424,7 +425,11 @@ impl<'a> Module<'a> {
         for (index, imp) in imports.iter().enumerate() {
             if let wasmparser::TypeRef::Func(u) = imp.ty {
                 final_funcs.push(Function::new(
-                    FuncKind::Import(ImportedFunction::new(index as ImportsID, u as TypeID, imp_fn_id as FunctionID)),
+                    FuncKind::Import(ImportedFunction::new(
+                        index as ImportsID,
+                        u as TypeID,
+                        imp_fn_id as FunctionID,
+                    )),
                     Some(imp.name.parse().unwrap()),
                 ));
                 imp_fn_id += 1;
@@ -781,60 +786,61 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Reorganises functions (both local and imports) in the correct ordering after any potential modifications
-    pub(crate) fn reorganise_functions(&mut self) {
+    /// Reorganises items (both local and imports) in the correct ordering after any potential modifications
+    pub(crate) fn reorganise_generic<T: LocalOrImport, U: ReIndexable<T> + Push<T>>(
+        orig_num_imported: u32,
+        items: &mut U,
+        items_read_only: IntoIter<T>,
+    ) {
         // Location where we may have to move an import (converted from local) to
-        let mut new_imported_funcs = self.num_imported_functions;
+        let mut num_imported = orig_num_imported;
         let mut num_deleted = 0;
-        // Iterate over cloned functions list
-        for (idx, func) in self.functions.clone().iter().enumerate() {
-            // If the index is less than < imported funcs
-            if idx < self.num_imported_functions {
-                // If it is a local function, that means it was an import before
-                if func.is_local() {
-                    let f = self.functions.remove((idx - num_deleted) as FunctionID);
-                    self.functions.push(f);
+
+        // Iterate over cloned list
+        for (idx, val) in items_read_only.enumerate() {
+            // If the index is less than < imported
+            if idx < orig_num_imported as usize {
+                // If it is a local, that means it was an import before
+                if val.is_local() {
+                    let f = items.remove((idx - num_deleted) as u32);
+                    items.push(f);
                     // decrement as this is the place where we might have to move an import to
-                    new_imported_funcs -= 1;
+                    num_imported -= 1;
                     // We update it here for the following case. A , B. A is moved to a position later than B, indices will reduce by 1 and we need the offset
                     num_deleted += 1;
-                // If function was import but was deleted
-                } else if func.deleted {
-                    self.functions.remove((idx - num_deleted) as FunctionID);
-                    new_imported_funcs -= 1;
+                } else if val.is_deleted() {
+                    // If val was import but was deleted
+                    items.remove((idx - num_deleted) as u32);
+                    num_imported -= 1;
                     num_deleted += 1;
                 }
             } else {
                 // If it's an import, was a local before
-                if func.is_import() {
-                    let f = self.functions.remove((idx - num_deleted) as FunctionID);
-                    self.functions.insert(new_imported_funcs as FunctionID, f);
+                if val.is_import() {
+                    let i = items.remove((idx - num_deleted) as u32);
+                    items.insert(num_imported, i);
                     // increment as this is the place where we might have to move an import to
-                    new_imported_funcs += 1;
+                    num_imported += 1;
                     // We do not update it here for the following case. A , B. A is moved to a position earlier than B, indices will not change and hence no need to update
                     // num_deleted += 1;
                 }
-                // If function was local but was deleted
-                else if func.deleted {
-                    self.functions.remove((idx - num_deleted) as FunctionID);
+                // If val was local but was deleted
+                else if val.is_deleted() {
+                    items.remove((idx - num_deleted) as u32);
                     num_deleted += 1;
                 }
             }
         }
     }
 
-    /// Get the mapping of old location -> new location in module.functions
-    pub(crate) fn get_function_mapping(&self) -> HashMap<i32, i32> {
+    /// Get the mapping of old ID -> new ID in module
+    pub(crate) fn get_mapping_generic<T: GetID>(
+        slice: std::slice::Iter<'_, T>,
+    ) -> HashMap<u32, u32> {
         let mut mapping = HashMap::new();
-        for (idx, func) in self.functions.iter().enumerate() {
-            match &func.kind {
-                FuncKind::Import(i) => {
-                    mapping.insert(i.import_fn_id as i32, idx as i32);
-                }
-                FuncKind::Local(l) => {
-                    mapping.insert(l.func_id as i32, idx as i32);
-                }
-            }
+        for (new_id, item) in slice.enumerate() {
+            let old_id = item.get_id();
+            mapping.insert(old_id, new_id as u32);
         }
         mapping
     }
@@ -845,9 +851,14 @@ impl<'a> Module<'a> {
         // First resolve any instrumentation that needs to be translated to before/after/alt
         self.resolve_special_instrumentation();
         // Reorganise any functions that have to be done
-        self.reorganise_functions();
+        let clone_iter = self.functions.into_iter();
+        Self::reorganise_generic(
+            self.num_imported_functions as u32,
+            &mut self.functions,
+            clone_iter,
+        );
         // Create the hashmap now
-        let func_mapping = self.get_function_mapping();
+        let func_mapping = Self::get_mapping_generic(self.functions.iter());
         assert_eq!(self.functions.len(), func_mapping.len());
 
         let mut module = wasm_encoder::Module::new();
@@ -970,7 +981,7 @@ impl<'a> Module<'a> {
                             exports.export(
                                 &export.name,
                                 wasm_encoder::ExportKind::from(export.kind),
-                                *func_mapping.get(&(export.index as i32)).unwrap() as u32,
+                                *func_mapping.get(&(export.index)).unwrap(),
                             );
                         }
                         _ => {
@@ -1002,7 +1013,7 @@ impl<'a> Module<'a> {
                     ElementItems::Functions(funcs) => {
                         element_items = funcs
                             .iter()
-                            .map(|f| *func_mapping.get(&(*f as i32)).unwrap() as FunctionID)
+                            .map(|f| *func_mapping.get(f).unwrap() as FunctionID)
                             .collect();
                         wasm_encoder::Elements::Functions(&element_items)
                     }
@@ -1154,7 +1165,7 @@ impl<'a> Module<'a> {
 
                     fn update_call_and_encode(
                         instrs: &mut Vec<Operator>,
-                        func_mapping: &HashMap<i32, i32>,
+                        func_mapping: &HashMap<u32, u32>,
                         function: &mut wasm_encoder::Function,
                         reencode: &mut RoundtripReencoder,
                     ) {
@@ -1261,7 +1272,12 @@ impl<'a> Module<'a> {
     // =============================
 
     // Adds an imported function and returns the position in the module.functions
-    pub(crate) fn add_func_to_imports(&mut self, module: String, name: String, ty_id: TypeID) -> (FunctionID, ImportsID) {
+    pub(crate) fn add_func_to_imports(
+        &mut self,
+        module: String,
+        name: String,
+        ty_id: TypeID,
+    ) -> (FunctionID, ImportsID) {
         let import = Import {
             module: module.leak(),
             name: name.clone().leak(),
@@ -1283,12 +1299,8 @@ impl<'a> Module<'a> {
         let (imp_fn_id, imp_id) = self.add_func_to_imports(module, name.clone(), ty_id);
 
         // Add to function as well as it has imported functions
-        self.functions.add_import_func(
-            imp_id,
-            ty_id,
-            Some(name),
-            imp_fn_id
-        );
+        self.functions
+            .add_import_func(imp_id, ty_id, Some(name), imp_fn_id);
         self.num_imports_added += 1;
         imp_fn_id
     }
@@ -1338,7 +1350,7 @@ impl<'a> Module<'a> {
             .set_kind(FuncKind::Import(ImportedFunction {
                 import_id,
                 import_fn_id: function_id,
-                ty_id
+                ty_id,
             }));
         self.functions.set_imported_fn_name(function_id, name);
     }
@@ -1422,6 +1434,25 @@ impl Default for Module<'_> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub trait GetID {
+    fn get_id(&self) -> u32;
+}
+
+pub(crate) trait ReIndexable<T> {
+    fn remove(&mut self, id: u32) -> T;
+    fn insert(&mut self, id: u32, val: T);
+}
+
+pub trait Push<T> {
+    fn push(&mut self, val: T);
+}
+
+pub trait LocalOrImport {
+    fn is_local(&self) -> bool;
+    fn is_import(&self) -> bool;
+    fn is_deleted(&self) -> bool;
 }
 
 // ================================

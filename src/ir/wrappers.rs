@@ -326,12 +326,12 @@ pub(crate) fn refers_to_func(op: &Operator) -> bool {
     matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
 }
 
-pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<i32, i32>) {
+pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<u32, u32>) {
     match op {
         Operator::Call { function_index } | Operator::RefFunc { function_index } => {
-            match mapping.get(&(*function_index as i32)) {
+            match mapping.get(&(*function_index)) {
                 Some(new_index) => {
-                    *function_index = *new_index as u32;
+                    *function_index = *new_index;
                 }
                 None => panic!("Deleted function!"),
             }

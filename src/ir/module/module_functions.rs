@@ -2,8 +2,10 @@
 
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
+use crate::ir::module::{GetID, LocalOrImport, Push, ReIndexable};
 use crate::ir::types::{Body, FuncInstrFlag, InstrumentationMode};
 use crate::DataType;
+use std::vec::IntoIter;
 use wasmparser::Operator;
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
@@ -12,6 +14,33 @@ pub struct Function<'a> {
     pub(crate) kind: FuncKind<'a>,
     name: Option<String>,
     pub(crate) deleted: bool,
+}
+
+impl GetID for Function<'_> {
+    /// Get the ID of the function
+    fn get_id(&self) -> u32 {
+        match &self.kind {
+            FuncKind::Import(i) => i.import_fn_id,
+            FuncKind::Local(l) => l.func_id,
+        }
+    }
+}
+
+impl LocalOrImport for Function<'_> {
+    /// Check if it's a local function
+    fn is_local(&self) -> bool {
+        matches!(&self.kind, FuncKind::Local(_))
+    }
+
+    /// Check if it's an imported function
+    fn is_import(&self) -> bool {
+        matches!(&self.kind, FuncKind::Import(_))
+    }
+
+    /// Check if this function has been deleted
+    fn is_deleted(&self) -> bool {
+        self.deleted
+    }
 }
 
 impl<'a> Function<'a> {
@@ -39,16 +68,6 @@ impl<'a> Function<'a> {
     /// Get the kind of the function
     pub fn kind(&self) -> &FuncKind<'a> {
         &self.kind
-    }
-
-    /// Check if it's a local function
-    pub fn is_local(&self) -> bool {
-        matches!(&self.kind, FuncKind::Local(_))
-    }
-
-    /// Check if it's an imported function
-    pub fn is_import(&self) -> bool {
-        matches!(&self.kind, FuncKind::Import(_))
     }
 
     /// Unwrap a local function. If it is an imported function, it panics.
@@ -215,7 +234,27 @@ pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
     num_import_fns: usize,
     num_local_fns: usize,
-    added_local_fns: u32
+    added_local_fns: u32,
+}
+
+impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
+    fn remove(&mut self, function_id: FunctionID) -> Function<'a> {
+        self.functions.remove(function_id as usize)
+    }
+
+    fn insert(&mut self, function_id: FunctionID, func: Function<'a>) {
+        self.functions.insert(function_id as usize, func);
+    }
+}
+
+impl<'a> Push<Function<'a>> for Functions<'a> {
+    /// Add a new function
+    fn push(&mut self, func: Function<'a>) {
+        if let FuncKind::Local(_) = func.kind {
+            self.added_local_fns += 1;
+        }
+        self.functions.push(func);
+    }
 }
 
 impl<'a> Functions<'a> {
@@ -225,7 +264,7 @@ impl<'a> Functions<'a> {
             functions,
             num_import_fns,
             num_local_fns,
-            added_local_fns: 0
+            added_local_fns: 0,
         }
     }
 
@@ -240,14 +279,6 @@ impl<'a> Functions<'a> {
     /// Get the number of functions
     pub fn len(&self) -> usize {
         self.functions.len()
-    }
-
-    /// Add a new function
-    pub fn push(&mut self, func: Function<'a>) {
-        if let FuncKind::Local(_) = func.kind {
-            self.added_local_fns += 1;
-        }
-        self.functions.push(func);
     }
 
     /// Checks if there are no functions
@@ -270,6 +301,10 @@ impl<'a> Functions<'a> {
     /// Get an iterator for the functions.
     pub fn iter(&self) -> std::slice::Iter<'_, Function<'a>> {
         self.functions.iter()
+    }
+
+    pub fn into_iter(&self) -> IntoIter<Function<'a>> {
+        self.functions.clone().into_iter()
     }
 
     /// Get by ID
@@ -381,15 +416,6 @@ impl<'a> Functions<'a> {
 
     /// Check if it's deleted
     pub fn is_deleted(&self, function_id: FunctionID) -> bool {
-        self.functions[function_id as usize].deleted
-    }
-
-    // Helper functions for rearrange
-    pub(crate) fn remove(&mut self, function_id: FunctionID) -> Function<'a> {
-        self.functions.remove(function_id as usize)
-    }
-
-    pub(crate) fn insert(&mut self, function_id: FunctionID, func: Function<'a>) {
-        self.functions.insert(function_id as usize, func);
+        self.functions[function_id as usize].is_deleted()
     }
 }

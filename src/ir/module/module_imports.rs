@@ -43,7 +43,6 @@ pub struct ModuleImports<'a> {
     imports: Vec<Import<'a>>,
 
     pub(crate) num_funcs: u32,
-
     // Variables representing functions added/deleted
     // pub(crate) deleted_imports: u32,
     // pub(crate) added_imports: u32,

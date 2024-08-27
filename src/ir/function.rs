@@ -3,7 +3,7 @@
 use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::FuncKind::Local;
 use crate::ir::module::module_functions::{add_local, Function, LocalFunction};
-use crate::ir::module::Module;
+use crate::ir::module::{Module, Push};
 use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
