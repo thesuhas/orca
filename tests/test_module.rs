@@ -3,8 +3,11 @@ use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{ExportsID, FunctionID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca::ir::types::Body;
-use orca::{Module, Opcode};
+use orca::ir::module::module_globals::Global;
+use orca::ir::types::{Body, Value};
+use orca::{DataType, InitExpr, Module, Opcode};
+use wasmparser::{GlobalType, ValType};
+
 mod common;
 use crate::common::check_instrumentation_encoding;
 
@@ -510,6 +513,35 @@ fn test_all_local_to_import_all_import_to_local() {
     module.convert_local_fn_to_import(5, "please".to_string(), "work".to_string(), 2);
     let result = module.encode();
 
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn add_global_with_import() {
+    let file = "tests/test_inputs/instr_testing/modules/function_modification/add_global.wat";
+
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // add new global
+    let gid = module.globals.add(Global {
+        ty: GlobalType {
+            content_type: ValType::I32,
+            mutable: true,
+            shared: false,
+        },
+        init_expr: InitExpr::Value(Value::I32(0)),
+    });
+    assert_eq!(1, gid);
+
+    let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
 
     if let Err(e) = check_instrumentation_encoding(&out, file) {
