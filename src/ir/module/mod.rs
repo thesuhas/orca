@@ -24,7 +24,6 @@ use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::error;
 use std::collections::HashMap;
-use gimli::{Dwarf};
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
 
@@ -425,7 +424,7 @@ impl<'a> Module<'a> {
         for (index, imp) in imports.iter().enumerate() {
             if let wasmparser::TypeRef::Func(u) = imp.ty {
                 final_funcs.push(Function::new(
-                    FuncKind::Import(ImportedFunction::new(index as ImportsID, u, imp_fn_id)),
+                    FuncKind::Import(ImportedFunction::new(index as ImportsID, u as TypeID, imp_fn_id as FunctionID)),
                     Some(imp.name.parse().unwrap()),
                 ));
                 imp_fn_id += 1;
@@ -1257,8 +1256,12 @@ impl<'a> Module<'a> {
         None
     }
 
+    // =============================
+    // ==== Function Management ====
+    // =============================
+
     // Adds an imported function and returns the position in the module.functions
-    pub(crate) fn add_import(&mut self, module: String, name: String, ty_id: TypeID) -> FunctionID {
+    pub(crate) fn add_func_to_imports(&mut self, module: String, name: String, ty_id: TypeID) -> (FunctionID, ImportsID) {
         let import = Import {
             module: module.leak(),
             name: name.clone().leak(),
@@ -1266,25 +1269,25 @@ impl<'a> Module<'a> {
             custom_name: None,
             deleted: false,
         };
-        self.imports.add_func(import);
+        let imp_id = self.imports.add_func(import);
         let imp_fn_id = if self.num_functions > 0 {
             self.functions.len() as u32
         } else {
             self.imports.num_funcs - 1
         };
-        imp_fn_id as FunctionID
+        (imp_fn_id as FunctionID, imp_id)
     }
 
     /// Add a new function to the module. Returns the index of the imported function
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        let imp_fn_id = self.add_import(module, name.clone(), ty_id);
+        let (imp_fn_id, imp_id) = self.add_func_to_imports(module, name.clone(), ty_id);
 
         // Add to function as well as it has imported functions
         self.functions.add_import_func(
-            (self.imports.len() - 1) as ImportsID,
+            imp_id,
             ty_id,
             Some(name),
-            imp_fn_id,
+            imp_fn_id
         );
         self.num_imports_added += 1;
         imp_fn_id
@@ -1293,12 +1296,11 @@ impl<'a> Module<'a> {
     /// Delete an imported function
     pub fn delete_import_func(&mut self, import_id: ImportsID) {
         if import_id >= self.num_imported_functions as u32 {
-            panic!("Invalid import function")
+            panic!("ID does not point to an imported function.")
         }
 
         self.functions.delete(import_id);
         self.imports.delete(import_id);
-        // self.num_imported_functions -= 1;
     }
 
     /// Convert an imported function to local
@@ -1322,7 +1324,7 @@ impl<'a> Module<'a> {
         function_id: FunctionID,
         module: String,
         name: String,
-        type_id: TypeID,
+        ty_id: TypeID,
     ) {
         if let FuncKind::Import(_) = self.functions.get_kind(function_id as FunctionID) {
             panic!("This is an imported function!");
@@ -1330,16 +1332,14 @@ impl<'a> Module<'a> {
         // Delete the associated function
         self.functions.delete(function_id);
         // Add import function to imports
-        self.add_import(module, name.clone(), type_id);
-        let imported_function = ImportedFunction {
-            import_id: (self.imports.len() - 1) as ImportsID,
-            import_fn_id: function_id,
-            ty_id: type_id,
-        };
-
+        let (.., import_id) = self.add_func_to_imports(module, name.clone(), ty_id);
         self.functions
             .get_mut(function_id as FunctionID)
-            .set_kind(FuncKind::Import(imported_function));
+            .set_kind(FuncKind::Import(ImportedFunction {
+                import_id,
+                import_fn_id: function_id,
+                ty_id
+            }));
         self.functions.set_imported_fn_name(function_id, name);
     }
 
@@ -1357,8 +1357,36 @@ impl<'a> Module<'a> {
         }
     }
 
+    // =============================
+    // ==== Globals Management ====
+    // =============================
+
+    // pub(crate) fn add_global_to_imports(&mut self, module: String, name: String, ty: DataType) -> ImportsID {
+    //     let import = Import {
+    //         module: module.leak(),
+    //         name: name.clone().leak(),
+    //         ty: wasmparser::TypeRef::Global(ty_id),
+    //         custom_name: None,
+    //         deleted: false,
+    //     };
+    //     self.imports.add_func(import);
+    //     let imp_fn_id = if self.num_functions > 0 {
+    //         self.functions.len() as u32
+    //     } else {
+    //         self.imports.num_funcs - 1
+    //     };
+    //     imp_fn_id as FunctionID
+    // }
+    //
+    // /// Adds a new function to the imports of the module, returns the ID of the imported function.
+    // pub fn add_import_global(&mut self, module: String, name: String, ty: DataType) -> ImportsID {
+    //     // add to the
+    //     let global_id = self.add_global_to_imports(module, name.clone(), ty);
+    // }
+
     /// Create an empty Module
     pub fn new() -> Self {
+        // TODO -- just use Default trait
         Module {
             types: ModuleTypes::new(vec![]),
             imports: ModuleImports::new(vec![]),
@@ -1390,7 +1418,7 @@ impl<'a> Module<'a> {
     }
 }
 
-impl<'a> Default for Module<'a> {
+impl Default for Module<'_> {
     fn default() -> Self {
         Self::new()
     }

@@ -1,7 +1,6 @@
 //! Intermediate Representation of a Module's Imports
 
 use crate::ir::id::{FunctionID, ImportsID};
-use std::cmp::min;
 use wasmparser::TypeRef;
 
 // TODO: Need to handle the relationship between Functions and Imports
@@ -13,7 +12,7 @@ pub struct Import<'a> {
     /// The name of the imported item.
     pub name: &'a str,
     /// The type of the imported item.
-    pub ty: wasmparser::TypeRef,
+    pub ty: TypeRef,
     /// The name (in the custom section) of the imported item.
     pub custom_name: Option<String>,
     pub(crate) deleted: bool,
@@ -34,7 +33,7 @@ impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
 impl Import<'_> {
     // TODO: Add documentation here
     pub fn is_function(&self) -> bool {
-        matches!(self.ty, wasmparser::TypeRef::Func(_))
+        matches!(self.ty, TypeRef::Func(_))
     }
 }
 
@@ -46,9 +45,9 @@ pub struct ModuleImports<'a> {
     pub(crate) num_funcs: u32,
 
     // Variables representing functions added/deleted
-    pub(crate) deleted_imports: u32,
-    pub(crate) added_imports: u32,
-    pub(crate) first_deleted_import: u32,
+    // pub(crate) deleted_imports: u32,
+    // pub(crate) added_imports: u32,
+    // pub(crate) first_deleted_import: u32,
 }
 
 impl<'a> ModuleImports<'a> {
@@ -57,9 +56,9 @@ impl<'a> ModuleImports<'a> {
         ModuleImports {
             imports,
             num_funcs: 0,
-            deleted_imports: 0,
-            added_imports: 0,
-            first_deleted_import: u32::MAX,
+            // deleted_imports: 0,
+            // added_imports: 0,
+            // first_deleted_import: u32::MAX,
         }
     }
 
@@ -82,20 +81,18 @@ impl<'a> ModuleImports<'a> {
         self.imports.len()
     }
 
-    pub(crate) fn add(&mut self, import: Import<'a>) {
+    pub(crate) fn add<'b>(&'b mut self, import: Import<'a>) -> ImportsID {
         self.imports.push(import);
-        self.added_imports += 1;
+        (self.imports.len() - 1) as ImportsID
     }
 
-    pub(crate) fn add_func(&mut self, import: Import<'a>) {
-        self.add(import);
+    pub(crate) fn add_func<'b>(&'b mut self, import: Import<'a>) -> ImportsID {
         self.num_funcs += 1;
+        self.add(import)
     }
 
     pub(crate) fn delete(&mut self, imports_id: ImportsID) {
         self.imports[imports_id as usize].deleted = true;
-        self.deleted_imports += 1;
-        self.first_deleted_import = min(self.first_deleted_import, imports_id);
     }
 
     /// Find an import by the `module` and `name` and return its `ImportsID` if found

@@ -125,8 +125,8 @@ impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> InjectAt<'b> for ModuleIterator<'a, 'b> {
-    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
+impl<'a> InjectAt<'a> for ModuleIterator<'_, 'a> {
+    fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'a>) {
         if let (Location::Module { func_idx, .. }, ..) = self.curr_loc() {
             let loc = Location::Module {
                 func_idx,
@@ -139,9 +139,9 @@ impl<'a, 'b> InjectAt<'b> for ModuleIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> Opcode<'b> for ModuleIterator<'a, 'b> {}
-impl<'a, 'b> MacroOpcode<'b> for ModuleIterator<'a, 'b> {}
-impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
+impl<'a> Opcode<'a> for ModuleIterator<'_, 'a> {}
+impl<'a> MacroOpcode<'a> for ModuleIterator<'_, 'a> {}
+impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let (
@@ -221,7 +221,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         }
     }
 
-    fn add_instr_at(&mut self, loc: Location, instr: Operator<'b>) {
+    fn add_instr_at(&mut self, loc: Location, instr: Operator<'a>) {
         if let Location::Module {
             func_idx,
             instr_idx,
@@ -299,7 +299,7 @@ impl<'a, 'b> Instrumenter<'b> for ModuleIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> IteratingInstrumenter<'b> for ModuleIterator<'a, 'b> {
+impl<'a> IteratingInstrumenter<'a> for ModuleIterator<'_, 'a> {
     fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
         self.set_instrument_mode_at(mode, self.curr_loc().0);
     }
@@ -309,7 +309,7 @@ impl<'a, 'b> IteratingInstrumenter<'b> for ModuleIterator<'a, 'b> {
     }
 }
 
-impl<'a, 'b> AddLocal for ModuleIterator<'a, 'b> {
+impl AddLocal for ModuleIterator<'_, '_> {
     fn add_local(&mut self, val_type: DataType) -> LocalID {
         let curr_loc = self.curr_loc();
         if let (Location::Module { func_idx, .. }, ..) = curr_loc {
@@ -321,7 +321,7 @@ impl<'a, 'b> AddLocal for ModuleIterator<'a, 'b> {
 }
 
 // Note: Marked Trait as the same lifetime as component
-impl<'a, 'b> Iterator for ModuleIterator<'a, 'b> {
+impl<'a> Iterator for ModuleIterator<'_, 'a> {
     /// Resets the Module Iterator
     fn reset(&mut self) {
         self.mod_iterator.reset();
@@ -342,7 +342,7 @@ impl<'a, 'b> Iterator for ModuleIterator<'a, 'b> {
     }
 
     /// Returns the current instruction
-    fn curr_op(&self) -> Option<&Operator<'b>> {
+    fn curr_op(&self) -> Option<&Operator<'a>> {
         if self.mod_iterator.end() {
             None
         } else if let (
