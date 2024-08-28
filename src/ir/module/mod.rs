@@ -3,12 +3,14 @@
 use super::types::{DataType, Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
-use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
+use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
     add_local, FuncKind, Function, Functions, ImportedFunction, LocalFunction,
 };
-use crate::ir::module::module_globals::{Global, ModuleGlobals};
+use crate::ir::module::module_globals::{
+    Global, GlobalKind, ImportedGlobal, LocalGlobal, ModuleGlobals,
+};
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{FuncType, ModuleTypes};
@@ -18,7 +20,8 @@ use crate::ir::types::{
     InstrumentationFlag,
 };
 use crate::ir::wrappers::{
-    indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, update_fn_instr,
+    indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, refers_to_global,
+    update_fn_instr, update_global_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
@@ -26,7 +29,7 @@ use log::error;
 use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
-use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
+use wasmparser::{ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -40,6 +43,8 @@ pub mod module_types;
 ///
 /// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
 pub struct Module<'a> {
+    /// name of module
+    pub module_name: Option<String>,
     /// Types
     pub types: ModuleTypes,
     /// Imports
@@ -55,7 +60,7 @@ pub struct Module<'a> {
     pub globals: ModuleGlobals,
     /// Data Sections
     pub data: Vec<DataSegment>,
-    pub data_count_section_exists: bool,
+    data_count_section_exists: bool,
     /// Exports
     pub exports: ModuleExports,
     /// Index of the start function.
@@ -65,13 +70,9 @@ pub struct Module<'a> {
     /// Custom Sections
     pub custom_sections: CustomSections<'a>,
     /// Number of local functions (not counting imported functions)
-    pub num_functions: usize,
-    /// Number of imported functions
-    pub num_imported_functions: usize,
-    /// name of module
-    pub module_name: Option<String>,
-
-    pub(crate) num_imports_added: usize,
+    pub(crate) num_functions: u32,
+    /// Number of local globals (not counting imported globals)
+    num_globals: u32,
 
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -108,7 +109,7 @@ impl<'a> Module<'a> {
         enable_multi_memory: bool,
         parser: Parser,
     ) -> Result<Self, Error> {
-        let mut imports: Vec<Import> = vec![];
+        let mut imports: ModuleImports = ModuleImports::default();
         let mut types: Vec<FuncType> = vec![];
         let mut data = vec![];
         let mut tables = vec![];
@@ -122,7 +123,6 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
-        let mut num_imported_functions = 0;
 
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
@@ -145,12 +145,9 @@ impl<'a> Module<'a> {
                     // count number of imported functions
                     for import in import_section_reader.into_iter() {
                         let imp = Import::from(import?);
-                        if imp.is_function() {
-                            num_imported_functions += 1;
-                        }
                         temp.push(imp);
                     }
-                    imports.append(&mut temp);
+                    imports = ModuleImports::new(temp);
                 }
                 Payload::TypeSection(type_section_reader) => {
                     for ty in type_section_reader.into_iter_err_on_gc_types() {
@@ -289,7 +286,7 @@ impl<'a> Module<'a> {
                                         for name in names {
                                             let naming = name?;
                                             let abs_idx = naming.index;
-                                            if abs_idx < num_imported_functions as u32 {
+                                            if abs_idx < imports.num_funcs {
                                                 let mut import_func_count = 0;
                                                 // TODO: this is very expensive, can we optimize this?
                                                 for import in imports.iter_mut() {
@@ -303,8 +300,7 @@ impl<'a> Module<'a> {
                                                     }
                                                 }
                                             } else {
-                                                let rel_idx =
-                                                    abs_idx - num_imported_functions as u32;
+                                                let rel_idx = abs_idx - imports.num_funcs;
                                                 // assert!(0 < rel_idx && rel_idx < code_sections.len() as u32);
                                                 code_sections[rel_idx as usize].name =
                                                     Some(naming.name.to_string());
@@ -423,7 +419,7 @@ impl<'a> Module<'a> {
         let mut final_funcs = vec![];
         let mut imp_fn_id = 0;
         for (index, imp) in imports.iter().enumerate() {
-            if let wasmparser::TypeRef::Func(u) = imp.ty {
+            if let TypeRef::Func(u) = imp.ty {
                 final_funcs.push(Function::new(
                     FuncKind::Import(ImportedFunction::new(
                         index as ImportsID,
@@ -444,7 +440,7 @@ impl<'a> Module<'a> {
             final_funcs.push(Function::new(
                 FuncKind::Local(LocalFunction::new(
                     functions[index],
-                    (num_imported_functions + index) as FunctionID,
+                    (imports.num_funcs as usize + index) as FunctionID,
                     (*code_sec).clone(),
                     args,
                 )),
@@ -452,13 +448,20 @@ impl<'a> Module<'a> {
             ));
         }
 
+        let num_globals = globals.len() as u32;
+        let num_imported_functions = imports.num_funcs;
+        let module_globals = ModuleGlobals::new(&imports, globals);
         Ok(Module {
             types: ModuleTypes::new(types),
-            imports: ModuleImports::new(imports),
-            functions: Functions::new(final_funcs, num_imported_functions, code_sections.len()),
+            imports,
+            functions: Functions::new(
+                final_funcs,
+                num_imported_functions,
+                code_sections.len() as u32,
+            ),
             tables: ModuleTables::new(tables),
             memories,
-            globals: ModuleGlobals::new(globals),
+            globals: module_globals,
             exports: ModuleExports::new(exports),
             start,
             elements,
@@ -466,8 +469,8 @@ impl<'a> Module<'a> {
             // code_sections: code_sections.clone(),
             data,
             custom_sections: CustomSections::new(custom_sections),
-            num_functions: code_sections.len(),
-            num_imported_functions,
+            num_functions: code_sections.len() as u32,
+            num_globals,
             module_name,
             local_names,
             type_names,
@@ -479,7 +482,6 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
-            num_imports_added: 0,
         })
     }
 
@@ -511,7 +513,7 @@ impl<'a> Module<'a> {
     /// translating them into the straightforward before/after/alt modes.
     fn resolve_special_instrumentation(&mut self) {
         if !self.num_functions > 0 {
-            for rel_func_idx in self.num_imported_functions..self.functions.len() {
+            for rel_func_idx in self.imports.num_funcs as usize..self.functions.len() {
                 let func_idx = rel_func_idx as FunctionID;
                 if let FuncKind::Import(..) = &self.functions.get_kind(func_idx as FunctionID) {
                     // skip imports
@@ -787,7 +789,7 @@ impl<'a> Module<'a> {
     }
 
     /// Reorganises items (both local and imports) in the correct ordering after any potential modifications
-    pub(crate) fn reorganise_generic<T: LocalOrImport, U: ReIndexable<T> + Push<T>>(
+    pub(crate) fn reorganise_generic<T: LocalOrImport, U: ReIndexable<T>>(
         orig_num_imported: u32,
         items: &mut U,
         items_read_only: IntoIter<T>,
@@ -845,21 +847,31 @@ impl<'a> Module<'a> {
         mapping
     }
 
+    pub(crate) fn recalculate_ids<T: LocalOrImport + GetID, U: Iter<T> + ReIndexable<T>>(
+        orig_num_imported: u32,
+        items: &mut U,
+    ) -> HashMap<u32, u32> {
+        let items_read_only = items.get_into_iter();
+        Self::reorganise_generic(orig_num_imported, items, items_read_only);
+        let id_mapping = Self::get_mapping_generic(items.iter());
+        assert_eq!(items.len(), id_mapping.len());
+        id_mapping
+    }
+
     /// Encodes an Orca Module to a wasm_encoder Module.
     /// This requires a mutable reference to self due to the special instrumentation resolution step.
     pub(crate) fn encode_internal(&mut self) -> wasm_encoder::Module {
         // First resolve any instrumentation that needs to be translated to before/after/alt
         self.resolve_special_instrumentation();
-        // Reorganise any functions that have to be done
-        let clone_iter = self.functions.into_iter();
-        Self::reorganise_generic(
-            self.num_imported_functions as u32,
+
+        let func_mapping = Self::recalculate_ids(
+            self.imports.num_funcs - self.imports.num_funcs_added,
             &mut self.functions,
-            clone_iter,
         );
-        // Create the hashmap now
-        let func_mapping = Self::get_mapping_generic(self.functions.iter());
-        assert_eq!(self.functions.len(), func_mapping.len());
+        let global_mapping = Self::recalculate_ids(
+            self.imports.num_globals - self.imports.num_globals_added,
+            &mut self.globals,
+        );
 
         let mut module = wasm_encoder::Module::new();
         let mut reencode = RoundtripReencoder;
@@ -958,14 +970,19 @@ impl<'a> Module<'a> {
         if !self.globals.is_empty() {
             let mut globals = wasm_encoder::GlobalSection::new();
             for global in self.globals.iter() {
-                globals.global(
-                    wasm_encoder::GlobalType {
-                        val_type: reencode.val_type(global.ty.content_type).unwrap(),
-                        mutable: global.ty.mutable,
-                        shared: global.ty.shared,
-                    },
-                    &(*global).clone().init_expr.to_wasmencoder_type(),
-                );
+                if !global.deleted {
+                    if let GlobalKind::Local(LocalGlobal { ty, init_expr, .. }) = &global.kind {
+                        globals.global(
+                            wasm_encoder::GlobalType {
+                                val_type: reencode.val_type(ty.content_type).unwrap(),
+                                mutable: ty.mutable,
+                                shared: ty.shared,
+                            },
+                            &init_expr.to_wasmencoder_type(),
+                        );
+                    }
+                }
+                // skip imported globals
             }
             module.section(&globals);
         }
@@ -1104,6 +1121,9 @@ impl<'a> Module<'a> {
                     if refers_to_func(op) {
                         update_fn_instr(op, &func_mapping);
                     }
+                    if refers_to_global(op) {
+                        update_global_instr(op, &global_mapping);
+                    }
                     if !instrument.has_instr() {
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
@@ -1136,14 +1156,21 @@ impl<'a> Module<'a> {
                         let at_end = idx >= instr_len;
 
                         // First encode before instructions
-                        update_call_and_encode(before, &func_mapping, &mut function, &mut reencode);
+                        update_ids_and_encode(
+                            before,
+                            &func_mapping,
+                            &global_mapping,
+                            &mut function,
+                            &mut reencode,
+                        );
 
                         // If there are any alternate, encode the alternate
                         if !at_end && !alternate.is_none() {
                             if let Some(alt) = alternate {
-                                update_call_and_encode(
+                                update_ids_and_encode(
                                     alt,
                                     &func_mapping,
+                                    &global_mapping,
                                     &mut function,
                                     &mut reencode,
                                 );
@@ -1154,24 +1181,29 @@ impl<'a> Module<'a> {
 
                         // Now encode the after instructions
                         if !at_end {
-                            update_call_and_encode(
+                            update_ids_and_encode(
                                 after,
                                 &func_mapping,
+                                &global_mapping,
                                 &mut function,
                                 &mut reencode,
                             );
                         }
                     }
 
-                    fn update_call_and_encode(
+                    fn update_ids_and_encode(
                         instrs: &mut Vec<Operator>,
                         func_mapping: &HashMap<u32, u32>,
+                        global_mapping: &HashMap<u32, u32>,
                         function: &mut wasm_encoder::Function,
                         reencode: &mut RoundtripReencoder,
                     ) {
                         for instr in instrs {
                             if refers_to_func(instr) {
                                 update_fn_instr(instr, func_mapping);
+                            }
+                            if refers_to_global(instr) {
+                                update_global_instr(instr, global_mapping);
                             }
                             encode(instr, function, reencode);
                         }
@@ -1267,52 +1299,77 @@ impl<'a> Module<'a> {
         None
     }
 
+    // ==============================
+    // ==== Module Manipulations ====
+    // ==============================
+
+    pub(crate) fn add_import(&mut self, import: Import<'a>) -> (u32, ImportsID) {
+        let (num_local, num_imported, num_total) = match import.ty {
+            TypeRef::Func(..) => (
+                self.num_functions,
+                self.imports.num_funcs,
+                self.functions.len() as u32,
+            ),
+            TypeRef::Global(..) => (
+                self.num_globals,
+                self.imports.num_globals,
+                self.globals.len() as u32,
+            ),
+            TypeRef::Table(..) => todo!(),
+            TypeRef::Tag(..) => todo!(),
+            TypeRef::Memory(..) => todo!(),
+        };
+
+        let id = if num_local > 0 {
+            num_total
+        } else {
+            num_imported
+        };
+        (id, self.imports.add(import))
+    }
+
     // =============================
     // ==== Function Management ====
     // =============================
 
-    // Adds an imported function and returns the position in the module.functions
-    pub(crate) fn add_func_to_imports(
+    pub(crate) fn add_local_func(
         &mut self,
-        module: String,
-        name: String,
-        ty_id: TypeID,
-    ) -> (FunctionID, ImportsID) {
-        let import = Import {
-            module: module.leak(),
-            name: name.clone().leak(),
-            ty: wasmparser::TypeRef::Func(ty_id),
-            custom_name: None,
-            deleted: false,
-        };
-        let imp_id = self.imports.add_func(import);
-        let imp_fn_id = if self.num_functions > 0 {
-            self.functions.len() as u32
-        } else {
-            self.imports.num_funcs - 1
-        };
-        (imp_fn_id as FunctionID, imp_id)
+        local_function: LocalFunction<'a>,
+        name: Option<String>,
+    ) -> FunctionID {
+        self.num_functions += 1;
+        self.functions.add_local_func(local_function, name)
     }
 
     /// Add a new function to the module. Returns the index of the imported function
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
-        let (imp_fn_id, imp_id) = self.add_func_to_imports(module, name.clone(), ty_id);
+        let (imp_fn_id, imp_id) = self.add_import(Import {
+            module: module.leak(),
+            name: name.clone().leak(),
+            ty: TypeRef::Func(ty_id),
+            custom_name: None,
+            deleted: false,
+        });
 
-        // Add to function as well as it has imported functions
+        // Add to functions as well as it has imported functions
         self.functions
             .add_import_func(imp_id, ty_id, Some(name), imp_fn_id);
-        self.num_imports_added += 1;
         imp_fn_id
     }
 
-    /// Delete an imported function
-    pub fn delete_import_func(&mut self, import_id: ImportsID) {
-        if import_id >= self.num_imported_functions as u32 {
-            panic!("ID does not point to an imported function.")
-        }
+    /// Get the number of imported functions
+    pub fn num_import_func(&self) -> u32 {
+        self.imports.num_funcs
+    }
 
-        self.functions.delete(import_id);
-        self.imports.delete(import_id);
+    /// Delete a function
+    pub fn delete_func(&mut self, function_id: FunctionID) {
+        self.functions.delete(function_id);
+        if let FuncKind::Import(ImportedFunction { import_id, .. }) =
+            self.functions.get_kind(function_id)
+        {
+            self.imports.delete(*import_id);
+        }
     }
 
     /// Convert an imported function to local
@@ -1321,10 +1378,10 @@ impl<'a> Module<'a> {
         imports_id: ImportsID,
         local_function: LocalFunction<'a>,
     ) {
-        if let FuncKind::Local(_) = self.functions.get_kind(imports_id as FunctionID) {
+        if self.functions.is_local(imports_id) {
             panic!("This is a local function!");
         }
-        self.delete_import_func(imports_id);
+        self.delete_func(imports_id);
         self.functions
             .get_mut(imports_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
@@ -1338,13 +1395,19 @@ impl<'a> Module<'a> {
         name: String,
         ty_id: TypeID,
     ) {
-        if let FuncKind::Import(_) = self.functions.get_kind(function_id as FunctionID) {
+        if self.functions.is_import(function_id) {
             panic!("This is an imported function!");
         }
         // Delete the associated function
-        self.functions.delete(function_id);
+        self.delete_func(function_id);
         // Add import function to imports
-        let (.., import_id) = self.add_func_to_imports(module, name.clone(), ty_id);
+        let (.., import_id) = self.add_import(Import {
+            module: module.leak(),
+            name: name.clone().leak(),
+            ty: TypeRef::Func(ty_id),
+            custom_name: None,
+            deleted: false,
+        });
         self.functions
             .get_mut(function_id as FunctionID)
             .set_kind(FuncKind::Import(ImportedFunction {
@@ -1355,17 +1418,12 @@ impl<'a> Module<'a> {
         self.functions.set_imported_fn_name(function_id, name);
     }
 
-    /// Count number of imported function
-    pub fn num_import_func(&self) -> u32 {
-        self.num_imported_functions as u32
-    }
-
     /// Set a function name to a function using its absolute index
-    pub fn set_fn_name(&mut self, func_idx: FunctionID, name: String) {
-        if func_idx < self.num_imported_functions as u32 {
-            self.imports.set_name(name, func_idx);
+    pub fn set_fn_name(&mut self, id: FunctionID, name: String) {
+        if id < self.imports.num_funcs {
+            self.imports.set_fn_name(name, id);
         } else {
-            self.functions.set_local_fn_name(func_idx, name);
+            self.functions.set_local_fn_name(id, name);
         }
     }
 
@@ -1373,28 +1431,43 @@ impl<'a> Module<'a> {
     // ==== Globals Management ====
     // =============================
 
-    // pub(crate) fn add_global_to_imports(&mut self, module: String, name: String, ty: DataType) -> ImportsID {
-    //     let import = Import {
-    //         module: module.leak(),
-    //         name: name.clone().leak(),
-    //         ty: wasmparser::TypeRef::Global(ty_id),
-    //         custom_name: None,
-    //         deleted: false,
-    //     };
-    //     self.imports.add_func(import);
-    //     let imp_fn_id = if self.num_functions > 0 {
-    //         self.functions.len() as u32
-    //     } else {
-    //         self.imports.num_funcs - 1
-    //     };
-    //     imp_fn_id as FunctionID
-    // }
-    //
-    // /// Adds a new function to the imports of the module, returns the ID of the imported function.
-    // pub fn add_import_global(&mut self, module: String, name: String, ty: DataType) -> ImportsID {
-    //     // add to the
-    //     let global_id = self.add_global_to_imports(module, name.clone(), ty);
-    // }
+    pub fn add_global(&mut self, global: Global) -> GlobalID {
+        self.num_globals += 1;
+        self.globals.add(global)
+    }
+
+    pub fn add_imported_global(
+        &mut self,
+        module: String,
+        name: String,
+        ty: GlobalType,
+    ) -> (GlobalID, ImportsID) {
+        let (imp_global_id, imp_id) = self.add_import(Import {
+            module: module.leak(),
+            name: name.leak(),
+            ty: TypeRef::Global(ty),
+            custom_name: None,
+            deleted: false,
+        });
+
+        // Add to globals as well since it has imported globals
+        self.add_global(Global::new(GlobalKind::Import(ImportedGlobal::new(
+            imp_id,
+            imp_global_id,
+            ty,
+        ))));
+        (imp_global_id as GlobalID, imp_id)
+    }
+
+    /// Delete a global
+    pub fn delete_global(&mut self, global_id: GlobalID) {
+        self.globals.delete(global_id);
+        if let GlobalKind::Import(ImportedGlobal { import_id, .. }) =
+            self.globals.get_kind(global_id)
+        {
+            self.imports.delete(*import_id);
+        }
+    }
 
     /// Create an empty Module
     pub fn new() -> Self {
@@ -1405,7 +1478,7 @@ impl<'a> Module<'a> {
             functions: Functions::new(vec![], 0, 0),
             tables: ModuleTables::new(vec![]),
             memories: vec![],
-            globals: ModuleGlobals::new(vec![]),
+            globals: ModuleGlobals::new(&ModuleImports::default(), vec![]),
             exports: ModuleExports::new(vec![]),
             start: None,
             elements: vec![],
@@ -1413,7 +1486,7 @@ impl<'a> Module<'a> {
             data: vec![],
             custom_sections: CustomSections::new(vec![]),
             num_functions: 0,
-            num_imported_functions: 0,
+            num_globals: 0,
             module_name: None,
             local_names: wasm_encoder::IndirectNameMap::new(),
             label_names: wasm_encoder::IndirectNameMap::new(),
@@ -1425,7 +1498,6 @@ impl<'a> Module<'a> {
             data_names: wasm_encoder::NameMap::new(),
             field_names: wasm_encoder::IndirectNameMap::new(),
             tag_names: wasm_encoder::NameMap::new(),
-            num_imports_added: 0,
         }
     }
 }
@@ -1440,9 +1512,16 @@ pub trait GetID {
     fn get_id(&self) -> u32;
 }
 
+pub(crate) trait Iter<T> {
+    fn iter(&self) -> std::slice::Iter<'_, T>;
+    fn get_into_iter(&self) -> IntoIter<T>;
+}
+
 pub(crate) trait ReIndexable<T> {
+    fn len(&self) -> usize;
     fn remove(&mut self, id: u32) -> T;
     fn insert(&mut self, id: u32, val: T);
+    fn push(&mut self, func: T);
 }
 
 pub trait Push<T> {

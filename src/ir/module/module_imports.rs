@@ -37,28 +37,34 @@ impl Import<'_> {
     }
 }
 
-#[derive(Clone, Debug)]
 /// Represents the Imports Section of a WASM Module
+#[derive(Clone, Debug, Default)]
 pub struct ModuleImports<'a> {
     imports: Vec<Import<'a>>,
 
     pub(crate) num_funcs: u32,
-    // Variables representing functions added/deleted
-    // pub(crate) deleted_imports: u32,
-    // pub(crate) added_imports: u32,
-    // pub(crate) first_deleted_import: u32,
+    pub(crate) num_funcs_added: u32,
+    pub(crate) num_globals: u32,
+    pub(crate) num_globals_added: u32,
+    pub(crate) num_tables: u32,
+    pub(crate) num_tables_added: u32,
+    pub(crate) num_tags: u32,
+    pub(crate) num_tags_added: u32,
+    pub(crate) num_memories: u32,
+    pub(crate) num_memories_added: u32,
 }
 
 impl<'a> ModuleImports<'a> {
     /// Creates a new `ModuleImports` struct given a Vec of Imports
     pub fn new(imports: Vec<Import<'a>>) -> Self {
-        ModuleImports {
-            imports,
-            num_funcs: 0,
-            // deleted_imports: 0,
-            // added_imports: 0,
-            // first_deleted_import: u32::MAX,
+        let mut def = Self::default();
+        for import in imports.iter() {
+            if import.is_function() {
+                def.num_funcs += 1;
+            }
         }
+        def.imports = imports;
+        def
     }
 
     /// Checks if there are no Imports
@@ -70,9 +76,30 @@ impl<'a> ModuleImports<'a> {
         self.imports.iter()
     }
 
-    /// Set the name of a given import
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Import<'a>> {
+        self.imports.iter_mut()
+    }
+
+    /// Set the name of a given import using the ImportsID.
     pub fn set_name(&mut self, name: String, imports_id: ImportsID) {
         self.imports[imports_id as usize].custom_name = Some(name)
+    }
+
+    /// Set the name of an imported function, using the FunctionID rather
+    /// than the ImportsID. Note that these are not necessarily equal if
+    /// the module has non-function imports! (It is more efficient to
+    /// do this operation using the ImportsID.)
+    pub fn set_fn_name(&mut self, name: String, func_id: FunctionID) {
+        let mut curr_fn_id: u32 = 0;
+        for import in self.imports.iter_mut() {
+            if let TypeRef::Func(..) = import.ty {
+                curr_fn_id += 1;
+                if curr_fn_id == func_id {
+                    import.custom_name = Some(name);
+                    return;
+                }
+            }
+        }
     }
 
     /// Returns the number of imports
@@ -81,13 +108,30 @@ impl<'a> ModuleImports<'a> {
     }
 
     pub(crate) fn add<'b>(&'b mut self, import: Import<'a>) -> ImportsID {
+        match import.ty {
+            TypeRef::Func(..) => {
+                self.num_funcs += 1;
+                self.num_funcs_added += 1;
+            }
+            TypeRef::Global(..) => {
+                self.num_globals += 1;
+                self.num_globals_added += 1;
+            }
+            TypeRef::Table(..) => {
+                self.num_tables += 1;
+                self.num_tables_added += 1;
+            }
+            TypeRef::Tag(..) => {
+                self.num_tags += 1;
+                self.num_tags_added += 1;
+            }
+            TypeRef::Memory(..) => {
+                self.num_memories += 1;
+                self.num_memories_added += 1;
+            }
+        }
         self.imports.push(import);
         (self.imports.len() - 1) as ImportsID
-    }
-
-    pub(crate) fn add_func<'b>(&'b mut self, import: Import<'a>) -> ImportsID {
-        self.num_funcs += 1;
-        self.add(import)
     }
 
     pub(crate) fn delete(&mut self, imports_id: ImportsID) {

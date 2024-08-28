@@ -3,9 +3,9 @@ use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{ExportsID, FunctionID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca::ir::module::module_globals::Global;
+use orca::ir::module::module_globals::{Global, GlobalKind, LocalGlobal};
 use orca::ir::types::{Body, Value};
-use orca::{DataType, InitExpr, Module, Opcode};
+use orca::{InitExpr, Module, Opcode};
 use wasmparser::{GlobalType, ValType};
 
 mod common;
@@ -82,7 +82,7 @@ fn test_import_delete() {
 
     assert!(!id.is_none());
 
-    module.delete_import_func(id.unwrap());
+    module.delete_func(id.unwrap());
 
     let result = module.encode();
 
@@ -102,7 +102,7 @@ fn test_local_fn_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.functions.delete(2);
+    module.delete_func(2);
 
     let result = module.encode();
 
@@ -123,7 +123,7 @@ fn test_panic_call_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.functions.delete(1);
+    module.delete_func(1);
 
     // Should panic here as func 2 calls func 1 which has been deleted
     module.encode();
@@ -137,7 +137,7 @@ fn test_renumber_fn_id() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.functions.delete(1);
+    module.delete_func(1);
 
     // Should reencode and get original add.wat file
     let result = module.encode();
@@ -314,7 +314,7 @@ fn test_middle_import_to_local_import_delete() {
 
     module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
-    module.delete_import_func(2);
+    module.delete_func(2);
     let result = module.encode();
 
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
@@ -341,8 +341,8 @@ fn test_middle_import_to_local_local_delete() {
 
     module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
-    module.delete_import_func(2);
-    module.functions.delete(3);
+    module.delete_func(2);
+    module.delete_func(3);
 
     let result = module.encode();
 
@@ -566,15 +566,17 @@ fn add_global_with_import() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add new global
-    let gid = module.globals.add(Global {
+    let global = Global::new(GlobalKind::Local(LocalGlobal {
+        global_id: 0, // will be fixed
         ty: GlobalType {
             content_type: ValType::I32,
             mutable: true,
             shared: false,
         },
         init_expr: InitExpr::Value(Value::I32(0)),
-    });
-    // assert_eq!(1, gid); // todo uncomment
+    }));
+    let gid = module.add_global(global);
+    assert_eq!(1, gid);
 
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");

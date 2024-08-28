@@ -3,7 +3,7 @@
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
 use crate::ir::module::module_functions::{FuncKind, LocalFunction};
 use crate::ir::module::module_globals::Global;
-use crate::ir::module::Module;
+use crate::ir::module::{Iter, Module};
 use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;

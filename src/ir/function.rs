@@ -1,9 +1,8 @@
 //! Function Builder
 
 use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
-use crate::ir::module::module_functions::FuncKind::Local;
-use crate::ir::module::module_functions::{add_local, Function, LocalFunction};
-use crate::ir::module::{Module, Push};
+use crate::ir::module::module_functions::{add_local, LocalFunction};
+use crate::ir::module::{Module, ReIndexable};
 use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
@@ -47,28 +46,22 @@ impl<'a> FunctionBuilder<'a> {
         self.end();
 
         let ty = module.types.add(&self.params, &self.results);
-
-        let id = module.functions.len();
-
-        let func = Function::new(
-            Local(LocalFunction::new(
+        let id = module.add_local_func(
+            LocalFunction::new(
                 ty,
-                id as FunctionID,
+                0, // will be fixed
                 self.body.clone(),
                 args,
-            )),
+            ),
             self.name,
         );
-        module.functions.push(func);
-        // module.code_sections.push(self.body);
-        module.num_functions += 1;
 
-        // assert_eq!(module.functions.len(), module.code_sections.len());
         assert_eq!(
-            module.functions.len(),
-            module.num_functions + module.num_imported_functions + module.num_imports_added
+            module.functions.len() as u32,
+            module.num_functions + module.imports.num_funcs
         );
-        id as FunctionID
+
+        id
     }
 
     /// Finish building a function (have side effect on component IR),
@@ -81,37 +74,25 @@ impl<'a> FunctionBuilder<'a> {
     ) -> FunctionID {
         // add End as last instruction
         self.end();
-
         let ty = comp.modules[0].types.add(&self.params, &self.results);
 
-        let id = comp.modules[mod_idx as usize].functions.len();
-
-        let func = Function::new(
-            Local(LocalFunction::new(
+        let id = comp.modules[mod_idx as usize].add_local_func(
+            LocalFunction::new(
                 ty,
-                id as FunctionID,
+                0, // will be fixed
                 self.body.clone(),
                 args,
-            )),
+            ),
             self.name,
         );
 
-        // the function index should also take account for imports
-        comp.modules[mod_idx as usize].functions.push(func);
-        // comp.modules[mod_idx as usize].code_sections.push(self.body);
-        comp.modules[mod_idx as usize].num_functions += 1;
-
-        // assert_eq!(
-        //     comp.modules[mod_idx as usize].functions.len(),
-        //     comp.modules[mod_idx as usize].code_sections.len()
-        // );
         assert_eq!(
-            comp.modules[mod_idx as usize].functions.len(),
+            comp.modules[mod_idx as usize].functions.len() as u32,
             comp.modules[mod_idx as usize].num_functions
-                + comp.modules[mod_idx as usize].num_imported_functions
-                + comp.modules[mod_idx as usize].num_imports_added
+                + comp.modules[mod_idx as usize].imports.num_funcs
+                + comp.modules[mod_idx as usize].imports.num_funcs_added
         );
-        id as FunctionID
+        id
     }
 
     pub fn set_name(&mut self, name: String) {
