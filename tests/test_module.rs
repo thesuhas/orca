@@ -3,10 +3,8 @@ use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{ExportsID, FunctionID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca::ir::module::module_globals::{Global, GlobalKind, LocalGlobal};
 use orca::ir::types::{Body, Value};
-use orca::{InitExpr, Module, Opcode};
-use wasmparser::{GlobalType, ValType};
+use orca::{DataType, InitExpr, Module, Opcode};
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -162,7 +160,6 @@ fn test_middle_import_to_local() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    builder.end();
 
     module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
@@ -188,7 +185,6 @@ fn test_first_import_to_local() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    builder.end();
 
     module.convert_import_fn_to_local(0, builder.local_func(vec![], 0, 0));
 
@@ -214,7 +210,6 @@ fn test_last_import_to_local() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    builder.end();
 
     module.convert_import_fn_to_local(2, builder.local_func(vec![], 2, 0));
 
@@ -241,19 +236,16 @@ fn test_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.end();
     module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.end();
     module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
 
     let mut third_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     third_builder.i32_const(3);
     third_builder.drop();
-    third_builder.end();
     module.convert_import_fn_to_local(2, third_builder.local_func(vec![], 2, 0));
 
     let result = module.encode();
@@ -279,13 +271,11 @@ fn test_some_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.end();
     module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.end();
     module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
 
     let result = module.encode();
@@ -310,7 +300,6 @@ fn test_middle_import_to_local_import_delete() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    builder.end();
 
     module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
@@ -337,7 +326,6 @@ fn test_middle_import_to_local_local_delete() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    builder.end();
 
     module.convert_import_fn_to_local(1, builder.local_func(vec![], 1, 0));
 
@@ -492,19 +480,16 @@ fn test_all_local_to_import_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     first_builder.i32_const(4);
     first_builder.drop();
-    first_builder.end();
     module.convert_import_fn_to_local(0, first_builder.local_func(vec![], 0, 0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     second_builder.i32_const(5);
     second_builder.drop();
-    second_builder.end();
     module.convert_import_fn_to_local(1, second_builder.local_func(vec![], 1, 0));
 
     let mut third_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     third_builder.i32_const(6);
     third_builder.drop();
-    third_builder.end();
     module.convert_import_fn_to_local(2, third_builder.local_func(vec![], 2, 0));
 
     module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
@@ -529,13 +514,13 @@ fn test_add_imports_and_local_fns() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add first import func
-    let imp0 = module.add_import_func("test0".to_string(), "func0".to_string(), 2);
+    let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), 2);
 
     // add first local func
     let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
     first_builder.i32_const(1);
     first_builder.i32_const(1);
-    first_builder.call(imp0);
+    first_builder.call(fid);
     let fid0 = first_builder.finish_module(0, &mut module);
 
     // add second local func
@@ -566,16 +551,7 @@ fn add_global_with_import() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add new global
-    let global = Global::new(GlobalKind::Local(LocalGlobal {
-        global_id: 0, // will be fixed
-        ty: GlobalType {
-            content_type: ValType::I32,
-            mutable: true,
-            shared: false,
-        },
-        init_expr: InitExpr::Value(Value::I32(0)),
-    }));
-    let gid = module.add_global(global);
+    let gid = module.add_global(InitExpr::Value(Value::I32(0)), DataType::I32, true, false);
     assert_eq!(1, gid);
 
     let result = module.encode();

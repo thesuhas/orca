@@ -35,7 +35,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
                 }
             }
         }
-        let num_funcs = module.num_functions;
+        let num_funcs = module.num_local_functions;
         ModuleIterator {
             module,
             mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs.to_owned()),

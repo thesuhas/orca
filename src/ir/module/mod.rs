@@ -37,6 +37,8 @@ pub mod module_globals;
 pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
+#[cfg(test)]
+mod test;
 
 #[derive(Debug, Default)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -70,9 +72,15 @@ pub struct Module<'a> {
     /// Custom Sections
     pub custom_sections: CustomSections<'a>,
     /// Number of local functions (not counting imported functions)
-    pub(crate) num_functions: u32,
+    pub(crate) num_local_functions: u32,
     /// Number of local globals (not counting imported globals)
-    num_globals: u32,
+    pub(crate) num_local_globals: u32,
+    /// Number of local tables (not counting imported tables)
+    #[allow(dead_code)]
+    pub(crate) num_local_tables: u32,
+    /// Number of local memories (not counting imported memories)
+    #[allow(dead_code)]
+    pub(crate) num_local_memories: u32,
 
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -449,16 +457,13 @@ impl<'a> Module<'a> {
         }
 
         let num_globals = globals.len() as u32;
-        let num_imported_functions = imports.num_funcs;
+        let num_memories = memories.len() as u32;
+        let num_tables = tables.len() as u32;
         let module_globals = ModuleGlobals::new(&imports, globals);
         Ok(Module {
             types: ModuleTypes::new(types),
             imports,
-            functions: Functions::new(
-                final_funcs,
-                num_imported_functions,
-                code_sections.len() as u32,
-            ),
+            functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
             memories,
             globals: module_globals,
@@ -469,8 +474,10 @@ impl<'a> Module<'a> {
             // code_sections: code_sections.clone(),
             data,
             custom_sections: CustomSections::new(custom_sections),
-            num_functions: code_sections.len() as u32,
-            num_globals,
+            num_local_functions: code_sections.len() as u32,
+            num_local_globals: num_globals,
+            num_local_tables: num_tables,
+            num_local_memories: num_memories,
             module_name,
             local_names,
             type_names,
@@ -512,7 +519,7 @@ impl<'a> Module<'a> {
     /// Visits the Orca Module and resolves the special instrumentation by
     /// translating them into the straightforward before/after/alt modes.
     fn resolve_special_instrumentation(&mut self) {
-        if !self.num_functions > 0 {
+        if !self.num_local_functions > 0 {
             for rel_func_idx in self.imports.num_funcs as usize..self.functions.len() {
                 let func_idx = rel_func_idx as FunctionID;
                 if let FuncKind::Import(..) = &self.functions.get_kind(func_idx as FunctionID) {
@@ -1084,7 +1091,7 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
-        if !self.num_functions > 0 {
+        if !self.num_local_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in 0..self.functions.len() {
                 if self.functions.is_deleted(rel_func_idx as FunctionID) {
@@ -1306,12 +1313,12 @@ impl<'a> Module<'a> {
     pub(crate) fn add_import(&mut self, import: Import<'a>) -> (u32, ImportsID) {
         let (num_local, num_imported, num_total) = match import.ty {
             TypeRef::Func(..) => (
-                self.num_functions,
+                self.num_local_functions,
                 self.imports.num_funcs,
                 self.functions.len() as u32,
             ),
             TypeRef::Global(..) => (
-                self.num_globals,
+                self.num_local_globals,
                 self.imports.num_globals,
                 self.globals.len() as u32,
             ),
@@ -1334,15 +1341,36 @@ impl<'a> Module<'a> {
 
     pub(crate) fn add_local_func(
         &mut self,
-        local_function: LocalFunction<'a>,
         name: Option<String>,
+        params: &[DataType],
+        results: &[DataType],
+        num_args: usize,
+        body: Body<'a>,
     ) -> FunctionID {
-        self.num_functions += 1;
-        self.functions.add_local_func(local_function, name)
+        let mut args = vec![];
+        for arg in 0..num_args {
+            args.push(arg as LocalID);
+        }
+        let ty = self.types.add(params, results);
+        let local_func = LocalFunction::new(
+            ty, 0, // will be fixed
+            body, args,
+        );
+
+        self.num_local_functions += 1;
+        self.functions.add_local_func(local_func, name.clone())
     }
 
-    /// Add a new function to the module. Returns the index of the imported function.
-    pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
+    /// Add a new function to the module, returns:
+    ///
+    /// - FunctionID: The ID that indexes into the function ID space. To be used when referring to the function, like in `call`.
+    /// - ImportsID: The ID that indexes into the import section.
+    pub fn add_import_func(
+        &mut self,
+        module: String,
+        name: String,
+        ty_id: TypeID,
+    ) -> (FunctionID, ImportsID) {
         let (imp_fn_id, imp_id) = self.add_import(Import {
             module: module.leak(),
             name: name.clone().leak(),
@@ -1354,7 +1382,7 @@ impl<'a> Module<'a> {
         // Add to functions as well as it has imported functions
         self.functions
             .add_import_func(imp_id, ty_id, Some(name), imp_fn_id);
-        imp_fn_id
+        (imp_fn_id, imp_id)
     }
 
     /// Get the number of imported functions in the module (including any added ones).
@@ -1373,7 +1401,8 @@ impl<'a> Module<'a> {
     }
 
     /// Convert an imported function to a local function.
-    /// Continue using the ImportsID as normal, this library will take care of ID changes for you during encoding.
+    /// The function ID inside the `local_function` parameter should equal the `imports_id` specified.
+    /// Continue using the ImportsID as normal (like in `call` instructions), this library will take care of ID changes for you during encoding.
     /// Returns false if it is a local function.
     pub fn convert_import_fn_to_local(
         &mut self,
@@ -1392,7 +1421,8 @@ impl<'a> Module<'a> {
     }
 
     /// Convert a local function to an imported function.
-    /// Continue using the FunctionID as normal, this library will take care of ID changes for you during encoding.
+    /// Continue using the FunctionID as normal (like in `call` instructions), this library will take care of ID changes for you during encoding.
+    /// Returns false if it is an imported function.
     pub fn convert_local_fn_to_import(
         &mut self,
         function_id: FunctionID,
@@ -1442,20 +1472,20 @@ impl<'a> Module<'a> {
     // =============================
 
     /// Add a new global to the module.
-    pub fn add_global(&mut self, global: Global) -> GlobalID {
-        self.num_globals += 1;
+    pub(crate) fn add_global_internal(&mut self, global: Global) -> GlobalID {
+        self.num_local_globals += 1;
         self.globals.add(global)
     }
 
     /// Create a new locally-defined global and add it to the module.
-    pub fn create_and_add_global(
+    pub fn add_global(
         &mut self,
         init_expr: InitExpr,
         content_ty: DataType,
         mutable: bool,
         shared: bool,
     ) -> GlobalID {
-        self.add_global(Global {
+        self.add_global_internal(Global {
             kind: GlobalKind::Local(LocalGlobal {
                 global_id: 0, // gets set in `add`
                 ty: GlobalType {
@@ -1477,21 +1507,28 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: GlobalType,
+        content_ty: DataType,
+        mutable: bool,
+        shared: bool,
     ) -> (GlobalID, ImportsID) {
+        let global_ty = GlobalType {
+            mutable,
+            content_type: wasmparser::ValType::from(&content_ty),
+            shared,
+        };
         let (imp_global_id, imp_id) = self.add_import(Import {
             module: module.leak(),
             name: name.leak(),
-            ty: TypeRef::Global(ty),
+            ty: TypeRef::Global(global_ty),
             custom_name: None,
             deleted: false,
         });
 
         // Add to globals as well since it has imported globals
-        self.add_global(Global::new(GlobalKind::Import(ImportedGlobal::new(
+        self.add_global_internal(Global::new(GlobalKind::Import(ImportedGlobal::new(
             imp_id,
             imp_global_id,
-            ty,
+            global_ty,
         ))));
         (imp_global_id as GlobalID, imp_id)
     }

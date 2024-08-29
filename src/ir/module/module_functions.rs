@@ -233,8 +233,6 @@ impl ImportedFunction {
 #[derive(Clone, Debug, Default)]
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
-    num_import_fns: u32,
-    num_local_fns: u32,
 }
 
 impl<'a> Iter<Function<'a>> for Functions<'a> {
@@ -268,12 +266,8 @@ impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
 
 impl<'a> Functions<'a> {
     /// Create a new functions section
-    pub fn new(functions: Vec<Function<'a>>, num_import_fns: u32, num_local_fns: u32) -> Self {
-        Functions {
-            functions,
-            num_import_fns,
-            num_local_fns,
-        }
+    pub fn new(functions: Vec<Function<'a>>) -> Self {
+        Functions { functions }
     }
 
     /// Get a function by its FunctionID
@@ -305,8 +299,8 @@ impl<'a> Functions<'a> {
     }
 
     /// Get the name of a function
-    pub fn get_name(&self, function_id: FunctionID) -> Option<String> {
-        self.functions[function_id as usize].name.clone()
+    pub fn get_name(&self, function_id: FunctionID) -> &Option<String> {
+        &self.functions[function_id as usize].name
     }
 
     /// Check if a function is a local
@@ -401,8 +395,10 @@ impl<'a> Functions<'a> {
         let id = self.next_id();
         local_function.func_id = id;
 
-        self.push(Function::new(FuncKind::Local(local_function), name));
-
+        self.push(Function::new(FuncKind::Local(local_function), name.clone()));
+        if let Some(name) = name {
+            self.set_local_fn_name(id, name);
+        }
         id
     }
 
@@ -411,14 +407,14 @@ impl<'a> Functions<'a> {
         imp_id: ImportsID,
         ty_id: TypeID,
         name: Option<String>,
+        // The id of the function we're using (at least until re-indexing)
         imp_fn_id: u32,
-    ) -> FunctionID {
-        let id = self.next_id();
+    ) {
+        assert_eq!(self.next_id(), imp_fn_id);
         self.functions.push(Function::new(
             FuncKind::Import(ImportedFunction::new(imp_id, ty_id, imp_fn_id)),
             name,
         ));
-        id
     }
 
     pub(crate) fn add_local(&mut self, func_idx: FunctionID, ty: DataType) -> LocalID {

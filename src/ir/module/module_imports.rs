@@ -78,6 +78,14 @@ impl<'a> ModuleImports<'a> {
         for import in imports.iter() {
             if import.is_function() {
                 def.num_funcs += 1;
+            } else if import.is_global() {
+                def.num_globals += 1;
+            } else if import.is_table() {
+                def.num_tables += 1;
+            } else if import.is_tag() {
+                def.num_tags += 1;
+            } else if import.is_memory() {
+                def.num_memories += 1;
             }
         }
         def.imports = imports;
@@ -109,14 +117,10 @@ impl<'a> ModuleImports<'a> {
     /// the module has non-function imports! (It is more efficient to
     /// do this operation using the ImportsID.)
     pub fn set_fn_name(&mut self, name: String, func_id: FunctionID) {
-        let mut curr_fn_id: u32 = 0;
-        for import in self.imports.iter_mut() {
-            if let TypeRef::Func(..) = import.ty {
-                curr_fn_id += 1;
-                if curr_fn_id == func_id {
-                    import.custom_name = Some(name);
-                    return;
-                }
+        for (curr_fn_id, import) in (0_u32..).zip(self.imports.iter_mut()) {
+            if import.is_function() && curr_fn_id == func_id {
+                import.custom_name = Some(name);
+                return;
             }
         }
     }

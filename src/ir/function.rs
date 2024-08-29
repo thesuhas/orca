@@ -38,27 +38,19 @@ impl<'a> FunctionBuilder<'a> {
     /// Finish building a function (have side effect on module IR),
     /// return function index
     pub fn finish_module(mut self, num_args: usize, module: &mut Module<'a>) -> FunctionID {
-        let mut args = vec![];
-        for arg in 0..num_args {
-            args.push(arg as LocalID);
-        }
         // add End as last instruction
         self.end();
-
-        let ty = module.types.add(&self.params, &self.results);
         let id = module.add_local_func(
-            LocalFunction::new(
-                ty,
-                0, // will be fixed
-                self.body.clone(),
-                args,
-            ),
             self.name,
+            &self.params,
+            &self.results,
+            num_args,
+            self.body.clone(),
         );
 
         assert_eq!(
             module.functions.len() as u32,
-            module.num_functions + module.imports.num_funcs
+            module.num_local_functions + module.imports.num_funcs
         );
 
         id
@@ -68,27 +60,24 @@ impl<'a> FunctionBuilder<'a> {
     /// return function index
     pub fn finish_component(
         mut self,
-        args: Vec<LocalID>,
         comp: &mut Component<'a>,
         mod_idx: ModuleID,
+        num_args: usize,
     ) -> FunctionID {
         // add End as last instruction
         self.end();
-        let ty = comp.modules[0].types.add(&self.params, &self.results);
 
         let id = comp.modules[mod_idx as usize].add_local_func(
-            LocalFunction::new(
-                ty,
-                0, // will be fixed
-                self.body.clone(),
-                args,
-            ),
             self.name,
+            &self.params,
+            &self.results,
+            num_args,
+            self.body.clone(),
         );
 
         assert_eq!(
             comp.modules[mod_idx as usize].functions.len() as u32,
-            comp.modules[mod_idx as usize].num_functions
+            comp.modules[mod_idx as usize].num_local_functions
                 + comp.modules[mod_idx as usize].imports.num_funcs
                 + comp.modules[mod_idx as usize].imports.num_funcs_added
         );
@@ -100,11 +89,13 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub fn local_func(
-        &self,
+        &mut self,
         args: Vec<LocalID>,
         function_id: FunctionID,
         ty: TypeID,
     ) -> LocalFunction<'a> {
+        // add End as last instruction
+        self.end();
         LocalFunction::new(ty, function_id, self.body.clone(), args)
     }
 }
