@@ -4,7 +4,7 @@
 
 <strong>Orca is a WebAssembly Transformation Library for the Component Model</strong>
 
-It is based on Dfinity's [IC](https://github.com/dfinity/ic/tree/master/rs/wasm_transform) and [Walrus](https://github.com/rustwasm/walrus/tree/main).
+It is based on [Dfinity's IC codebase](https://github.com/dfinity/ic/tree/master/rs/wasm_transform) and [Walrus](https://github.com/rustwasm/walrus/tree/main).
 
 </div>
 

@@ -24,8 +24,8 @@ use crate::ir::wrappers::{
     update_fn_instr, update_global_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
-use crate::{Location, Opcode};
-use log::error;
+use crate::{InitExpr, Location, Opcode};
+use log::{error, warn};
 use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
@@ -38,7 +38,7 @@ pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
 ///
 /// [WASM Spec]: https://webassembly.github.io/spec/core/binary/modules.html
@@ -1341,7 +1341,7 @@ impl<'a> Module<'a> {
         self.functions.add_local_func(local_function, name)
     }
 
-    /// Add a new function to the module. Returns the index of the imported function
+    /// Add a new function to the module. Returns the index of the imported function.
     pub fn add_import_func(&mut self, module: String, name: String, ty_id: TypeID) -> ImportsID {
         let (imp_fn_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1357,12 +1357,12 @@ impl<'a> Module<'a> {
         imp_fn_id
     }
 
-    /// Get the number of imported functions
+    /// Get the number of imported functions in the module (including any added ones).
     pub fn num_import_func(&self) -> u32 {
         self.imports.num_funcs
     }
 
-    /// Delete a function
+    /// Delete a function from the module.
     pub fn delete_func(&mut self, function_id: FunctionID) {
         self.functions.delete(function_id);
         if let FuncKind::Import(ImportedFunction { import_id, .. }) =
@@ -1372,31 +1372,37 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Convert an imported function to local
+    /// Convert an imported function to a local function.
+    /// Continue using the ImportsID as normal, this library will take care of ID changes for you during encoding.
+    /// Returns false if it is a local function.
     pub fn convert_import_fn_to_local(
         &mut self,
         imports_id: ImportsID,
         local_function: LocalFunction<'a>,
-    ) {
+    ) -> bool {
         if self.functions.is_local(imports_id) {
-            panic!("This is a local function!");
+            warn!("This is a local function!");
+            return false;
         }
         self.delete_func(imports_id);
         self.functions
             .get_mut(imports_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
+        true
     }
 
-    /// Convert a local function to imported
+    /// Convert a local function to an imported function.
+    /// Continue using the FunctionID as normal, this library will take care of ID changes for you during encoding.
     pub fn convert_local_fn_to_import(
         &mut self,
         function_id: FunctionID,
         module: String,
         name: String,
         ty_id: TypeID,
-    ) {
+    ) -> bool {
         if self.functions.is_import(function_id) {
-            panic!("This is an imported function!");
+            warn!("This is an imported function!");
+            return false;
         }
         // Delete the associated function
         self.delete_func(function_id);
@@ -1415,15 +1421,19 @@ impl<'a> Module<'a> {
                 import_fn_id: function_id,
                 ty_id,
             }));
-        self.functions.set_imported_fn_name(function_id, name);
+        assert!(self.functions.set_imported_fn_name(function_id, name));
+        true
     }
 
-    /// Set a function name to a function using its absolute index
+    /// Set the name of a function using its ID.
     pub fn set_fn_name(&mut self, id: FunctionID, name: String) {
         if id < self.imports.num_funcs {
-            self.imports.set_fn_name(name, id);
+            // the function is an import
+            self.imports.set_fn_name(name.clone(), id);
+            assert!(self.functions.set_imported_fn_name(id, name));
         } else {
-            self.functions.set_local_fn_name(id, name);
+            // the function is local
+            assert!(self.functions.set_local_fn_name(id, name));
         }
     }
 
@@ -1431,11 +1441,38 @@ impl<'a> Module<'a> {
     // ==== Globals Management ====
     // =============================
 
+    /// Add a new global to the module.
     pub fn add_global(&mut self, global: Global) -> GlobalID {
         self.num_globals += 1;
         self.globals.add(global)
     }
 
+    /// Create a new locally-defined global and add it to the module.
+    pub fn create_and_add_global(
+        &mut self,
+        init_expr: InitExpr,
+        content_ty: DataType,
+        mutable: bool,
+        shared: bool,
+    ) -> GlobalID {
+        self.add_global(Global {
+            kind: GlobalKind::Local(LocalGlobal {
+                global_id: 0, // gets set in `add`
+                ty: GlobalType {
+                    mutable,
+                    content_type: wasmparser::ValType::from(&content_ty),
+                    shared,
+                },
+                init_expr,
+            }),
+            deleted: false,
+        })
+    }
+
+    /// Add a new imported global to the module, returns:
+    ///
+    /// - GlobalID: The ID that indexes into the global ID space. To be used when referring to the global, like in `global.get`.
+    /// - ImportsID: The ID that indexes into the import section.
     pub fn add_imported_global(
         &mut self,
         module: String,
@@ -1459,7 +1496,8 @@ impl<'a> Module<'a> {
         (imp_global_id as GlobalID, imp_id)
     }
 
-    /// Delete a global
+    /// Delete a global from the module (can either be an imported or locally-defined global).
+    /// Use the global ID for this operation, not the import ID!
     pub fn delete_global(&mut self, global_id: GlobalID) {
         self.globals.delete(global_id);
         if let GlobalKind::Import(ImportedGlobal { import_id, .. }) =
@@ -1467,44 +1505,6 @@ impl<'a> Module<'a> {
         {
             self.imports.delete(*import_id);
         }
-    }
-
-    /// Create an empty Module
-    pub fn new() -> Self {
-        // TODO -- just use Default trait
-        Module {
-            types: ModuleTypes::new(vec![]),
-            imports: ModuleImports::new(vec![]),
-            functions: Functions::new(vec![], 0, 0),
-            tables: ModuleTables::new(vec![]),
-            memories: vec![],
-            globals: ModuleGlobals::new(&ModuleImports::default(), vec![]),
-            exports: ModuleExports::new(vec![]),
-            start: None,
-            elements: vec![],
-            data_count_section_exists: false,
-            data: vec![],
-            custom_sections: CustomSections::new(vec![]),
-            num_functions: 0,
-            num_globals: 0,
-            module_name: None,
-            local_names: wasm_encoder::IndirectNameMap::new(),
-            label_names: wasm_encoder::IndirectNameMap::new(),
-            type_names: wasm_encoder::NameMap::new(),
-            table_names: wasm_encoder::NameMap::new(),
-            elem_names: wasm_encoder::NameMap::new(),
-            memory_names: wasm_encoder::NameMap::new(),
-            global_names: wasm_encoder::NameMap::new(),
-            data_names: wasm_encoder::NameMap::new(),
-            field_names: wasm_encoder::IndirectNameMap::new(),
-            tag_names: wasm_encoder::NameMap::new(),
-        }
-    }
-}
-
-impl Default for Module<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

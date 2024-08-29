@@ -31,15 +31,32 @@ impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
 }
 
 impl Import<'_> {
-    // TODO: Add documentation here
+    /// Check whether this is an import for a function.
     pub fn is_function(&self) -> bool {
         matches!(self.ty, TypeRef::Func(_))
+    }
+    /// Check whether this is an import for a global.
+    pub fn is_global(&self) -> bool {
+        matches!(self.ty, TypeRef::Global(_))
+    }
+    /// Check whether this is an import for a table.
+    pub fn is_table(&self) -> bool {
+        matches!(self.ty, TypeRef::Table(_))
+    }
+    /// Check whether this is an import for a tag.
+    pub fn is_tag(&self) -> bool {
+        matches!(self.ty, TypeRef::Tag(_))
+    }
+    /// Check whether this is an import for a memory.
+    pub fn is_memory(&self) -> bool {
+        matches!(self.ty, TypeRef::Memory(_))
     }
 }
 
 /// Represents the Imports Section of a WASM Module
 #[derive(Clone, Debug, Default)]
 pub struct ModuleImports<'a> {
+    /// The imports.
     imports: Vec<Import<'a>>,
 
     pub(crate) num_funcs: u32,
@@ -72,10 +89,12 @@ impl<'a> ModuleImports<'a> {
         self.imports.is_empty()
     }
 
+    /// Get an iterator over the imports.
     pub fn iter(&self) -> std::slice::Iter<'_, Import<'a>> {
         self.imports.iter()
     }
 
+    /// Get a mutable iterator over the imports.
     pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Import<'a>> {
         self.imports.iter_mut()
     }
@@ -107,7 +126,10 @@ impl<'a> ModuleImports<'a> {
         self.imports.len()
     }
 
+    /// Add a new import to the module.
     pub(crate) fn add<'b>(&'b mut self, import: Import<'a>) -> ImportsID {
+        // using a match instead of import.is_*() to make sure that we're
+        // exhaustive due to the compiler guarantees.
         match import.ty {
             TypeRef::Func(..) => {
                 self.num_funcs += 1;
@@ -151,10 +173,8 @@ impl<'a> ModuleImports<'a> {
     /// Get the function ID of an Imported Function
     pub fn get_func(&self, module: String, name: String) -> Option<FunctionID> {
         for (idx, imp) in self.imports.iter().enumerate() {
-            if let TypeRef::Func(_) = imp.ty {
-                if imp.module == module.as_str() && *imp.name == name {
-                    return Some(idx as FunctionID);
-                }
+            if imp.is_function() && imp.module == module.as_str() && *imp.name == name {
+                return Some(idx as FunctionID);
             }
         }
         None

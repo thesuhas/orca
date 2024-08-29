@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::ir::id::{GlobalID, ImportsID};
 use crate::ir::module::module_imports::ModuleImports;
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::{DataType, InitExpr};
+use crate::InitExpr;
 use std::vec::IntoIter;
 use wasmparser::{GlobalType, TypeRef};
 
@@ -46,7 +46,9 @@ impl ImportedGlobal {
 /// Globals in a wasm module.
 #[derive(Debug, Clone)]
 pub struct Global {
+    /// The kind of global (imported or locally-defined).
     pub(crate) kind: GlobalKind,
+    /// Whether this global was deleted.
     pub(crate) deleted: bool,
 }
 
@@ -112,13 +114,6 @@ impl Global {
             }) => {
                 *global_id = id;
             }
-        }
-    }
-
-    pub(crate) fn get_ty(&self) -> &GlobalType {
-        match &self.kind {
-            GlobalKind::Local(LocalGlobal { ty, .. })
-            | GlobalKind::Import(ImportedGlobal { ty, .. }) => ty,
         }
     }
 
@@ -221,28 +216,6 @@ impl ModuleGlobals {
         if id < self.globals.len() as u32 {
             self.globals[id as usize].delete();
         }
-    }
-
-    /// Create a new global and add it
-    pub(crate) fn create(
-        &mut self,
-        init_expr: InitExpr,
-        content_ty: DataType,
-        mutable: bool,
-        shared: bool,
-    ) -> GlobalID {
-        self.add(Global {
-            kind: GlobalKind::Local(LocalGlobal {
-                global_id: 0, // gets set in `add`
-                ty: GlobalType {
-                    mutable,
-                    content_type: wasmparser::ValType::from(&content_ty),
-                    shared,
-                },
-                init_expr,
-            }),
-            deleted: false,
-        })
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.

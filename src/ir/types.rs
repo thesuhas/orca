@@ -1016,7 +1016,7 @@ impl From<BlockType> for wasmparser::BlockType {
 }
 
 /// Intermediate Representation of Custom Sections
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CustomSections<'a> {
     custom_sections: Vec<CustomSection<'a>>,
 }
