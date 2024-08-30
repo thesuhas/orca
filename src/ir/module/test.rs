@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::process::Command;
 
 // FUNCTIONS
-
 #[test]
 fn test_add_local_func() {
     let (buff, mut init_state) = setup();
@@ -24,12 +23,12 @@ fn test_add_local_func() {
     builder.drop();
     assert_eq!(
         init_state.func_count + 1 as FunctionID,
-        builder.finish_module(0, &mut module)
+        builder.finish_module(&mut module)
     );
     init_state.add_local_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -50,7 +49,7 @@ fn test_add_import_func() {
     init_state.add_imported_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -68,7 +67,7 @@ fn test_add_local_then_imported_func() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    assert_eq!(init_state.next_fid(), builder.finish_module(0, &mut module));
+    assert_eq!(init_state.next_fid(), builder.finish_module(&mut module));
     init_state.add_local_func();
 
     // add imported func
@@ -78,7 +77,7 @@ fn test_add_local_then_imported_func() {
     init_state.add_imported_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -103,11 +102,11 @@ fn test_add_imported_then_local_func() {
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(fid);
-    assert_eq!(init_state.next_fid(), builder.finish_module(0, &mut module));
+    assert_eq!(init_state.next_fid(), builder.finish_module(&mut module));
     init_state.add_local_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -125,7 +124,7 @@ fn test_add_then_delete_local_func() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.i32_const(1);
     builder.drop();
-    let fid = builder.finish_module(0, &mut module);
+    let fid = builder.finish_module(&mut module);
     assert_eq!(init_state.next_fid(), fid);
     init_state.add_local_func();
 
@@ -134,7 +133,7 @@ fn test_add_then_delete_local_func() {
     init_state.delete_local_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -155,7 +154,7 @@ fn test_delete_local_func() {
     module.exports.delete(49);
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -180,7 +179,7 @@ fn test_add_then_delete_imported_func() {
     init_state.delete_imported_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -199,7 +198,7 @@ fn test_delete_imported_func() {
     init_state.delete_imported_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -224,7 +223,7 @@ fn test_delete_local_and_imported_func() {
     init_state.delete_imported_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -239,24 +238,22 @@ fn test_convert_import_fn_to_local() {
     state_assertions(&module, &init_state, false);
 
     // convert the import to a function
-    let mut builder =
-        FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![DataType::I32]);
+    let mut builder = FunctionBuilder::new(&*vec![DataType::I32], &*vec![DataType::I32]);
     builder.i32_const(1);
     builder.drop();
-    // todo -- remove need of specifying local_func below
-    module.convert_import_fn_to_local(0, builder.local_func(vec![], 0, 0));
+    builder.replace_import_in_module(&mut module, 0);
 
     // add local function using the translated function
     let mut builder = FunctionBuilder::new(&vec![], &vec![DataType::I32]);
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(0);
-    assert_eq!(init_state.next_fid(), builder.finish_module(0, &mut module));
+    assert_eq!(init_state.next_fid(), builder.finish_module(&mut module));
     init_state.add_local_func();
     init_state.import_func_to_local();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -275,7 +272,7 @@ fn test_convert_local_fn_to_import() {
     init_state.local_func_to_import();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -294,7 +291,7 @@ fn test_set_fn_name_import_through_import() {
     new_import_names.insert(0, "test".to_string());
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &new_import_names,
         &HashMap::new(),
@@ -313,7 +310,7 @@ fn test_set_fn_name_import_through_module() {
     new_import_names.insert(0, "test".to_string());
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &new_import_names,
         &HashMap::new(),
@@ -332,7 +329,7 @@ fn test_set_fn_name_local_through_functions() {
     new_func_names.insert(10, "test".to_string());
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &new_func_names,
@@ -351,7 +348,7 @@ fn test_set_fn_name_local_through_module() {
     new_func_names.insert(10, "test".to_string());
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &new_func_names,
@@ -373,7 +370,7 @@ fn test_set_fn_name_local_through_func_builder() {
     builder.i32_const(1);
     builder.drop();
     builder.set_name(name.to_string());
-    let fid = builder.finish_module(0, &mut module);
+    let fid = builder.finish_module(&mut module);
 
     assert_eq!(init_state.next_fid(), fid);
     init_state.add_local_func();
@@ -385,7 +382,7 @@ fn test_set_fn_name_local_through_func_builder() {
     builder.i32_const(1);
     builder.drop();
     builder.set_name("test1".to_string());
-    let fid = builder.finish_module(0, &mut module);
+    let fid = builder.finish_module(&mut module);
 
     assert_eq!(init_state.next_fid(), fid);
     init_state.add_local_func();
@@ -393,7 +390,7 @@ fn test_set_fn_name_local_through_func_builder() {
     new_func_names.insert(fid, name.to_string());
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &new_func_names,
@@ -423,13 +420,13 @@ fn test_create_and_add_global() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.global_get(gid);
     builder.drop();
-    let fid = builder.finish_module(0, &mut module);
+    let fid = builder.finish_module(&mut module);
 
     assert_eq!(init_state.next_fid(), fid);
     init_state.add_local_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -459,13 +456,13 @@ fn test_add_imported_global() {
     let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
     builder.global_get(gid);
     builder.drop();
-    let fid = builder.finish_module(0, &mut module);
+    let fid = builder.finish_module(&mut module);
 
     assert_eq!(init_state.next_fid(), fid);
     init_state.add_local_func();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -483,7 +480,7 @@ fn test_delete_global() {
     init_state.delete_local_global();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -501,7 +498,7 @@ fn test_delete_imported_global() {
     init_state.delete_imported_global();
 
     is_valid(
-        module,
+        &mut module,
         &mut init_state,
         &HashMap::new(),
         &HashMap::new(),
@@ -635,17 +632,17 @@ fn setup() -> (Vec<u8>, State) {
     (buff, init_state)
 }
 
-const TEST_DEBUG_DIR: &str = "output/tests/debug_me/";
+const TEST_DEBUG_DIR: &str = "output/tests/debug_me/ir.module.test/";
 
 /// create output path if it doesn't exist
-pub(crate) fn try_path(path: &String) {
+pub(crate) fn try_path(path: &str) {
     if !PathBuf::from(path).exists() {
         std::fs::create_dir_all(PathBuf::from(path).parent().unwrap()).unwrap();
     }
 }
 
 fn is_valid(
-    mut module: Module,
+    module: &mut Module,
     state: &mut State,
     new_import_names: &HashMap<ImportsID, String>,
     new_fn_names: &HashMap<FunctionID, String>,
@@ -655,14 +652,7 @@ fn is_valid(
 
     // encode and write to file
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/{test_name}.wasm");
-    try_path(&output_wasm_path);
-    if let Err(e) = module.emit_wasm(&output_wasm_path) {
-        panic!(
-            "Failed to dump wasm to {output_wasm_path} due to error: {}",
-            e
-        );
-    }
-    validate_wasm(&output_wasm_path);
+    encode_and_validate_wasm(module, &output_wasm_path);
 
     // reload from file
     let buff = std::fs::read(output_wasm_path).unwrap();
@@ -682,20 +672,6 @@ fn is_valid(
     // make sure state assertions pass on the reloaded module!
     state.clear_temporal();
     state_assertions(&new_module, state, false)
-}
-
-pub fn validate_wasm(wasm_path: &str) -> bool {
-    debug!("Running 'wasm-tools validate' on file: {wasm_path}");
-    let res = Command::new("wasm-tools")
-        .arg("validate")
-        .arg(wasm_path)
-        .output()
-        .expect("failed to execute process");
-    if !res.status.success() {
-        println!("{:?}", std::str::from_utf8(&res.stderr).unwrap());
-    }
-
-    res.status.success()
 }
 
 fn state_assertions(module: &Module, state: &State, only_temporal: bool) {
@@ -726,4 +702,29 @@ fn state_assertions(module: &Module, state: &State, only_temporal: bool) {
     assert_eq!(state.global_count, module.num_local_globals);
     assert_eq!(state.table_count, module.num_local_tables);
     assert_eq!(state.memory_count, module.num_local_memories);
+}
+
+pub(crate) fn encode_and_validate_wasm(module: &mut Module, output_wasm_path: &str) {
+    try_path(output_wasm_path);
+    if let Err(e) = module.emit_wasm(&output_wasm_path) {
+        panic!(
+            "Failed to dump wasm to {output_wasm_path} due to error: {}",
+            e
+        );
+    }
+    validate_wasm(&output_wasm_path);
+}
+
+pub(crate) fn validate_wasm(wasm_path: &str) -> bool {
+    debug!("Running 'wasm-tools validate' on file: {wasm_path}");
+    let res = Command::new("wasm-tools")
+        .arg("validate")
+        .arg(wasm_path)
+        .output()
+        .expect("failed to execute process");
+    if !res.status.success() {
+        println!("{:?}", std::str::from_utf8(&res.stderr).unwrap());
+    }
+
+    res.status.success()
 }

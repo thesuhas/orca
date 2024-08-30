@@ -441,16 +441,12 @@ impl<'a> Module<'a> {
         }
         // Local Functions
         for (index, code_sec) in code_sections.iter().enumerate() {
-            let mut args = vec![];
-            for i in 0..types[functions[index] as usize].params.len() {
-                args.push(i as LocalID);
-            }
             final_funcs.push(Function::new(
                 FuncKind::Local(LocalFunction::new(
                     functions[index],
                     (imports.num_funcs as usize + index) as FunctionID,
                     (*code_sec).clone(),
-                    args,
+                    types[functions[index] as usize].params.len(),
                 )),
                 (*code_sec).clone().name,
             ));
@@ -1344,17 +1340,14 @@ impl<'a> Module<'a> {
         name: Option<String>,
         params: &[DataType],
         results: &[DataType],
-        num_args: usize,
         body: Body<'a>,
     ) -> FunctionID {
-        let mut args = vec![];
-        for arg in 0..num_args {
-            args.push(arg as LocalID);
-        }
         let ty = self.types.add(params, results);
         let local_func = LocalFunction::new(
-            ty, 0, // will be fixed
-            body, args,
+            ty,
+            0, // will be fixed
+            body,
+            params.len(),
         );
 
         self.num_local_functions += 1;
@@ -1404,18 +1397,18 @@ impl<'a> Module<'a> {
     /// The function ID inside the `local_function` parameter should equal the `imports_id` specified.
     /// Continue using the ImportsID as normal (like in `call` instructions), this library will take care of ID changes for you during encoding.
     /// Returns false if it is a local function.
-    pub fn convert_import_fn_to_local(
+    pub(crate) fn convert_import_fn_to_local(
         &mut self,
-        imports_id: ImportsID,
+        import_id: ImportsID,
         local_function: LocalFunction<'a>,
     ) -> bool {
-        if self.functions.is_local(imports_id) {
+        if self.functions.is_local(import_id) {
             warn!("This is a local function!");
             return false;
         }
-        self.delete_func(imports_id);
+        self.delete_func(import_id);
         self.functions
-            .get_mut(imports_id as FunctionID)
+            .get_mut(import_id as FunctionID)
             .set_kind(FuncKind::Local(local_function));
         true
     }

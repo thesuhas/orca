@@ -142,12 +142,11 @@ pub struct LocalFunction<'a> {
 
 impl<'a> LocalFunction<'a> {
     /// Creates a new local function
-    pub fn new(
-        type_id: TypeID,
-        function_id: FunctionID,
-        body: Body<'a>,
-        args: Vec<LocalID>,
-    ) -> Self {
+    pub fn new(type_id: TypeID, function_id: FunctionID, body: Body<'a>, num_args: usize) -> Self {
+        let mut args = vec![];
+        for arg in 0..num_args {
+            args.push(arg as LocalID);
+        }
         LocalFunction {
             ty_id: type_id,
             func_id: function_id,

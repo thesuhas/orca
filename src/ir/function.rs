@@ -1,6 +1,6 @@
 //! Function Builder
 
-use crate::ir::id::{FunctionID, LocalID, ModuleID, TypeID};
+use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID};
 use crate::ir::module::module_functions::{add_local, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
 use crate::ir::types::DataType;
@@ -9,7 +9,7 @@ use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::{Component, Location};
-use wasmparser::Operator;
+use wasmparser::{Operator, TypeRef};
 
 // TODO: probably need better reasoning with lifetime here
 /// Build a function from scratch
@@ -37,16 +37,10 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, num_args: usize, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, module: &mut Module<'a>) -> FunctionID {
         // add End as last instruction
         self.end();
-        let id = module.add_local_func(
-            self.name,
-            &self.params,
-            &self.results,
-            num_args,
-            self.body.clone(),
-        );
+        let id = module.add_local_func(self.name, &self.params, &self.results, self.body.clone());
 
         assert_eq!(
             module.functions.len() as u32,
@@ -56,14 +50,35 @@ impl<'a> FunctionBuilder<'a> {
         id
     }
 
+    pub fn replace_import_in_module(mut self, module: &mut Module<'a>, import_id: ImportsID) {
+        // add End as last instruction
+        self.end();
+
+        let err_msg = "Could not replace the specified import with this function,";
+        if let TypeRef::Func(imp_ty_id) = module.imports.get(import_id).ty {
+            if let Some(ty) = module.types.get(imp_ty_id) {
+                if *ty.params == self.params && *ty.results == self.results {
+                    let local_func = LocalFunction::new(
+                        imp_ty_id,
+                        import_id,
+                        self.body.clone(),
+                        self.params.len(),
+                    );
+                    module.convert_import_fn_to_local(import_id, local_func);
+                } else {
+                    panic!("{err_msg} types are not equivalent.")
+                }
+            } else {
+                panic!("{err_msg} could not find an associated type for the specified import ID: {import_id}.")
+            }
+        } else {
+            panic!("{err_msg} the specified import ID does not point to a function!")
+        }
+    }
+
     /// Finish building a function (have side effect on component IR),
     /// return function index
-    pub fn finish_component(
-        mut self,
-        comp: &mut Component<'a>,
-        mod_idx: ModuleID,
-        num_args: usize,
-    ) -> FunctionID {
+    pub fn finish_component(mut self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
         // add End as last instruction
         self.end();
 
@@ -71,7 +86,6 @@ impl<'a> FunctionBuilder<'a> {
             self.name,
             &self.params,
             &self.results,
-            num_args,
             self.body.clone(),
         );
 
@@ -86,17 +100,6 @@ impl<'a> FunctionBuilder<'a> {
 
     pub fn set_name(&mut self, name: String) {
         self.name = Some(name)
-    }
-
-    pub fn local_func(
-        &mut self,
-        args: Vec<LocalID>,
-        function_id: FunctionID,
-        ty: TypeID,
-    ) -> LocalFunction<'a> {
-        // add End as last instruction
-        self.end();
-        LocalFunction::new(ty, function_id, self.body.clone(), args)
     }
 }
 
