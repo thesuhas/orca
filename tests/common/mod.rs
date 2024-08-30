@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

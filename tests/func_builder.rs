@@ -5,6 +5,7 @@ use std::process::Command;
 
 // #[test]
 // build factorial from scratch
+#[allow(dead_code)]
 fn run_fac_orca() {
     // run cargo run in fac_orca dir
     let a = Command::new("cargo")
@@ -21,6 +22,7 @@ fn run_fac_orca() {
 
 // #[test]
 // test start function instrumentation with FunctionModifier
+#[allow(dead_code)]
 fn run_start_orca() {
     let file_name = "tests/test_inputs/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");

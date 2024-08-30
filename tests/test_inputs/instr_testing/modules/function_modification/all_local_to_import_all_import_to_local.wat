@@ -23,15 +23,15 @@
     i32.const 3 ;; rm
     drop ;; rm
     ) ;; rm
-  ;; << (func (;3;) (type 0)
+  ;; << (func (;3;) (type 2) (param i32 i32)
   ;; <<   i32.const 4
   ;; <<   drop
   ;; <<   )
-  ;; << (func (;4;) (type 0)
+  ;; << (func (;4;) (type 2) (param i32 i32)
   ;; <<   i32.const 5
   ;; <<   drop
   ;; <<   )
-  ;; << (func (;5;) (type 0)
+  ;; << (func (;5;) (type 2) (param i32 i32)
   ;; <<   i32.const 6
   ;; <<   drop
   ;; <<   )

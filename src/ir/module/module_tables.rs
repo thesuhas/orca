@@ -4,7 +4,7 @@ use crate::ir::id::TableID;
 use wasmparser::{RefType, TableType};
 
 /// Tables Section of a module
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ModuleTables<'a> {
     tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
 }
