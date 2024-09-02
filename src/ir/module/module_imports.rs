@@ -109,7 +109,7 @@ impl<'a> ModuleImports<'a> {
 
     /// Set the name of a given import using the ImportsID.
     pub fn set_name(&mut self, name: String, imports_id: ImportsID) {
-        self.imports[imports_id as usize].custom_name = Some(name)
+        self.imports[*imports_id as usize].custom_name = Some(name)
     }
 
     /// Set the name of an imported function, using the FunctionID rather
@@ -118,7 +118,7 @@ impl<'a> ModuleImports<'a> {
     /// do this operation using the ImportsID.)
     pub fn set_fn_name(&mut self, name: String, func_id: FunctionID) {
         for (curr_fn_id, import) in (0_u32..).zip(self.imports.iter_mut()) {
-            if import.is_function() && curr_fn_id == func_id {
+            if import.is_function() && curr_fn_id == *func_id {
                 import.custom_name = Some(name);
                 return;
             }
@@ -157,18 +157,18 @@ impl<'a> ModuleImports<'a> {
             }
         }
         self.imports.push(import);
-        (self.imports.len() - 1) as ImportsID
+        ImportsID((self.imports.len() - 1) as u32)
     }
 
     pub(crate) fn delete(&mut self, imports_id: ImportsID) {
-        self.imports[imports_id as usize].deleted = true;
+        self.imports[*imports_id as usize].deleted = true;
     }
 
     /// Find an import by the `module` and `name` and return its `ImportsID` if found
     pub fn find(&self, module: String, name: String) -> Option<ImportsID> {
         for (id, imp) in self.imports.iter().enumerate() {
             if imp.module == module.as_str() && imp.name == name.as_str() {
-                return Some(id as ImportsID);
+                return Some(ImportsID(id as u32));
             }
         }
         None
@@ -178,7 +178,7 @@ impl<'a> ModuleImports<'a> {
     pub fn get_func(&self, module: String, name: String) -> Option<FunctionID> {
         for (idx, imp) in self.imports.iter().enumerate() {
             if imp.is_function() && imp.module == module.as_str() && *imp.name == name {
-                return Some(idx as FunctionID);
+                return Some(FunctionID(idx as u32));
             }
         }
         None
@@ -186,11 +186,11 @@ impl<'a> ModuleImports<'a> {
 
     /// Get an Import by its `ImportsID`
     pub fn get(&self, id: ImportsID) -> &Import {
-        &self.imports[id as usize]
+        &self.imports[*id as usize]
     }
 
     /// Get the name of an Import
     pub fn get_import_name(&self, imports_id: ImportsID) -> &Option<String> {
-        &self.imports[imports_id as usize].custom_name
+        &self.imports[*imports_id as usize].custom_name
     }
 }

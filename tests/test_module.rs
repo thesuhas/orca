@@ -1,12 +1,13 @@
 use log::{debug, error};
 use orca::ir::function::FunctionBuilder;
-use orca::ir::id::{ExportsID, FunctionID};
+use orca::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
 use orca::ir::module::module_functions::FuncKind::{Import, Local};
 use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
 use orca::ir::types::{Body, Value};
 use orca::{DataType, InitExpr, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
+use orca::ir::types::BlockType::Type;
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -19,16 +20,16 @@ fn test_fn_types() {
     let module = Module::parse(&buff, false).expect("Unable to parse module");
 
     assert_eq!(
-        *module.functions.get_kind(0),
-        Import(ImportedFunction::new(0, 2, 0))
+        *module.functions.get_kind(FunctionID(0)),
+        Import(ImportedFunction::new(ImportsID(0), TypeID(2), FunctionID(0)))
     );
     assert_eq!(
-        *module.functions.get_kind(1),
-        Local(LocalFunction::new(5, 0, Body::default(), 0))
+        *module.functions.get_kind(FunctionID(1)),
+        Local(LocalFunction::new(TypeID(5), FunctionID(0), Body::default(), 0))
     );
     assert_eq!(
-        *module.functions.get_kind(2),
-        Local(LocalFunction::new(0, 0, Body::default(), 0))
+        *module.functions.get_kind(FunctionID(2)),
+        Local(LocalFunction::new(TypeID(0), FunctionID(0), Body::default(), 0))
     );
 }
 
@@ -42,7 +43,7 @@ fn test_exports() {
     // Get func ID by name
     assert_eq!(
         module.exports.get_func_by_name("add".to_string()).unwrap(),
-        1 as FunctionID
+        FunctionID(1)
     );
 
     // Get Export ID by name
@@ -51,7 +52,7 @@ fn test_exports() {
             .exports
             .get_export_id_by_name("add".to_string())
             .unwrap(),
-        0 as ExportsID
+        ExportsID(0)
     );
 
     // Check deletion
@@ -85,7 +86,7 @@ fn test_import_delete() {
 
     assert!(!id.is_none());
 
-    module.delete_func(id.unwrap());
+    module.delete_func(FunctionID(*id.unwrap()));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_import_delete.wasm");
@@ -107,7 +108,7 @@ fn test_local_fn_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.delete_func(2);
+    module.delete_func(FunctionID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_local_fn_delete.wasm");
@@ -130,7 +131,7 @@ fn test_panic_call_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.delete_func(1);
+    module.delete_func(FunctionID(1));
 
     // Should panic here as func 2 calls func 1 which has been deleted
     module.encode();
@@ -144,7 +145,7 @@ fn test_renumber_fn_id() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.delete_func(1);
+    module.delete_func(FunctionID(1));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_renumber_fn_id.wasm");
@@ -172,7 +173,7 @@ fn test_middle_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, 1);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_middle_import_to_local.wasm");
@@ -199,7 +200,7 @@ fn test_first_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, 0);
+    builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_first_import_to_local.wasm");
@@ -226,7 +227,7 @@ fn test_last_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, 2);
+    builder.replace_import_in_module(&mut module, ImportsID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_last_import_to_local.wasm");
@@ -253,17 +254,17 @@ fn test_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, 0);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, 1);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let mut third_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     third_builder.i32_const(3);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, 2);
+    third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_all_import_to_local.wasm");
@@ -290,12 +291,12 @@ fn test_some_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, 0);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, 1);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_some_import_to_local.wasm");
@@ -322,9 +323,9 @@ fn test_middle_import_to_local_import_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, 1);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    module.delete_func(2);
+    module.delete_func(FunctionID(2));
 
     let result = module.encode();
     let output_wasm_path =
@@ -352,10 +353,10 @@ fn test_middle_import_to_local_local_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, 1);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    module.delete_func(2);
-    module.delete_func(3);
+    module.delete_func(FunctionID(2));
+    module.delete_func(FunctionID(3));
 
     let result = module.encode();
     let output_wasm_path =
@@ -378,7 +379,7 @@ fn test_add_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.add_import_func("orca".to_string(), "better".to_string(), 2);
+    module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_add_import.wasm");
@@ -401,7 +402,7 @@ fn test_middle_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(2, "orca".to_string(), "better".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(2), "orca".to_string(), "better".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm");
@@ -424,7 +425,7 @@ fn test_first_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(1, "orca".to_string(), "better".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(1), "orca".to_string(), "better".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm");
@@ -447,7 +448,7 @@ fn test_last_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(3, "orca".to_string(), "better".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(3), "orca".to_string(), "better".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm");
@@ -470,9 +471,9 @@ fn test_all_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
-    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
-    module.convert_local_fn_to_import(5, "please".to_string(), "work".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(FunctionID(5), "please".to_string(), "work".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm");
@@ -495,8 +496,8 @@ fn test_some_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
-    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm");
@@ -522,21 +523,21 @@ fn test_all_local_to_import_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     first_builder.i32_const(4);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, 0);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     second_builder.i32_const(5);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, 1);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let mut third_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
     third_builder.i32_const(6);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, 2);
+    third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    module.convert_local_fn_to_import(3, "all".to_string(), "local".to_string(), 2);
-    module.convert_local_fn_to_import(4, "to".to_string(), "import".to_string(), 2);
-    module.convert_local_fn_to_import(5, "please".to_string(), "work".to_string(), 2);
+    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(FunctionID(5), "please".to_string(), "work".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path =
@@ -559,7 +560,7 @@ fn test_add_imports_and_local_fns() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add first import func
-    let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), 2);
+    let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2));
 
     // add first local func
     let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
@@ -576,7 +577,7 @@ fn test_add_imports_and_local_fns() {
     sec_builder.finish_module(&mut module);
 
     // add second import func
-    module.add_import_func("test1".to_string(), "func1".to_string(), 2);
+    module.add_import_func("test1".to_string(), "func1".to_string(), TypeID(2));
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_add_imports_and_local_fns.wasm");
@@ -600,7 +601,7 @@ fn add_global_with_import() {
 
     // add new global
     let gid = module.add_global(InitExpr::Value(Value::I32(0)), DataType::I32, true, false);
-    assert_eq!(1, gid);
+    assert_eq!(1, *gid);
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/add_global_with_import.wasm");

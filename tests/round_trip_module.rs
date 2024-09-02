@@ -5,6 +5,7 @@ use log::{debug, error, trace};
 use orca::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
+use orca::ir::id::FunctionID;
 
 fn write_to_file(bytes: &Vec<u8>, path: String) {
     try_path(&path);
@@ -84,7 +85,7 @@ fn set_name() {
     let filename = "tests/test_inputs/handwritten/modules/func1.wat";
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).unwrap();
-    module.set_fn_name(1, "test".to_string());
+    module.set_fn_name(FunctionID(1), "test".to_string());
     // println!("{:#?}", module);
     let result = module.encode();
 

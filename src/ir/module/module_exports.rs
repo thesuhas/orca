@@ -49,11 +49,11 @@ impl ModuleExports {
     }
 
     /// Add an exported function
-    pub fn add_export_func(&mut self, name: String, func_idx: u32) {
+    pub fn add_export_func(&mut self, name: String, exp_id: u32) {
         let export = Export {
             name,
             kind: ExternalKind::Func,
-            index: func_idx,
+            index: exp_id,
             deleted: false,
         };
         self.exports.push(export);
@@ -73,7 +73,7 @@ impl ModuleExports {
     pub fn get_export_id_by_name(&self, name: String) -> Option<ExportsID> {
         for (idx, exp) in self.exports.iter().enumerate() {
             if exp.name == name {
-                return Some(idx as ExportsID);
+                return Some(ExportsID(idx as u32));
             }
         }
         None
@@ -81,8 +81,8 @@ impl ModuleExports {
 
     /// Get the export by ID
     pub fn get_by_id(&self, id: ExportsID) -> Option<Export> {
-        if id < self.exports.len() as ExportsID {
-            Some(self.exports[id as usize].clone())
+        if *id < self.exports.len() as u32 {
+            Some(self.exports[*id as usize].clone())
         } else {
             None
         }
@@ -91,8 +91,8 @@ impl ModuleExports {
     /// Get the Export ID from its function ID
     pub fn get_func_by_id(&self, id: FunctionID) -> Option<ExportsID> {
         for (export_id, exp) in self.exports.iter().enumerate() {
-            if matches!(exp.kind, ExternalKind::Func) && exp.index == id {
-                return Some(export_id as ExportsID);
+            if matches!(exp.kind, ExternalKind::Func) && exp.index == *id {
+                return Some(ExportsID(export_id as u32));
             }
         }
         None
@@ -102,7 +102,7 @@ impl ModuleExports {
     pub fn get_func_by_name(&self, name: String) -> Option<FunctionID> {
         for exp in self.exports.iter() {
             if matches!(exp.kind, ExternalKind::Func) && exp.name == name {
-                return Some(exp.index);
+                return Some(FunctionID(exp.index));
             }
         }
         None
@@ -111,6 +111,6 @@ impl ModuleExports {
     /// Delete an export by its exports ID
     pub fn delete(&mut self, id: ExportsID) {
         // Must just mark for deletion as or else will result in indicies getting messed up
-        self.exports[id as usize].deleted = true;
+        self.exports[*id as usize].deleted = true;
     }
 }

@@ -9,6 +9,7 @@ use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
 use std::mem::discriminant;
 use wasmparser::Operator;
+use orca::ir::id::FunctionID;
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -33,7 +34,7 @@ fn no_injection() {
         } = comp_it.curr_loc().0
         {
             trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
+                "Mod: {:?}, Func: {:?}, +{}: {:?}, {:?}",
                 mod_idx,
                 func_idx,
                 instr_idx,
@@ -67,7 +68,7 @@ fn no_injection() {
             }
 
             trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
+                "Mod: {:?}, Func: {:?}, +{}: {:?}, {:?}",
                 mod_idx,
                 func_idx,
                 instr_idx,
@@ -104,7 +105,7 @@ fn iterator_inject_i32_before() {
         } = comp_it.curr_loc().0
         {
             trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
+                "Mod: {:?}, Func: {:?}, +{}: {:?}, {:?}",
                 mod_idx,
                 func_idx,
                 instr_idx,
@@ -155,7 +156,7 @@ fn iterator_inject_all_variations() {
         } = comp_it.curr_loc().0
         {
             trace!(
-                "Mod: {}, Func: {}, +{}: {:?}, {:?}",
+                "Mod: {:?}, Func: {:?}, +{}: {:?}, {:?}",
                 mod_idx,
                 func_idx,
                 instr_idx,
@@ -163,7 +164,7 @@ fn iterator_inject_all_variations() {
                 instr_mode
             );
             if *comp_it.curr_op().unwrap() == before {
-                comp_it.before().call(0);
+                comp_it.before().call(FunctionID(0));
             }
 
             if *comp_it.curr_op().unwrap() == after {
@@ -206,7 +207,7 @@ fn test_inject_locals() {
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            println!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+            println!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             if mod_it.curr_op().unwrap() == &Operator::I32Add {
                 let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
@@ -1931,7 +1932,7 @@ fn run_block_injection<'a, 'b, 'c>(
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+            trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             for (op, (mode, body)) in ops_of_interest.iter() {
                 let matches = match op {

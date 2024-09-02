@@ -2,6 +2,7 @@ use orca::opcode::Instrumenter;
 use orca::Opcode;
 use orca::{Location, Module};
 use std::process::Command;
+use orca::ir::id::FunctionID;
 
 // #[test]
 // build factorial from scratch
@@ -33,7 +34,7 @@ fn run_start_orca() {
 
     function_builder
         .before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: 0,
         })
         .i32_const(1);

@@ -68,7 +68,7 @@ impl ModuleSubIterator {
 
     /// Resets the ModuleSubIterator when it is a Child SubIterator of a ComponentSubIterator
     pub(crate) fn reset_from_comp_iterator(&mut self, metadata: HashMap<FunctionID, usize>) {
-        self.curr_func = 0;
+        *self.curr_func = 0;
         self.metadata = metadata;
         self.func_iterator.reset(
             *self
@@ -80,25 +80,26 @@ impl ModuleSubIterator {
 
     /// Resets the ModuleSubIterator when it is not a Child SubIterator
     pub fn reset(&mut self) {
-        self.curr_func = 0;
-        self.func_iterator.reset(*self.metadata.get(&0).unwrap());
+        *self.curr_func = 0;
+        self.func_iterator
+            .reset(*self.metadata.get(&FunctionID(0)).unwrap());
     }
 
     /// Checks if there are functions left to visit
     pub fn has_next_function(&self) -> bool {
-        self.curr_func + 1 < self.num_funcs
+        *self.curr_func + 1 < self.num_funcs
     }
 
     /// Goes to the next function in the module
     fn next_function(&mut self) -> bool {
-        self.curr_func += 1;
+        *self.curr_func += 1;
         self.visited_funcs += 1;
 
         // skip over configured funcs
         while self.visited_funcs < self.num_funcs
             && self.skip_funcs.contains(&(self.curr_func as FunctionID))
         {
-            self.curr_func += 1;
+            *self.curr_func += 1;
             self.visited_funcs += 1;
         }
         if self.visited_funcs < self.num_funcs {

@@ -2,35 +2,172 @@
 #![allow(dead_code)]
 
 /// LocalID in a function
-pub type LocalID = u32;
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct LocalID(pub u32);
+impl std::ops::Deref for LocalID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for LocalID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 /// TypeID in a module
-pub type TypeID = u32;
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TypeID(pub u32);
+impl std::ops::Deref for TypeID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for TypeID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 /// ModuleID in a Component
-pub type ModuleID = u32;
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ModuleID(pub u32);
+impl std::ops::Deref for ModuleID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ModuleID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 /// FunctionID in a module
-pub type FunctionID = u32;
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct FunctionID(pub u32);
+impl std::ops::Deref for FunctionID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for FunctionID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// DataSegmentID
-pub type DataSegmentID = u32;
+impl From<u32> for FunctionID {
+    fn from(id: u32) -> Self {
+        Self(id)
+    }
+}
 
-/// GlobalID
-pub type GlobalID = u32;
+/// DataSegmentID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DataSegmentID(pub u32);
+impl std::ops::Deref for DataSegmentID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for DataSegmentID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// ImportsID
-pub type ImportsID = u32;
+/// GlobalID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct GlobalID(pub u32);
+impl std::ops::Deref for GlobalID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for GlobalID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// ExportsID
-// Note: Refers to an exports position in a module/component's list of exports
-pub type ExportsID = u32;
+/// ImportsID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ImportsID(pub u32);
+impl std::ops::Deref for ImportsID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ImportsID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// Custom Section ID
-pub type CustomSectionID = u32;
+/// ExportsID - Refers to an exports position in a module/component's list of exports
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ExportsID(pub u32);
+impl std::ops::Deref for ExportsID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ExportsID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// Table ID
-pub type TableID = u32;
+/// Custom Section ID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CustomSectionID(pub u32);
+impl std::ops::Deref for CustomSectionID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for CustomSectionID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-/// Memory ID
-pub type MemoryID = u32;
+/// Table ID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TableID(pub u32);
+impl std::ops::Deref for TableID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for TableID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// Memory ID in a module
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct MemoryID(pub u32);
+impl std::ops::Deref for MemoryID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for MemoryID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}

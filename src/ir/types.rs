@@ -91,7 +91,7 @@ impl From<ValType> for DataType {
                     wasmparser::AbstractHeapType::NoExn => DataType::NoExn,
                 },
                 wasmparser::HeapType::Concrete(u) => match u {
-                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module(idx),
+                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module(ModuleID(idx)),
                     wasmparser::UnpackedIndex::RecGroup(idx) => DataType::RecGroup(idx),
                     wasmparser::UnpackedIndex::Id(_id) => panic!("Not supported yet!"),
                 },
@@ -185,7 +185,7 @@ impl From<&DataType> for wasm_encoder::ValType {
             }),
             DataType::Module(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
-                heap_type: wasm_encoder::HeapType::Concrete(*idx),
+                heap_type: wasm_encoder::HeapType::Concrete(**idx),
             }),
             DataType::RecGroup(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
@@ -312,7 +312,7 @@ impl From<&DataType> for ValType {
             DataType::Module(idx) => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(*idx)),
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(**idx)),
                 )
                 .unwrap(),
             ),
@@ -429,7 +429,9 @@ impl ElementItems<'_> {
                 let functions = reader
                     .into_iter()
                     .collect::<std::result::Result<Vec<_>, _>>()?;
-                Ok(ElementItems::Functions(functions))
+                // unsure how to avoid a second iteration (cast while iterating above)
+                let fids = functions.iter().map(|id| FunctionID(*id)).collect();
+                Ok(ElementItems::Functions(fids))
             }
             wasmparser::ElementItems::Expressions(ref_type, reader) => {
                 let exprs = reader
@@ -914,10 +916,10 @@ impl InitExpr {
             F32Const { value } => InitExpr::Value(Value::F32(f32::from_bits(value.bits()))),
             F64Const { value } => InitExpr::Value(Value::F64(f64::from_bits(value.bits()))),
             V128Const { value } => InitExpr::Value(Value::V128(v128_to_u128(&value))),
-            GlobalGet { global_index } => InitExpr::Global(global_index),
+            GlobalGet { global_index } => InitExpr::Global(GlobalID(global_index)),
             // Marking nullable as true as it's a null reference
             RefNull { hty } => InitExpr::RefNull(RefType::new(true, hty).unwrap()),
-            RefFunc { function_index } => InitExpr::RefFunc(function_index),
+            RefFunc { function_index } => InitExpr::RefFunc(FunctionID(function_index)),
             _ => panic!("invalid constant expression"),
         };
         match reader.read().unwrap() {
@@ -937,7 +939,7 @@ impl InitExpr {
                 Value::F64(v) => wasm_encoder::ConstExpr::f64_const(v),
                 Value::V128(v) => wasm_encoder::ConstExpr::v128_const(v as i128),
             },
-            InitExpr::Global(g) => wasm_encoder::ConstExpr::global_get(g),
+            InitExpr::Global(g) => wasm_encoder::ConstExpr::global_get(*g),
             InitExpr::RefNull(ty) => wasm_encoder::ConstExpr::ref_null(if ty.is_func_ref() {
                 wasm_encoder::HeapType::Abstract {
                     shared: false,
@@ -951,7 +953,7 @@ impl InitExpr {
             } else {
                 unreachable!()
             }),
-            InitExpr::RefFunc(f) => wasm_encoder::ConstExpr::ref_func(f),
+            InitExpr::RefFunc(f) => wasm_encoder::ConstExpr::ref_func(*f),
         }
     }
 }
@@ -999,7 +1001,7 @@ impl From<wasmparser::BlockType> for BlockType {
     fn from(value: wasmparser::BlockType) -> Self {
         match value {
             wasmparser::BlockType::Empty => BlockType::Empty,
-            wasmparser::BlockType::FuncType(u) => BlockType::FuncType(u),
+            wasmparser::BlockType::FuncType(u) => BlockType::FuncType(TypeID(u)),
             wasmparser::BlockType::Type(val) => BlockType::Type(DataType::from(val)),
         }
     }
@@ -1009,7 +1011,7 @@ impl From<BlockType> for wasmparser::BlockType {
     fn from(ty: BlockType) -> Self {
         match ty {
             BlockType::Empty => wasmparser::BlockType::Empty,
-            BlockType::FuncType(u) => wasmparser::BlockType::FuncType(u),
+            BlockType::FuncType(u) => wasmparser::BlockType::FuncType(*u),
             BlockType::Type(data) => wasmparser::BlockType::Type(ValType::from(&data)),
         }
     }
@@ -1035,7 +1037,7 @@ impl<'a> CustomSections<'a> {
     pub fn get_id(&self, name: String) -> Option<CustomSectionID> {
         for (index, section) in self.custom_sections.iter().enumerate() {
             if section.name == name {
-                return Some(index as CustomSectionID);
+                return Some(CustomSectionID(index as u32));
             }
         }
         None
@@ -1043,16 +1045,16 @@ impl<'a> CustomSections<'a> {
 
     /// Get a custom section by its ID
     pub fn get_by_id(&self, custom_section_id: CustomSectionID) -> &CustomSection {
-        if custom_section_id < self.custom_sections.len() as u32 {
-            return &self.custom_sections[custom_section_id as usize];
+        if *custom_section_id < self.custom_sections.len() as u32 {
+            return &self.custom_sections[*custom_section_id as usize];
         }
         panic!("Invalid custom section ID");
     }
 
     /// Delete a Custom Section by its ID
     pub fn delete(&mut self, id: CustomSectionID) {
-        if id < self.custom_sections.len() as u32 {
-            self.custom_sections.remove(id as usize);
+        if *id < self.custom_sections.len() as u32 {
+            self.custom_sections.remove(*id as usize);
         }
     }
 
