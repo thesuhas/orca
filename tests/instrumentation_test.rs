@@ -1,4 +1,5 @@
 use log::{error, trace};
+use orca::ir::id::FunctionID;
 use orca::ir::types::InstrumentationMode;
 use orca::iterator::component_iterator::ComponentIterator;
 use orca::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
@@ -9,7 +10,6 @@ use orca::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
 use std::mem::discriminant;
 use wasmparser::Operator;
-use orca::ir::id::FunctionID;
 
 mod common;
 use crate::common::check_instrumentation_encoding;

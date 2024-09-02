@@ -1,5 +1,6 @@
 use log::{debug, trace};
 use orca::ir::component::Component;
+use orca::ir::id::{FunctionID, ModuleID};
 use orca::ir::module::Module;
 use orca::ir::types::Location;
 use orca::iterator::component_iterator::ComponentIterator;
@@ -9,7 +10,6 @@ use orca::module_builder::AddLocal;
 use orca::opcode::Instrumenter;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
-use orca::ir::id::{FunctionID, ModuleID};
 
 #[test]
 fn test_iterator_count() {
@@ -265,7 +265,12 @@ fn iterate_module_and_count(mod_it: &mut ModuleIterator, num_imports: u32, exp_c
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            trace!("Func: {}, {}: {:?},", num_imports + *func_idx, instr_idx, op);
+            trace!(
+                "Func: {}, {}: {:?},",
+                num_imports + *func_idx,
+                instr_idx,
+                op
+            );
         } else {
             panic!("Should've gotten Module Location!");
         }

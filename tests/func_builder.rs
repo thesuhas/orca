@@ -1,8 +1,8 @@
+use orca::ir::id::FunctionID;
 use orca::opcode::Instrumenter;
 use orca::Opcode;
 use orca::{Location, Module};
 use std::process::Command;
-use orca::ir::id::FunctionID;
 
 // #[test]
 // build factorial from scratch

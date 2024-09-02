@@ -9,7 +9,6 @@ use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
-use crate::ir::module::module_globals::GlobalKind::Import;
 
 // FUNCTIONS
 #[test]
@@ -269,7 +268,12 @@ fn test_convert_local_fn_to_import() {
     state_assertions(&module, &init_state, false);
 
     // convert local func to import
-    module.convert_local_fn_to_import(FunctionID(52), "please".to_string(), "work".to_string(), TypeID(1)); // unused in wat file!
+    module.convert_local_fn_to_import(
+        FunctionID(52),
+        "please".to_string(),
+        "work".to_string(),
+        TypeID(1),
+    ); // unused in wat file!
     init_state.local_func_to_import();
 
     is_valid(
@@ -327,7 +331,9 @@ fn test_set_fn_name_local_through_functions() {
 
     let fid = FunctionID(10);
     let mut new_func_names = HashMap::new();
-    module.functions.set_local_fn_name(fid.clone(), "test".to_string());
+    module
+        .functions
+        .set_local_fn_name(fid.clone(), "test".to_string());
     new_func_names.insert(fid, "test".to_string());
 
     is_valid(

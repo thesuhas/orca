@@ -7,7 +7,6 @@ use orca::ir::types::{Body, Value};
 use orca::{DataType, InitExpr, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
-use orca::ir::types::BlockType::Type;
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -21,15 +20,29 @@ fn test_fn_types() {
 
     assert_eq!(
         *module.functions.get_kind(FunctionID(0)),
-        Import(ImportedFunction::new(ImportsID(0), TypeID(2), FunctionID(0)))
+        Import(ImportedFunction::new(
+            ImportsID(0),
+            TypeID(2),
+            FunctionID(0)
+        ))
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(1)),
-        Local(LocalFunction::new(TypeID(5), FunctionID(0), Body::default(), 0))
+        Local(LocalFunction::new(
+            TypeID(5),
+            FunctionID(0),
+            Body::default(),
+            0
+        ))
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(2)),
-        Local(LocalFunction::new(TypeID(0), FunctionID(0), Body::default(), 0))
+        Local(LocalFunction::new(
+            TypeID(0),
+            FunctionID(0),
+            Body::default(),
+            0
+        ))
     );
 }
 
@@ -402,7 +415,12 @@ fn test_middle_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(FunctionID(2), "orca".to_string(), "better".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(2),
+        "orca".to_string(),
+        "better".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm");
@@ -425,7 +443,12 @@ fn test_first_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(FunctionID(1), "orca".to_string(), "better".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(1),
+        "orca".to_string(),
+        "better".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm");
@@ -448,7 +471,12 @@ fn test_last_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(FunctionID(3), "orca".to_string(), "better".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(3),
+        "orca".to_string(),
+        "better".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm");
@@ -471,9 +499,24 @@ fn test_all_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
-    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
-    module.convert_local_fn_to_import(FunctionID(5), "please".to_string(), "work".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(3),
+        "all".to_string(),
+        "local".to_string(),
+        TypeID(2),
+    );
+    module.convert_local_fn_to_import(
+        FunctionID(4),
+        "to".to_string(),
+        "import".to_string(),
+        TypeID(2),
+    );
+    module.convert_local_fn_to_import(
+        FunctionID(5),
+        "please".to_string(),
+        "work".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm");
@@ -496,8 +539,18 @@ fn test_some_local_to_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
-    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(3),
+        "all".to_string(),
+        "local".to_string(),
+        TypeID(2),
+    );
+    module.convert_local_fn_to_import(
+        FunctionID(4),
+        "to".to_string(),
+        "import".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm");
@@ -535,9 +588,24 @@ fn test_all_local_to_import_all_import_to_local() {
     third_builder.drop();
     third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    module.convert_local_fn_to_import(FunctionID(3), "all".to_string(), "local".to_string(), TypeID(2));
-    module.convert_local_fn_to_import(FunctionID(4), "to".to_string(), "import".to_string(), TypeID(2));
-    module.convert_local_fn_to_import(FunctionID(5), "please".to_string(), "work".to_string(), TypeID(2));
+    module.convert_local_fn_to_import(
+        FunctionID(3),
+        "all".to_string(),
+        "local".to_string(),
+        TypeID(2),
+    );
+    module.convert_local_fn_to_import(
+        FunctionID(4),
+        "to".to_string(),
+        "import".to_string(),
+        TypeID(2),
+    );
+    module.convert_local_fn_to_import(
+        FunctionID(5),
+        "please".to_string(),
+        "work".to_string(),
+        TypeID(2),
+    );
 
     let result = module.encode();
     let output_wasm_path =

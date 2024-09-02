@@ -2,10 +2,10 @@ mod common;
 
 use crate::common::{try_path, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};
 use log::{debug, error, trace};
+use orca::ir::id::FunctionID;
 use orca::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
-use orca::ir::id::FunctionID;
 
 fn write_to_file(bytes: &Vec<u8>, path: String) {
     try_path(&path);
