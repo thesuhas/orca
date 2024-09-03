@@ -96,10 +96,16 @@ fn test_import_delete() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     let id = module.imports.find("bogus".to_string(), "hi".to_string());
-
+    let fid = module
+        .imports
+        .get_func("bogus".to_string(), "hi".to_string());
     assert!(!id.is_none());
+    assert!(!fid.is_none());
 
-    module.delete_func(FunctionID(*id.unwrap()));
+    let id = id.unwrap();
+    let fid = fid.unwrap();
+    assert_eq!(*id, *fid);
+    module.delete_func(fid);
 
     let result = module.encode();
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_import_delete.wasm");
