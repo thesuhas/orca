@@ -981,10 +981,19 @@ pub trait MacroOpcode<'a>: Inject<'a> {
     /// Helper function to reinterpret an u32 as an i32 and inject an i32.const instruction with that reinterpreted value.
     /// (Useful to emitting memory addresses.)
     /// We cast using the `as` keyword to accomplish this.
-    /// See https://github.com/thesuhas/orca/issues/133 for an explanation.
+    /// See <https://github.com/thesuhas/orca/issues/133> for an explanation.
     fn u32_const(&mut self, value: u32) -> &mut Self {
         let i32_val = value as i32;
         self.inject(Operator::I32Const { value: i32_val });
+        self
+    }
+    /// Helper function to reinterpret an u64 as an i64 and inject an i64.const instruction with that reinterpreted value.
+    /// (Useful to emitting memory addresses.)
+    /// We cast using the `as` keyword to accomplish this.
+    /// See <https://github.com/thesuhas/orca/issues/133> for an explanation.
+    fn u64_const(&mut self, value: u64) -> &mut Self {
+        let i64_val = value as i64;
+        self.inject(Operator::I64Const { value: i64_val });
         self
     }
 }

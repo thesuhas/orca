@@ -27,7 +27,7 @@ impl<'a> From<wasmparser::Export<'a>> for Export {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 /// Represents the Exports Section of a WASM Module
 pub struct ModuleExports {
     exports: Vec<Export>,

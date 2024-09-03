@@ -213,8 +213,11 @@ fn test_fn_name() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let module = Module::parse(&buff, false).expect("Unable to parse");
-    assert_eq!("add".to_string(), module.functions.get_name(1).unwrap());
-    assert_eq!(None, module.functions.get_name(2));
+    assert_eq!(
+        "add".to_string(),
+        *module.functions.get_name(1).as_ref().unwrap()
+    );
+    assert_eq!(None, *module.functions.get_name(2));
 }
 
 // =================

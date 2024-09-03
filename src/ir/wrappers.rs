@@ -353,16 +353,57 @@ pub(crate) fn refers_to_func(op: &Operator) -> bool {
     matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
 }
 
-pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<i32, i32>) {
+pub(crate) fn refers_to_global(op: &Operator) -> bool {
+    matches!(
+        op,
+        Operator::GlobalGet { .. }
+            | Operator::GlobalSet { .. }
+            | Operator::GlobalAtomicGet { .. }
+            | Operator::GlobalAtomicSet { .. }
+            | Operator::GlobalAtomicRmwAdd { .. }
+            | Operator::GlobalAtomicRmwAnd { .. }
+            | Operator::GlobalAtomicRmwCmpxchg { .. }
+            | Operator::GlobalAtomicRmwOr { .. }
+            | Operator::GlobalAtomicRmwSub { .. }
+            | Operator::GlobalAtomicRmwXchg { .. }
+            | Operator::GlobalAtomicRmwXor { .. }
+    )
+}
+
+pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<u32, u32>) {
     match op {
         Operator::Call { function_index } | Operator::RefFunc { function_index } => {
-            match mapping.get(&(*function_index as i32)) {
+            match mapping.get(&(*function_index)) {
                 Some(new_index) => {
-                    *function_index = *new_index as u32;
+                    *function_index = *new_index;
                 }
                 None => panic!("Deleted function!"),
             }
         }
-        _ => panic!("Not a call operation!"),
+        _ => panic!("Operation doesn't need to be checked for function IDs!"),
+    }
+}
+
+pub(crate) fn update_global_instr(op: &mut Operator, mapping: &HashMap<u32, u32>) {
+    match op {
+        Operator::GlobalGet { global_index }
+        | Operator::GlobalSet { global_index }
+        | Operator::GlobalAtomicGet { global_index, .. }
+        | Operator::GlobalAtomicSet { global_index, .. }
+        | Operator::GlobalAtomicRmwAdd { global_index, .. }
+        | Operator::GlobalAtomicRmwAnd { global_index, .. }
+        | Operator::GlobalAtomicRmwCmpxchg { global_index, .. }
+        | Operator::GlobalAtomicRmwOr { global_index, .. }
+        | Operator::GlobalAtomicRmwSub { global_index, .. }
+        | Operator::GlobalAtomicRmwXchg { global_index, .. }
+        | Operator::GlobalAtomicRmwXor { global_index, .. } => {
+            match mapping.get(&(*global_index)) {
+                Some(new_index) => {
+                    *global_index = *new_index;
+                }
+                None => panic!("Deleted global!"),
+            }
+        }
+        _ => panic!("Operation doesn't need to be checked for global IDs!"),
     }
 }

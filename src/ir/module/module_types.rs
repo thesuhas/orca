@@ -20,7 +20,7 @@ impl FuncType {
 }
 
 /// The Module Types Section
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ModuleTypes {
     pub types: Vec<FuncType>,
 }

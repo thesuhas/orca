@@ -24,7 +24,7 @@
     call 4 ;; < call 2
     drop
     )
-   ;; << (func (;5;) (type 0)
+   ;; << (func (;5;) (type 2) (param i32 i32)
    ;; <<   i32.const 1
    ;; <<   drop
    ;; <<   )
