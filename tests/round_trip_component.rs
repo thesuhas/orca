@@ -30,7 +30,6 @@ fn round_trip_component(testname: &str, folder: &str) {
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    // component.print();
     let result = component.encode();
     write_to_file(
         &result,
@@ -62,23 +61,23 @@ macro_rules! make_round_trip_tests_component {
 
 mod round_trip {
     // note, the dfinity test suite has name conflicts with wasm-tools
-    // make_round_trip_tests_component!(
-    //     "dfinity/components",
-    //     data_section,
-    //     func,
-    //     func_locals,
-    //     table,
-    //     table_init,
-    //     exports,
-    //     start,
-    //     const_expr
-    // );
-    //
-    // make_round_trip_tests_component!("handwritten/components", add);
-    //
-    // make_round_trip_tests_component!("wizard/components", func_loop);
-    //
-    // make_round_trip_tests_component!("spec-test/components", if_test);
+    make_round_trip_tests_component!(
+        "dfinity/components",
+        data_section,
+        func,
+        func_locals,
+        table,
+        table_init,
+        exports,
+        start,
+        const_expr
+    );
+
+    make_round_trip_tests_component!("handwritten/components", add);
+
+    make_round_trip_tests_component!("wizard/components", func_loop);
+
+    make_round_trip_tests_component!("spec-test/components", if_test);
 
     make_round_trip_tests_component!("spin", hello_world);
 }

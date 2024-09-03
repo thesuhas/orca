@@ -1,8 +1,9 @@
-use gimli::read::{Dwarf};
+use gimli::read::Dwarf;
+use gimli::{EndianSlice, LittleEndian};
 
 /// The DWARF debug section in input WebAssembly binary.
 #[derive(Debug, Default)]
-pub struct ModuleDebugData {
+pub struct ModuleDebugData<'a> {
     /// DWARF debug data
-    pub dwarf: Dwarf<Vec<u8>>
+    pub dwarf: Dwarf<EndianSlice<'a, LittleEndian>>,
 }

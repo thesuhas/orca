@@ -1,7 +1,9 @@
 //! Intermediate Representation of a wasm module.
 
+use super::types::DataType;
 use super::types::{Instruction, InstrumentationMode};
 use crate::error::Error;
+use crate::ir::dwarf::ModuleDebugData;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
@@ -17,19 +19,17 @@ use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
 };
+use crate::ir::wrappers::get_section_id;
 use crate::ir::wrappers::{
     indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, update_fn_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
+use gimli::{Dwarf, EndianSlice, LittleEndian, SectionId};
 use log::error;
 use std::collections::HashMap;
-use gimli::{Dwarf};
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, MemoryType, Operator, Parser, Payload};
-use crate::ir::dwarf::ModuleDebugData;
-use super::types::DataType;
-use crate::ir::wrappers::get_section_id;
 
 pub mod module_exports;
 pub mod module_functions;
@@ -37,7 +37,6 @@ pub mod module_globals;
 pub mod module_imports;
 pub mod module_tables;
 pub mod module_types;
-
 
 #[derive(Debug)]
 /// Intermediate Representation of a wasm module. See the [WASM Spec] for different sections.
@@ -75,7 +74,7 @@ pub struct Module<'a> {
     /// name of module
     pub module_name: Option<String>,
     /// Dwarf debug data.
-    pub debug: ModuleDebugData,
+    pub debug: ModuleDebugData<'a>,
 
     pub(crate) num_imports_added: usize,
 
@@ -415,7 +414,7 @@ impl<'a> Module<'a> {
             }
         }
         let debug_vec = CustomSections::new(debug_sections);
-        let debug = Module::parse_debug_sections(debug_vec);
+        let debug = Module::parse_debug_sections(debug_vec)?;
 
         if code_section_count != code_sections.len() || code_section_count != functions.len() {
             return Err(Error::IncorrectCodeCounts {
@@ -531,8 +530,9 @@ impl<'a> Module<'a> {
 
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
-                if let FuncKind::Local(LocalFunction { ref mut instr_flag, .. }) =
-                    self.functions.get_kind_mut(func_idx as FunctionID)
+                if let FuncKind::Local(LocalFunction {
+                    ref mut instr_flag, ..
+                }) = self.functions.get_kind_mut(func_idx as FunctionID)
                 {
                     if !instr_flag.has_special_instr {
                         // skip functions without special instrumentation!
@@ -1261,20 +1261,23 @@ impl<'a> Module<'a> {
 
     pub(crate) fn parse_debug_sections(
         mut debug_sections: CustomSections,
-    ) -> ModuleDebugData {
-        let load_section = |id: gimli::SectionId| -> Result<Vec<u8>, Error> {
+    ) -> Result<ModuleDebugData, Error> {
+        let load_section = |id: SectionId| -> Result<EndianSlice<'_, LittleEndian>, Error> {
             match debug_sections
                 .iter_mut()
                 .find(|section| section.name == id.name())
             {
-                Some(section) => Ok(std::mem::take(&mut section.data.to_vec())),
-                None => Ok(Vec::new()),
+                Some(section) => {
+                    let data = std::mem::take(&mut section.data);
+                    Ok(EndianSlice::new(&data[..], LittleEndian)) // Return the slice wrapped in Ok
+                }
+                None => Ok(EndianSlice::new(&[], LittleEndian)), // Return an empty slice wrapped in Ok
             }
         };
 
-        ModuleDebugData {
-            dwarf: Dwarf::load(load_section).unwrap(),
-        }
+        let dwarf = Dwarf::load(load_section)?; // Propagate the error if any
+
+        Ok(ModuleDebugData { dwarf })
     }
 
     /// Get the memory ID of a module. Does not support multiple memories
@@ -1421,6 +1424,29 @@ impl<'a> Module<'a> {
             num_imports_added: 0,
             debug: ModuleDebugData::default(),
         }
+    }
+
+    pub fn print_dwarf(&self) {
+        println!("Debug Info:");
+        let mut iter = self.debug.dwarf.debug_info.units();
+        while let Some(unit) = iter.next().unwrap() {
+            println!("unit's length is {}", unit.unit_length());
+        }
+        println!("####################");
+
+        println!("Debug Header:");
+        let mut head_iter = self.debug.dwarf.debug_aranges.headers();
+        while let Some(header) = head_iter.next().unwrap() {
+            println!("Header length is {}", header.length());
+        }
+        println!("####################");
+
+        println!("Debug Types:");
+        let mut iter_types = self.debug.dwarf.debug_types.units();
+        while let Some(unit) = iter_types.next().unwrap() {
+            println!("Types's length is {}", unit.unit_length());
+        }
+        println!("####################");
     }
 }
 
