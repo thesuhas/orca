@@ -1,6 +1,6 @@
 //! Function Builder
 
-use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID};
+use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::{add_local, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
 use crate::ir::types::DataType;
@@ -56,11 +56,11 @@ impl<'a> FunctionBuilder<'a> {
 
         let err_msg = "Could not replace the specified import with this function,";
         if let TypeRef::Func(imp_ty_id) = module.imports.get(import_id).ty {
-            if let Some(ty) = module.types.get(imp_ty_id) {
+            if let Some(ty) = module.types.get(TypeID(imp_ty_id)) {
                 if *ty.params == self.params && *ty.results == self.results {
                     let local_func = LocalFunction::new(
-                        imp_ty_id,
-                        import_id,
+                        TypeID(imp_ty_id),
+                        FunctionID(*import_id),
                         self.body.clone(),
                         self.params.len(),
                     );
@@ -69,7 +69,10 @@ impl<'a> FunctionBuilder<'a> {
                     panic!("{err_msg} types are not equivalent.")
                 }
             } else {
-                panic!("{err_msg} could not find an associated type for the specified import ID: {import_id}.")
+                panic!(
+                    "{} could not find an associated type for the specified import ID: {:?}.",
+                    err_msg, import_id
+                )
             }
         } else {
             panic!("{err_msg} the specified import ID does not point to a function!")
@@ -82,7 +85,7 @@ impl<'a> FunctionBuilder<'a> {
         // add End as last instruction
         self.end();
 
-        let id = comp.modules[mod_idx as usize].add_local_func(
+        let id = comp.modules[*mod_idx as usize].add_local_func(
             self.name,
             &self.params,
             &self.results,
@@ -90,10 +93,10 @@ impl<'a> FunctionBuilder<'a> {
         );
 
         assert_eq!(
-            comp.modules[mod_idx as usize].functions.len() as u32,
-            comp.modules[mod_idx as usize].num_local_functions
-                + comp.modules[mod_idx as usize].imports.num_funcs
-                + comp.modules[mod_idx as usize].imports.num_funcs_added
+            comp.modules[*mod_idx as usize].functions.len() as u32,
+            comp.modules[*mod_idx as usize].num_local_functions
+                + comp.modules[*mod_idx as usize].imports.num_funcs
+                + comp.modules[*mod_idx as usize].imports.num_funcs_added
         );
         id
     }
@@ -149,7 +152,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
             instr_idx: None,
         };
         func_modifier.before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx,
         });
         func_modifier
@@ -187,7 +190,7 @@ impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
 impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         let loc = Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         };
         self.set_instrument_mode_at(mode, loc);

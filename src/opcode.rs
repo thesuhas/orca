@@ -127,7 +127,7 @@ pub trait Opcode<'a>: Inject<'a> {
     /// Inject a call instruction
     fn call(&mut self, idx: FunctionID) -> &mut Self {
         self.inject(Operator::Call {
-            function_index: idx,
+            function_index: *idx,
         });
         self
     }
@@ -201,18 +201,18 @@ pub trait Opcode<'a>: Inject<'a> {
     // Numerics
     /// Inject a local.get
     fn local_get(&mut self, idx: LocalID) -> &mut Self {
-        self.inject(Operator::LocalGet { local_index: idx });
+        self.inject(Operator::LocalGet { local_index: *idx });
         self
     }
 
     /// Inject a local.set
     fn local_set(&mut self, idx: LocalID) -> &mut Self {
-        self.inject(Operator::LocalSet { local_index: idx });
+        self.inject(Operator::LocalSet { local_index: *idx });
         self
     }
 
     fn local_tee(&mut self, idx: LocalID) -> &mut Self {
-        self.inject(Operator::LocalTee { local_index: idx });
+        self.inject(Operator::LocalTee { local_index: *idx });
         self
     }
 
@@ -961,13 +961,13 @@ pub trait Opcode<'a>: Inject<'a> {
 
     /// Inject a global.get
     fn global_get(&mut self, idx: GlobalID) -> &mut Self {
-        self.inject(Operator::GlobalGet { global_index: idx });
+        self.inject(Operator::GlobalGet { global_index: *idx });
         self
     }
 
     /// Inject a global.set
     fn global_set(&mut self, idx: GlobalID) -> &mut Self {
-        self.inject(Operator::GlobalSet { global_index: idx });
+        self.inject(Operator::GlobalSet { global_index: *idx });
         self
     }
 }

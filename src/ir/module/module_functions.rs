@@ -21,8 +21,8 @@ impl GetID for Function<'_> {
     /// Get the ID of the function
     fn get_id(&self) -> u32 {
         match &self.kind {
-            FuncKind::Import(i) => i.import_fn_id,
-            FuncKind::Local(l) => l.func_id,
+            FuncKind::Import(i) => *i.import_fn_id,
+            FuncKind::Local(l) => *l.func_id,
         }
     }
 }
@@ -145,7 +145,7 @@ impl<'a> LocalFunction<'a> {
     pub fn new(type_id: TypeID, function_id: FunctionID, body: Body<'a>, num_args: usize) -> Self {
         let mut args = vec![];
         for arg in 0..num_args {
-            args.push(arg as LocalID);
+            args.push(LocalID(arg as u32));
         }
         LocalFunction {
             ty_id: type_id,
@@ -205,7 +205,7 @@ pub(crate) fn add_local(
         locals.push((1, ty));
     }
 
-    index as LocalID
+    LocalID(index as u32)
 }
 
 /// Intermediate representation of an Imported Function. The actual Import is stored in the Imports field of the module.
@@ -250,11 +250,11 @@ impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
     fn len(&self) -> usize {
         self.functions.len()
     }
-    fn remove(&mut self, function_id: FunctionID) -> Function<'a> {
+    fn remove(&mut self, function_id: u32) -> Function<'a> {
         self.functions.remove(function_id as usize)
     }
 
-    fn insert(&mut self, function_id: FunctionID, func: Function<'a>) {
+    fn insert(&mut self, function_id: u32, func: Function<'a>) {
         self.functions.insert(function_id as usize, func);
     }
     /// Add a new function
@@ -271,8 +271,8 @@ impl<'a> Functions<'a> {
 
     /// Get a function by its FunctionID
     pub fn get_fn_by_id(&self, function_id: FunctionID) -> Option<&Function<'a>> {
-        if function_id < self.functions.len() as u32 {
-            return Some(&self.functions[function_id as usize]);
+        if *function_id < self.functions.len() as u32 {
+            return Some(&self.functions[*function_id as usize]);
         }
         None
     }
@@ -288,38 +288,38 @@ impl<'a> Functions<'a> {
 
     /// Get kind of function
     pub fn get_kind(&self, function_id: FunctionID) -> &FuncKind<'a> {
-        &self.functions[function_id as usize].kind
+        &self.functions[*function_id as usize].kind
     }
 
     /// Get kind of function
     // TODO -- can this be removed?
     pub fn get_kind_mut(&mut self, function_id: FunctionID) -> &mut FuncKind<'a> {
-        &mut self.functions[function_id as usize].kind
+        &mut self.functions[*function_id as usize].kind
     }
 
     /// Get the name of a function
     pub fn get_name(&self, function_id: FunctionID) -> &Option<String> {
-        &self.functions[function_id as usize].name
+        &self.functions[*function_id as usize].name
     }
 
     /// Check if a function is a local
     pub fn is_local(&self, function_id: FunctionID) -> bool {
-        self.functions[function_id as usize].is_local()
+        self.functions[*function_id as usize].is_local()
     }
 
     /// Check if a function is an import
     pub fn is_import(&self, function_id: FunctionID) -> bool {
-        self.functions[function_id as usize].is_import()
+        self.functions[*function_id as usize].is_import()
     }
 
     /// Get the type ID of a function
     pub fn get_type_id(&self, id: FunctionID) -> TypeID {
-        self.functions[id as usize].get_type_id()
+        self.functions[*id as usize].get_type_id()
     }
 
     /// Check if it's deleted
     pub fn is_deleted(&self, function_id: FunctionID) -> bool {
-        self.functions[function_id as usize].is_deleted()
+        self.functions[*function_id as usize].is_deleted()
     }
 
     // ======================
@@ -328,17 +328,17 @@ impl<'a> Functions<'a> {
 
     /// Get by ID
     pub fn get(&self, function_id: FunctionID) -> &Function<'a> {
-        &self.functions[function_id as usize]
+        &self.functions[*function_id as usize]
     }
 
     /// Get mutable function by ID
     pub fn get_mut(&mut self, function_id: FunctionID) -> &mut Function<'a> {
-        &mut self.functions[function_id as usize]
+        &mut self.functions[*function_id as usize]
     }
 
     /// Unwrap local function.
     pub fn unwrap_local(&mut self, function_id: FunctionID) -> &mut LocalFunction<'a> {
-        self.functions[function_id as usize].unwrap_local_mut()
+        self.functions[*function_id as usize].unwrap_local_mut()
     }
 
     /// Get local Function ID by name
@@ -348,7 +348,7 @@ impl<'a> Functions<'a> {
                 match &l.body.name {
                     Some(n) => {
                         if n == name {
-                            return Some(idx as FunctionID);
+                            return Some(FunctionID(idx as u32));
                         }
                     }
                     None => {}
@@ -368,7 +368,7 @@ impl<'a> Functions<'a> {
         func_id: FunctionID,
     ) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
-        return match &mut self.functions.get_mut(func_id as usize)?.kind {
+        return match &mut self.functions.get_mut(*func_id as usize)?.kind {
             FuncKind::Local(ref mut l) => Some(FunctionModifier::init(&mut l.body, &mut l.args)),
             _ => None,
         };
@@ -376,13 +376,13 @@ impl<'a> Functions<'a> {
 
     /// Delete a function
     pub(crate) fn delete(&mut self, id: FunctionID) {
-        if id < self.functions.len() as u32 {
-            self.functions[id as usize].delete();
+        if *id < self.functions.len() as u32 {
+            self.functions[*id as usize].delete();
         }
     }
 
     fn next_id(&self) -> FunctionID {
-        self.functions.len() as FunctionID
+        FunctionID(self.functions.len() as u32)
     }
 
     pub(crate) fn add_local_func(
@@ -409,38 +409,38 @@ impl<'a> Functions<'a> {
         // The id of the function we're using (at least until re-indexing)
         imp_fn_id: u32,
     ) {
-        assert_eq!(self.next_id(), imp_fn_id);
+        assert_eq!(*self.next_id(), imp_fn_id);
         self.functions.push(Function::new(
-            FuncKind::Import(ImportedFunction::new(imp_id, ty_id, imp_fn_id)),
+            FuncKind::Import(ImportedFunction::new(imp_id, ty_id, FunctionID(imp_fn_id))),
             name,
         ));
     }
 
     pub(crate) fn add_local(&mut self, func_idx: FunctionID, ty: DataType) -> LocalID {
-        let local_func = self.functions[func_idx as usize].unwrap_local_mut();
+        let local_func = self.functions[*func_idx as usize].unwrap_local_mut();
         local_func.add_local(ty)
     }
 
     /// Set the name for a local function. Returns false if it is an imported function.
     pub fn set_local_fn_name(&mut self, func_idx: FunctionID, name: String) -> bool {
-        match &mut self.functions[func_idx as usize].kind {
+        match &mut self.functions[*func_idx as usize].kind {
             FuncKind::Import(_) => {
                 warn!("is an imported function!");
                 return false;
             }
             FuncKind::Local(ref mut l) => l.body.name = Some(name.clone()),
         }
-        self.functions[func_idx as usize].name = Some(name);
+        self.functions[*func_idx as usize].name = Some(name);
         true
     }
 
     /// Set the name for an imported function. Returns false if it is a local function.
     pub(crate) fn set_imported_fn_name(&mut self, func_idx: FunctionID, name: String) -> bool {
-        if self.functions[func_idx as usize].is_local() {
+        if self.functions[*func_idx as usize].is_local() {
             warn!("is a local function!");
             return false;
         }
-        self.functions[func_idx as usize].name = Some(name);
+        self.functions[*func_idx as usize].name = Some(name);
         true
     }
 }

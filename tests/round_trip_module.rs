@@ -2,6 +2,7 @@ mod common;
 
 use crate::common::{try_path, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};
 use log::{debug, error, trace};
+use orca::ir::id::FunctionID;
 use orca::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
@@ -84,7 +85,7 @@ fn set_name() {
     let filename = "tests/test_inputs/handwritten/modules/func1.wat";
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).unwrap();
-    module.set_fn_name(1, "test".to_string());
+    module.set_fn_name(FunctionID(1), "test".to_string());
     // println!("{:#?}", module);
     let result = module.encode();
 

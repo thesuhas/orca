@@ -60,7 +60,7 @@ impl GetID for Global {
             | GlobalKind::Import(ImportedGlobal {
                 import_global_id: global_id,
                 ..
-            }) => *global_id,
+            }) => **global_id,
         }
     }
 }
@@ -97,7 +97,7 @@ impl Global {
         let init_expr = InitExpr::eval(&global.init_expr);
         Ok(Global {
             kind: GlobalKind::Local(LocalGlobal {
-                global_id: 0,
+                global_id: GlobalID(0),
                 ty,
                 init_expr,
             }),
@@ -144,11 +144,11 @@ impl ReIndexable<Global> for ModuleGlobals {
     fn len(&self) -> usize {
         self.globals.len()
     }
-    fn remove(&mut self, global_id: GlobalID) -> Global {
+    fn remove(&mut self, global_id: u32) -> Global {
         self.globals.remove(global_id as usize)
     }
 
-    fn insert(&mut self, global_id: GlobalID, global: Global) {
+    fn insert(&mut self, global_id: u32, global: Global) {
         self.globals.insert(global_id as usize, global);
     }
     /// Add a new function
@@ -170,8 +170,8 @@ impl ModuleGlobals {
                 // This is an imported global
                 result.add(Global {
                     kind: GlobalKind::Import(ImportedGlobal {
-                        import_id: id as ImportsID,
-                        import_global_id: curr_global_id,
+                        import_id: ImportsID(id as u32),
+                        import_global_id: GlobalID(curr_global_id),
                         ty,
                     }),
                     deleted: false,
@@ -183,7 +183,7 @@ impl ModuleGlobals {
         for global in local_globals.iter() {
             // fix the ID
             let mut owned = global.to_owned();
-            owned.set_id(curr_global_id);
+            owned.set_id(GlobalID(curr_global_id));
             curr_global_id += 1;
 
             result.add(owned);
@@ -193,7 +193,7 @@ impl ModuleGlobals {
 
     /// Get kind of global
     pub fn get_kind(&self, global_id: GlobalID) -> &GlobalKind {
-        &self.globals[global_id as usize].kind
+        &self.globals[*global_id as usize].kind
     }
 
     /// Create an iterable over the global section
@@ -213,14 +213,14 @@ impl ModuleGlobals {
 
     /// Remove the last global from the list. Can only remove the final Global due to indexing
     pub(crate) fn delete(&mut self, id: GlobalID) {
-        if id < self.globals.len() as u32 {
-            self.globals[id as usize].delete();
+        if *id < self.globals.len() as u32 {
+            self.globals[*id as usize].delete();
         }
     }
 
     /// Add a new Global to the module. Returns the index of the new Global.
     pub(crate) fn add(&mut self, mut global: Global) -> GlobalID {
-        let id = self.globals.len() as GlobalID;
+        let id = GlobalID(self.globals.len() as u32);
         global.set_id(id);
         self.globals.push(global);
         id

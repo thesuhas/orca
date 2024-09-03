@@ -44,7 +44,7 @@ impl ModuleTypes {
             ret.to_vec().into_boxed_slice(),
         );
         self.types.push(ty);
-        index as TypeID
+        TypeID(index as u32)
     }
 
     /// Number of types in this module
@@ -59,6 +59,6 @@ impl ModuleTypes {
 
     /// Get type from index of the type section
     pub fn get(&self, index: TypeID) -> Option<&FuncType> {
-        self.types.get(index as usize)
+        self.types.get(*index as usize)
     }
 }

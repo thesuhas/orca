@@ -205,7 +205,7 @@ impl<'a> Module<'a> {
                     let temp: Vec<u32> = function_section_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
-                    functions.extend(temp.iter().map(|id| *id as TypeID));
+                    functions.extend(temp.iter().map(|id| TypeID(*id)));
                 }
                 Payload::GlobalSection(global_section_reader) => {
                     globals = global_section_reader
@@ -222,7 +222,7 @@ impl<'a> Module<'a> {
                     if start.is_some() {
                         return Err(Error::MultipleStartSections);
                     }
-                    start = Some(func as FunctionID);
+                    start = Some(FunctionID(func));
                 }
                 Payload::ElementSection(element_section_reader) => {
                     for element in element_section_reader.into_iter() {
@@ -430,9 +430,9 @@ impl<'a> Module<'a> {
             if let TypeRef::Func(u) = imp.ty {
                 final_funcs.push(Function::new(
                     FuncKind::Import(ImportedFunction::new(
-                        index as ImportsID,
-                        u as TypeID,
-                        imp_fn_id as FunctionID,
+                        ImportsID(index as u32),
+                        TypeID(u),
+                        FunctionID(imp_fn_id),
                     )),
                     Some(imp.name.parse().unwrap()),
                 ));
@@ -444,9 +444,9 @@ impl<'a> Module<'a> {
             final_funcs.push(Function::new(
                 FuncKind::Local(LocalFunction::new(
                     functions[index],
-                    (imports.num_funcs as usize + index) as FunctionID,
+                    FunctionID(imports.num_funcs + index as u32),
                     (*code_sec).clone(),
-                    types[functions[index] as usize].params.len(),
+                    types[*functions[index] as usize].params.len(),
                 )),
                 (*code_sec).clone().name,
             ));
@@ -517,8 +517,8 @@ impl<'a> Module<'a> {
     fn resolve_special_instrumentation(&mut self) {
         if !self.num_local_functions > 0 {
             for rel_func_idx in self.imports.num_funcs as usize..self.functions.len() {
-                let func_idx = rel_func_idx as FunctionID;
-                if let FuncKind::Import(..) = &self.functions.get_kind(func_idx as FunctionID) {
+                let func_idx = FunctionID(rel_func_idx as u32);
+                if let FuncKind::Import(..) = &self.functions.get_kind(func_idx) {
                     // skip imports
                     continue;
                 }
@@ -526,7 +526,7 @@ impl<'a> Module<'a> {
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
                 if let FuncKind::Local(LocalFunction { instr_flag, .. }) =
-                    self.functions.get_kind_mut(func_idx as FunctionID)
+                    self.functions.get_kind_mut(func_idx)
                 {
                     if !instr_flag.has_special_instr {
                         // skip functions without special instrumentation!
@@ -598,7 +598,7 @@ impl<'a> Module<'a> {
                                 {
                                     builder.clear_instr_at(
                                         Location::Module {
-                                            func_idx: 0, // not used
+                                            func_idx: FunctionID(0), // not used
                                             instr_idx: idx,
                                         },
                                         BlockAlt,
@@ -612,7 +612,7 @@ impl<'a> Module<'a> {
                             if delete_block.is_some() {
                                 // delete this block and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 });
                                 continue;
@@ -640,7 +640,7 @@ impl<'a> Module<'a> {
                                 {
                                     builder.clear_instr_at(
                                         Location::Module {
-                                            func_idx: 0, // not used
+                                            func_idx: FunctionID(0), // not used
                                             instr_idx: idx,
                                         },
                                         BlockAlt,
@@ -654,7 +654,7 @@ impl<'a> Module<'a> {
                             if delete_block.is_some() {
                                 // delete this block and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 });
                                 continue;
@@ -673,7 +673,7 @@ impl<'a> Module<'a> {
                                         if !retain_end {
                                             // delete this end and skip all instrumentation handling (like below)
                                             builder.empty_alternate_at(Location::Module {
-                                                func_idx: 0, // not used
+                                                func_idx: FunctionID(0), // not used
                                                 instr_idx: idx,
                                             });
                                             retain_end = true;
@@ -684,7 +684,7 @@ impl<'a> Module<'a> {
                                     } else {
                                         // delete this instruction and skip all instrumentation handling (like below)
                                         builder.empty_alternate_at(Location::Module {
-                                            func_idx: 0, // not used
+                                            func_idx: FunctionID(0), // not used
                                             instr_idx: idx,
                                         });
                                         continue;
@@ -713,7 +713,7 @@ impl<'a> Module<'a> {
                             if delete_block.is_some() {
                                 // delete this instruction and skip all instrumentation handling (like below)
                                 builder.empty_alternate_at(Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 });
                                 continue;
@@ -742,7 +742,7 @@ impl<'a> Module<'a> {
                             resolve_block_entry(block_entry, &mut builder, op, idx);
                             builder.clear_instr_at(
                                 Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 },
                                 BlockEntry,
@@ -760,7 +760,7 @@ impl<'a> Module<'a> {
                             );
                             builder.clear_instr_at(
                                 Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 },
                                 BlockExit,
@@ -779,7 +779,7 @@ impl<'a> Module<'a> {
                             );
                             builder.clear_instr_at(
                                 Location::Module {
-                                    func_idx: 0, // not used
+                                    func_idx: FunctionID(0), // not used
                                     instr_idx: idx,
                                 },
                                 SemanticAfter,
@@ -927,7 +927,7 @@ impl<'a> Module<'a> {
             for func in self.functions.iter() {
                 if !func.deleted {
                     if let FuncKind::Local(l) = func.kind() {
-                        functions.function(l.ty_id);
+                        functions.function(*l.ty_id);
                     }
                 }
             }
@@ -1018,7 +1018,9 @@ impl<'a> Module<'a> {
         }
 
         if let Some(function_index) = self.start {
-            module.section(&wasm_encoder::StartSection { function_index });
+            module.section(&wasm_encoder::StartSection {
+                function_index: *function_index,
+            });
         }
 
         if !self.elements.is_empty() {
@@ -1033,9 +1035,9 @@ impl<'a> Module<'a> {
                     ElementItems::Functions(funcs) => {
                         element_items = funcs
                             .iter()
-                            .map(|f| *func_mapping.get(f).unwrap() as FunctionID)
+                            .map(|f| *func_mapping.get(f).unwrap())
                             .collect();
-                        wasm_encoder::Elements::Functions(&element_items)
+                        wasm_encoder::Elements::Functions(element_items.as_slice())
                     }
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
@@ -1090,16 +1092,18 @@ impl<'a> Module<'a> {
         if !self.num_local_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in 0..self.functions.len() {
-                if self.functions.is_deleted(rel_func_idx as FunctionID) {
+                if self.functions.is_deleted(FunctionID(rel_func_idx as u32)) {
                     continue;
                 }
-                if let FuncKind::Import(_) = &self.functions.get_kind(rel_func_idx as FunctionID) {
+                if let FuncKind::Import(_) =
+                    &self.functions.get_kind(FunctionID(rel_func_idx as u32))
+                {
                     continue;
                 }
 
                 let func = self
                     .functions
-                    .get_mut(rel_func_idx as FunctionID)
+                    .get_mut(FunctionID(rel_func_idx as u32))
                     .unwrap_local_mut();
                 let Body {
                     instructions,
@@ -1286,7 +1290,7 @@ impl<'a> Module<'a> {
     pub fn add_data(&mut self, data: DataSegment) -> DataSegmentID {
         let index = self.data.len();
         self.data.push(data);
-        index as DataSegmentID
+        DataSegmentID(index as u32)
     }
 
     /// Get the memory ID of a module. Does not support multiple memories
@@ -1296,7 +1300,7 @@ impl<'a> Module<'a> {
         }
 
         if !self.memories.is_empty() {
-            return Some(0 as MemoryID);
+            return Some(MemoryID(0));
         }
         // module does not export a memory
         None
@@ -1345,7 +1349,7 @@ impl<'a> Module<'a> {
         let ty = self.types.add(params, results);
         let local_func = LocalFunction::new(
             ty,
-            0, // will be fixed
+            FunctionID(0), // will be fixed
             body,
             params.len(),
         );
@@ -1367,7 +1371,7 @@ impl<'a> Module<'a> {
         let (imp_fn_id, imp_id) = self.add_import(Import {
             module: module.leak(),
             name: name.clone().leak(),
-            ty: TypeRef::Func(ty_id),
+            ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
         });
@@ -1375,7 +1379,7 @@ impl<'a> Module<'a> {
         // Add to functions as well as it has imported functions
         self.functions
             .add_import_func(imp_id, ty_id, Some(name), imp_fn_id);
-        (imp_fn_id, imp_id)
+        (FunctionID(imp_fn_id), imp_id)
     }
 
     /// Get the number of imported functions in the module (including any added ones).
@@ -1402,13 +1406,13 @@ impl<'a> Module<'a> {
         import_id: ImportsID,
         local_function: LocalFunction<'a>,
     ) -> bool {
-        if self.functions.is_local(import_id) {
+        if self.functions.is_local(FunctionID(*import_id)) {
             warn!("This is a local function!");
             return false;
         }
-        self.delete_func(import_id);
+        self.delete_func(FunctionID(*import_id));
         self.functions
-            .get_mut(import_id as FunctionID)
+            .get_mut(FunctionID(*import_id))
             .set_kind(FuncKind::Local(local_function));
         true
     }
@@ -1433,7 +1437,7 @@ impl<'a> Module<'a> {
         let (.., import_id) = self.add_import(Import {
             module: module.leak(),
             name: name.clone().leak(),
-            ty: TypeRef::Func(ty_id),
+            ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
         });
@@ -1450,7 +1454,7 @@ impl<'a> Module<'a> {
 
     /// Set the name of a function using its ID.
     pub fn set_fn_name(&mut self, id: FunctionID, name: String) {
-        if id < self.imports.num_funcs {
+        if *id < self.imports.num_funcs {
             // the function is an import
             self.imports.set_fn_name(name.clone(), id);
             assert!(self.functions.set_imported_fn_name(id, name));
@@ -1480,7 +1484,7 @@ impl<'a> Module<'a> {
     ) -> GlobalID {
         self.add_global_internal(Global {
             kind: GlobalKind::Local(LocalGlobal {
-                global_id: 0, // gets set in `add`
+                global_id: GlobalID(0), // gets set in `add`
                 ty: GlobalType {
                     mutable,
                     content_type: wasmparser::ValType::from(&content_ty),
@@ -1520,10 +1524,10 @@ impl<'a> Module<'a> {
         // Add to globals as well since it has imported globals
         self.add_global_internal(Global::new(GlobalKind::Import(ImportedGlobal::new(
             imp_id,
-            imp_global_id,
+            GlobalID(imp_global_id),
             global_ty,
         ))));
-        (imp_global_id as GlobalID, imp_id)
+        (GlobalID(imp_global_id), imp_id)
     }
 
     /// Delete a global from the module (can either be an imported or locally-defined global).
@@ -1589,7 +1593,7 @@ fn resolve_function_entry<'a, 'b, 'c>(
     if idx == 0 {
         // we're at the function entry!
         builder.before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         });
         builder.inject_all(instr_func_on_entry);
@@ -1609,7 +1613,7 @@ fn resolve_function_exit<'a, 'b, 'c>(
     if idx == builder.body.instructions.len() - 1 {
         // we're at the end of the function!
         builder.before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         });
         builder.inject_all(instr_func_on_entry);
@@ -1635,7 +1639,7 @@ fn resolve_block_entry<'a, 'b, 'c>(
         | Operator::Else { .. } => {
             // just inject immediately after the start of the block
             builder.after_at(Location::Module {
-                func_idx: 0, // not used
+                func_idx: FunctionID(0), // not used
                 instr_idx: idx,
             });
             builder.inject_all(block_entry);
@@ -1700,7 +1704,7 @@ where
         | Operator::If { .. }
         | Operator::Else { .. } => {
             let loc = Location::Module {
-                func_idx: 0, // not used
+                func_idx: FunctionID(0), // not used
                 instr_idx: idx,
             };
             if !block_alt.is_empty() {
@@ -1816,7 +1820,7 @@ where
     // set flag to true before the opcode
     builder
         .before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         })
         .i32_const(1)
@@ -1825,7 +1829,7 @@ where
     // set flag to false after the opcode
     builder
         .after_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         })
         .i32_const(0)
@@ -1943,7 +1947,7 @@ fn resolve_bodies<'a, 'b, 'c>(
     for InstrBodyFlagged { body, bool_flag } in flagged.iter() {
         // Inject the bodies in the correct mode at the current END opcode
         let loc = Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: idx,
         };
         match mode {
@@ -1980,7 +1984,7 @@ fn resolve_bodies<'a, 'b, 'c>(
     // handle non-flagged bodies
     // Inject the bodies AFTER the current END opcode
     let loc = Location::Module {
-        func_idx: 0, // not used
+        func_idx: FunctionID(0), // not used
         instr_idx: idx,
     };
     match mode {

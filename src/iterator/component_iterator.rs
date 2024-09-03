@@ -50,13 +50,18 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
                     }
                 }
             }
-            metadata.insert(mod_idx as ModuleID, mod_metadata);
+            metadata.insert(ModuleID(mod_idx as u32), mod_metadata);
         }
         print_metadata(&metadata);
         let num_modules = comp.num_modules;
         ComponentIterator {
             comp,
-            comp_iterator: ComponentSubIterator::new(0, num_modules, metadata, skip_funcs),
+            comp_iterator: ComponentSubIterator::new(
+                ModuleID(0),
+                num_modules,
+                metadata,
+                skip_funcs,
+            ),
         }
     }
 
@@ -91,9 +96,9 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
             ..,
         ) = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx as usize]
+            match &self.comp.modules[*mod_idx as usize]
                 .functions
-                .get(func_idx as FunctionID)
+                .get(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => None,
@@ -160,9 +165,9 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
             ..,
         ) = self.curr_loc()
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
@@ -209,9 +214,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..,
         ) = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx as usize]
+            match &self.comp.modules[*mod_idx as usize]
                 .functions
-                .get(func_idx as FunctionID)
+                .get(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => {
@@ -232,9 +237,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..
         } = loc
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -255,9 +260,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..,
         ) = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx as usize]
+            match &self.comp.modules[*mod_idx as usize]
                 .functions
-                .get(func_idx as FunctionID)
+                .get(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => {
@@ -278,9 +283,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..,
         ) = self.curr_loc()
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -299,9 +304,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..
         } = loc
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -320,9 +325,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..
         } = loc
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -343,9 +348,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..
         } = loc
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -368,9 +373,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..
         } = loc
         {
-            match self.comp.modules[mod_idx as usize]
+            match self.comp.modules[*mod_idx as usize]
                 .functions
-                .get_mut(func_idx as FunctionID)
+                .get_mut(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
@@ -398,9 +403,9 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             ..,
         ) = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx as usize]
+            match &self.comp.modules[*mod_idx as usize]
                 .functions
-                .get(func_idx as FunctionID)
+                .get(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
@@ -431,7 +436,7 @@ impl<'a, 'b> IteratingInstrumenter<'b> for ComponentIterator<'a, 'b> {
     }
 
     fn add_global(&mut self, global: Global) -> GlobalID {
-        let curr_mod = self.curr_module() as usize;
+        let curr_mod = *self.curr_module() as usize;
         self.comp.modules[curr_mod].globals.add(global)
     }
 }
@@ -471,9 +476,9 @@ impl<'a, 'b> Iterator for ComponentIterator<'a, 'b> {
             ..,
         ) = self.comp_iterator.curr_loc()
         {
-            match &self.comp.modules[mod_idx as usize]
+            match &self.comp.modules[*mod_idx as usize]
                 .functions
-                .get(func_idx as FunctionID)
+                .get(func_idx)
                 .kind
             {
                 FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
@@ -493,9 +498,9 @@ impl AddLocal for ComponentIterator<'_, '_> {
         } = curr_loc
         {
             {
-                self.comp.modules[mod_idx as usize]
+                self.comp.modules[*mod_idx as usize]
                     .functions
-                    .add_local(func_idx as FunctionID, val_type)
+                    .add_local(func_idx, val_type)
             }
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
