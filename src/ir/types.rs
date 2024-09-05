@@ -16,7 +16,7 @@ type Result<T> = std::result::Result<T, Error>;
 /// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
-#[derive(Debug, Clone, Eq, PartialEq, Copy)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum DataType {
     I32,
     I64,
