@@ -222,7 +222,6 @@ impl ModuleGlobals {
 
     /// Add a new Global to the module. Returns the index of the new Global.
     pub(crate) fn add(&mut self, mut global: Global) -> GlobalID {
-        self.recalculate_ids = true;
         let id = GlobalID(self.globals.len() as u32);
         global.set_id(id);
         self.globals.push(global);
