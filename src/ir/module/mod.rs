@@ -867,14 +867,22 @@ impl<'a> Module<'a> {
         // First resolve any instrumentation that needs to be translated to before/after/alt
         self.resolve_special_instrumentation();
 
-        let func_mapping = Self::recalculate_ids(
-            self.imports.num_funcs - self.imports.num_funcs_added,
-            &mut self.functions,
-        );
-        let global_mapping = Self::recalculate_ids(
-            self.imports.num_globals - self.imports.num_globals_added,
-            &mut self.globals,
-        );
+        let func_mapping = if self.functions.recalculate_ids {
+            Self::recalculate_ids(
+                self.imports.num_funcs - self.imports.num_funcs_added,
+                &mut self.functions,
+            )
+        } else {
+            Self::get_mapping_generic(self.functions.iter())
+        };
+        let global_mapping = if self.globals.recalculate_ids {
+            Self::recalculate_ids(
+                self.imports.num_globals - self.imports.num_globals_added,
+                &mut self.globals,
+            )
+        } else {
+            Self::get_mapping_generic(self.globals.iter())
+        };
 
         let mut module = wasm_encoder::Module::new();
         let mut reencode = RoundtripReencoder;

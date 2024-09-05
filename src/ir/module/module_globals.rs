@@ -126,6 +126,7 @@ impl Global {
 #[derive(Clone, Debug, Default)]
 pub struct ModuleGlobals {
     globals: Vec<Global>,
+    pub(crate) recalculate_ids: bool
 }
 
 impl Iter<Global> for ModuleGlobals {
@@ -213,6 +214,7 @@ impl ModuleGlobals {
 
     /// Remove the last global from the list. Can only remove the final Global due to indexing
     pub(crate) fn delete(&mut self, id: GlobalID) {
+        self.recalculate_ids = true;
         if *id < self.globals.len() as u32 {
             self.globals[*id as usize].delete();
         }
@@ -220,6 +222,7 @@ impl ModuleGlobals {
 
     /// Add a new Global to the module. Returns the index of the new Global.
     pub(crate) fn add(&mut self, mut global: Global) -> GlobalID {
+        self.recalculate_ids = true;
         let id = GlobalID(self.globals.len() as u32);
         global.set_id(id);
         self.globals.push(global);

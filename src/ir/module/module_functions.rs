@@ -232,6 +232,7 @@ impl ImportedFunction {
 #[derive(Clone, Debug, Default)]
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
+    pub(crate) recalculate_ids: bool
 }
 
 impl<'a> Iter<Function<'a>> for Functions<'a> {
@@ -266,7 +267,7 @@ impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
 impl<'a> Functions<'a> {
     /// Create a new functions section
     pub fn new(functions: Vec<Function<'a>>) -> Self {
-        Functions { functions }
+        Functions { functions, recalculate_ids: false }
     }
 
     /// Get a function by its FunctionID
@@ -376,6 +377,7 @@ impl<'a> Functions<'a> {
 
     /// Delete a function
     pub(crate) fn delete(&mut self, id: FunctionID) {
+        self.recalculate_ids = true;
         if *id < self.functions.len() as u32 {
             self.functions[*id as usize].delete();
         }
@@ -390,6 +392,7 @@ impl<'a> Functions<'a> {
         mut local_function: LocalFunction<'a>,
         name: Option<String>,
     ) -> FunctionID {
+        self.recalculate_ids = true;
         // fix the ID of the function
         let id = self.next_id();
         local_function.func_id = id;
@@ -409,6 +412,7 @@ impl<'a> Functions<'a> {
         // The id of the function we're using (at least until re-indexing)
         imp_fn_id: u32,
     ) {
+        self.recalculate_ids = true;
         assert_eq!(*self.next_id(), imp_fn_id);
         self.functions.push(Function::new(
             FuncKind::Import(ImportedFunction::new(imp_id, ty_id, FunctionID(imp_fn_id))),
