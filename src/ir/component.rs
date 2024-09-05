@@ -6,7 +6,7 @@ use crate::ir::helpers::{
     print_alias, print_component_export, print_component_import, print_component_type,
     print_core_type,
 };
-use crate::ir::id::{FunctionID, GlobalID, ModuleID};
+use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID};
 use crate::ir::module::{Iter, Module};
 use crate::ir::section::ComponentSection;
 use crate::ir::wrappers::{
@@ -828,7 +828,9 @@ impl<'a> Component<'a> {
                     for custom_sec_idx in
                         last_processed_custom_section..last_processed_custom_section + num
                     {
-                        let section = &self.custom_sections.get_by_id(custom_sec_idx);
+                        let section = &self
+                            .custom_sections
+                            .get_by_id(CustomSectionID(custom_sec_idx));
                         component.section(&wasm_encoder::CustomSection {
                             name: std::borrow::Cow::Borrowed(section.name),
                             data: std::borrow::Cow::Borrowed(section.data),
@@ -924,7 +926,7 @@ impl<'a> Component<'a> {
     /// Get Local Function ID by name
     // Note: returned absolute id here
     pub fn get_fid_by_name(&self, name: &str, module_idx: ModuleID) -> Option<FunctionID> {
-        for (idx, func) in self.modules[module_idx as usize]
+        for (idx, func) in self.modules[*module_idx as usize]
             .functions
             .iter()
             .enumerate()
@@ -933,7 +935,7 @@ impl<'a> Component<'a> {
                 match &l.body.name {
                     Some(n) => {
                         if n == name {
-                            return Some(idx as FunctionID);
+                            return Some(FunctionID(idx as u32));
                         }
                     }
                     None => {}

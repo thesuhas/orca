@@ -46,7 +46,7 @@ impl<'a> ModuleTables<'a> {
             .enumerate()
             .filter(|(_, (t, _))| t.element_type == RefType::FUNCREF);
         let id = match tables.next() {
-            Some((index, _)) => Some(index as TableID),
+            Some((index, _)) => Some(TableID(index as u32)),
             None => return None,
         };
         if tables.next().is_some() {
@@ -57,16 +57,16 @@ impl<'a> ModuleTables<'a> {
 
     /// Get a table
     pub fn get(&self, table_id: TableID) -> Option<TableType> {
-        if table_id < self.tables.len() as u32 {
-            return Some(self.tables[table_id as usize].0);
+        if *table_id < self.tables.len() as u32 {
+            return Some(self.tables[*table_id as usize].0);
         }
         None
     }
 
     /// Get a mutable reference to a table
     pub fn get_mut(&mut self, table_id: TableID) -> &mut TableType {
-        if table_id < self.tables.len() as u32 {
-            return &mut self.tables[table_id as usize].0;
+        if *table_id < self.tables.len() as u32 {
+            return &mut self.tables[*table_id as usize].0;
         }
         panic!("Invalid Table ID")
     }

@@ -1,3 +1,4 @@
+use orca::ir::id::FunctionID;
 use orca::opcode::Instrumenter;
 use orca::Opcode;
 use orca::{Location, Module};
@@ -33,7 +34,7 @@ fn run_start_orca() {
 
     function_builder
         .before_at(Location::Module {
-            func_idx: 0, // not used
+            func_idx: FunctionID(0), // not used
             instr_idx: 0,
         })
         .i32_const(1);

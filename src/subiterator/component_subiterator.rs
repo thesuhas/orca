@@ -34,7 +34,7 @@ impl ComponentSubIterator {
             num_mods,
             metadata: metadata.clone(),
             mod_iterator: ModuleSubIterator::new(
-                metadata.get(&0).unwrap().keys().len() as u32,
+                metadata.get(&ModuleID(0)).unwrap().keys().len() as u32,
                 (*metadata.get(&curr_mod).unwrap()).clone(),
                 match skip_funcs.contains_key(&curr_mod) {
                     true => skip_funcs.get(&curr_mod).unwrap().clone(),
@@ -47,15 +47,15 @@ impl ComponentSubIterator {
 
     /// Resets the ComponentSubIterator and all child SubIterators
     pub fn reset(&mut self) {
-        self.curr_mod = 0;
+        *self.curr_mod = 0;
         self.mod_iterator
             .reset_from_comp_iterator((*self.metadata.get(&self.curr_mod).unwrap()).clone());
     }
 
     /// Goes to the next module enclosed by the component
     fn next_module(&mut self) -> bool {
-        self.curr_mod += 1;
-        if self.curr_mod < self.num_mods as u32 {
+        *self.curr_mod += 1;
+        if *self.curr_mod < self.num_mods as u32 {
             let num_funcs = self.metadata.get(&self.curr_mod).unwrap().keys().len() as u32;
             let met = self.metadata.get(&self.curr_mod).unwrap().clone();
             // If we're defining a new module, we have to reset function
@@ -90,7 +90,7 @@ impl ComponentSubIterator {
 
     /// Checks if the SubIterator has finished traversing all the modules
     pub fn end(&self) -> bool {
-        self.curr_mod as usize == self.num_mods
+        *self.curr_mod as usize == self.num_mods
     }
 
     /// Returns the Current Location as a Location and a bool value that

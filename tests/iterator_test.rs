@@ -1,5 +1,6 @@
 use log::{debug, trace};
 use orca::ir::component::Component;
+use orca::ir::id::{FunctionID, ModuleID};
 use orca::ir::module::Module;
 use orca::ir::types::Location;
 use orca::iterator::component_iterator::ComponentIterator;
@@ -59,7 +60,7 @@ fn test_it_instr_at() {
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
     let loc = Location::Module {
-        func_idx: 1,
+        func_idx: FunctionID(1),
         instr_idx: 1,
     };
     mod_it.before_at(loc.clone());
@@ -71,7 +72,7 @@ fn test_it_instr_at() {
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+            trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
         } else {
             panic!("Should've gotten Module Location!");
         }
@@ -101,7 +102,7 @@ fn test_it_dup_instr() {
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            trace!("Func: {}, {}: {:?},", func_idx, instr_idx, op);
+            trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             let loc = mod_it.curr_loc().0;
             let orig = mod_it.curr_op_owned().unwrap();
@@ -155,7 +156,7 @@ fn test_function_skipping_module() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
-    let functions_skip = vec![1];
+    let functions_skip = vec![FunctionID(1)];
     let mut mod_it = ModuleIterator::new(&mut module, &functions_skip);
 
     let mut set = HashSet::new();
@@ -176,7 +177,7 @@ fn test_function_skipping_module() {
     }
 
     assert_eq!(set.len(), 1);
-    assert!(set.contains(&2));
+    assert!(set.contains(&FunctionID(2)));
 }
 
 #[test]
@@ -185,9 +186,9 @@ fn test_function_skipping_component() {
 
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut comp = Component::parse(&buff, false).expect("Unable to parse");
-    let functions_skip = vec![0];
+    let functions_skip = vec![FunctionID(0)];
     let mut mapping = HashMap::new();
-    mapping.insert(0, functions_skip);
+    mapping.insert(ModuleID(0), functions_skip);
     let mut comp_it = ComponentIterator::new(&mut comp, mapping);
 
     let mut set = HashSet::new();
@@ -204,7 +205,7 @@ fn test_function_skipping_component() {
     }
 
     assert_eq!(set.len(), 1);
-    assert!(set.contains(&1));
+    assert!(set.contains(&FunctionID(1)));
 }
 
 #[test]
@@ -215,9 +216,9 @@ fn test_fn_name() {
     let module = Module::parse(&buff, false).expect("Unable to parse");
     assert_eq!(
         "add".to_string(),
-        *module.functions.get_name(1).as_ref().unwrap()
+        *module.functions.get_name(FunctionID(1)).as_ref().unwrap()
     );
-    assert_eq!(None, *module.functions.get_name(2));
+    assert_eq!(None, *module.functions.get_name(FunctionID(2)));
 }
 
 // =================
@@ -235,7 +236,7 @@ fn iterate_component_and_count(comp_it: &mut ComponentIterator, exp_count: u32) 
         } = comp_it.curr_loc().0
         {
             trace!(
-                "Mod: {}, Func: {}, {}: {:?},",
+                "Mod: {:?}, Func: {:?}, {}: {:?},",
                 mod_idx,
                 func_idx,
                 instr_idx,
@@ -264,7 +265,12 @@ fn iterate_module_and_count(mod_it: &mut ModuleIterator, num_imports: u32, exp_c
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            trace!("Func: {}, {}: {:?},", num_imports + func_idx, instr_idx, op);
+            trace!(
+                "Func: {}, {}: {:?},",
+                num_imports + *func_idx,
+                instr_idx,
+                op
+            );
         } else {
             panic!("Should've gotten Module Location!");
         }
