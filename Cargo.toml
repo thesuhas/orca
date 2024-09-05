@@ -12,6 +12,10 @@ categories = ["wasm"]
 keywords = ["wasm", "WebAssembly", "instrumentation"]
 exclude = [
     "tests/*",
+    ".github/*",
+    ".cargo_vcs_info.json",
+    ".gitignore",
+
 ]
 
 [dependencies]
