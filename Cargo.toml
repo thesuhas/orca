@@ -11,7 +11,7 @@ license = "Apache-2.0"
 categories = ["wasm"]
 keywords = ["wasm", "WebAssembly", "instrumentation"]
 include = [
-    "**/*.rs",
+    "src/**/*.rs",
     "Cargo.toml",
 ]
 
