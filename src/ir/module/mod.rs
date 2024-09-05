@@ -1535,6 +1535,7 @@ impl<'a> Module<'a> {
             GlobalID(imp_global_id),
             global_ty,
         ))));
+        self.globals.recalculate_ids = true;
         (GlobalID(imp_global_id), imp_id)
     }
 
