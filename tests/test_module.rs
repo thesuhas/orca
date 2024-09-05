@@ -1,10 +1,10 @@
 use log::{debug, error};
-use orca::ir::function::FunctionBuilder;
-use orca::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
-use orca::ir::module::module_functions::FuncKind::{Import, Local};
-use orca::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca::ir::types::{Body, Value};
-use orca::{DataType, InitExpr, Module, Opcode};
+use orca_wasm::ir::function::FunctionBuilder;
+use orca_wasm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
+use orca_wasm::ir::module::module_functions::FuncKind::{Import, Local};
+use orca_wasm::ir::module::module_functions::{ImportedFunction, LocalFunction};
+use orca_wasm::ir::types::{Body, Value};
+use orca_wasm::{DataType, InitExpr, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
 

@@ -3,10 +3,10 @@
 //!
 //! You can run this wasm file with `fact.js`
 
-use orca::ir::function::FunctionBuilder;
-use orca::ir::module::*;
-use orca::ir::types::*;
-use orca::opcode::Opcode;
+use orca_wasm::ir::function::FunctionBuilder;
+use orca_wasm::ir::module::*;
+use orca_wasm::ir::types::*;
+use orca_wasm::opcode::Opcode;
 
 fn main() {
     let mut module = Module::new();

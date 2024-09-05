@@ -1,7 +1,7 @@
 mod common;
 
 use crate::common::WASM_OUTPUT_DIR;
-use orca::ir::component::Component;
+use orca_wasm::ir::component::Component;
 use std::fs::File;
 use std::io::Write;
 
