@@ -2,16 +2,17 @@
 
 use crate::ir::id::TypeID;
 use crate::DataType;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 /// Orca's representation of function types, shortened from [Walrus' Representation].
 ///
 /// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FuncType {
     pub params: Box<[DataType]>,
     pub results: Box<[DataType]>,
 }
-
 impl FuncType {
     /// Create a new Function Type
     pub fn new(params: Box<[DataType]>, results: Box<[DataType]>) -> Self {
@@ -23,12 +24,18 @@ impl FuncType {
 #[derive(Clone, Debug, Default)]
 pub struct ModuleTypes {
     pub types: Vec<FuncType>,
+    /// This enables us to quickly do a lookup to determine if a type has already been added
+    pub types_map: HashMap<FuncType, TypeID>,
 }
 
 impl ModuleTypes {
     /// Create a new Module Types section
     pub fn new(types: Vec<FuncType>) -> Self {
-        ModuleTypes { types }
+        let mut types_map = HashMap::default();
+        for (id, ty) in types.iter().enumerate() {
+            types_map.insert(ty.clone(), TypeID(id as u32));
+        }
+        ModuleTypes { types, types_map }
     }
 
     /// Check if there are any types in this module
@@ -43,8 +50,14 @@ impl ModuleTypes {
             param.to_vec().into_boxed_slice(),
             ret.to_vec().into_boxed_slice(),
         );
-        self.types.push(ty);
-        TypeID(index as u32)
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
     }
 
     /// Number of types in this module

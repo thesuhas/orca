@@ -5,8 +5,6 @@
   (type (;3;) (func (param i32 i32 i32 i32) (result i32)))
   (type (;4;) (func (param i32 i32 i32 i32 i32 i32 i32 i32)))
   (type (;5;) (func (param i32 i32) (result i32)))
-  ;; << (type (;6;) (func))
-  ;; << (type (;7;) (func))
   (import "bogus" "hi" (func (;0;) (type 2)))
   ;; << (import "test0" "func0" (func (;1;) (type 2)))
   ;; << (import "test1" "func1" (func (;2;) (type 2)))
@@ -27,12 +25,12 @@
     call 2 ;; < call 4
     drop
     )
-  ;; << (func (;6;) (type 6)
+  ;; << (func (;6;) (type 0)
   ;; <<   i32.const 1
   ;; <<   i32.const 1
   ;; <<   call 1
   ;; << )
-  ;; << (func (;7;) (type 7)
+  ;; << (func (;7;) (type 0)
   ;; <<   i32.const 2
   ;; <<   drop
   ;; <<   call 6
