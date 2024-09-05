@@ -10,12 +10,9 @@ repository = "https://github.com/thesuhas/orca"
 license = "Apache-2.0"
 categories = ["wasm"]
 keywords = ["wasm", "WebAssembly", "instrumentation"]
-exclude = [
-    "tests/*",
-    ".github/*",
-    ".cargo_vcs_info.json",
-    ".gitignore",
-
+include = [
+    "**/*.rs",
+    "Cargo.toml",
 ]
 
 [dependencies]
