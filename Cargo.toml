@@ -1,5 +1,5 @@
 [package]
-name = "orca"
+name = "orca-wasm"
 version = "0.1.0"
 edition = "2021"
 authors = ["Suhas Thalanki", "Alex Bai", "Elizabeth Gilbert"]
