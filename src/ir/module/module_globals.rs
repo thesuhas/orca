@@ -126,7 +126,7 @@ impl Global {
 #[derive(Clone, Debug, Default)]
 pub struct ModuleGlobals {
     globals: Vec<Global>,
-    pub(crate) recalculate_ids: bool
+    pub(crate) recalculate_ids: bool,
 }
 
 impl Iter<Global> for ModuleGlobals {

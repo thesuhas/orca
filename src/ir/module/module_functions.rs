@@ -232,7 +232,7 @@ impl ImportedFunction {
 #[derive(Clone, Debug, Default)]
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
-    pub(crate) recalculate_ids: bool
+    pub(crate) recalculate_ids: bool,
 }
 
 impl<'a> Iter<Function<'a>> for Functions<'a> {
@@ -267,7 +267,10 @@ impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
 impl<'a> Functions<'a> {
     /// Create a new functions section
     pub fn new(functions: Vec<Function<'a>>) -> Self {
-        Functions { functions, recalculate_ids: false }
+        Functions {
+            functions,
+            recalculate_ids: false,
+        }
     }
 
     /// Get a function by its FunctionID
