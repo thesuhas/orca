@@ -4,6 +4,12 @@
 /// LocalID in a function
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct LocalID(pub u32);
+impl From<usize> for LocalID {
+    fn from(value: usize) -> Self {
+        LocalID(value as u32)
+    }
+}
+
 impl std::ops::Deref for LocalID {
     type Target = u32;
     fn deref(&self) -> &Self::Target {
@@ -115,6 +121,13 @@ impl std::ops::DerefMut for ImportsID {
 /// ExportsID - Refers to an exports position in a module/component's list of exports
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExportsID(pub u32);
+
+impl From<usize> for ExportsID {
+    fn from(value: usize) -> Self {
+        ExportsID(value as u32)
+    }
+}
+
 impl std::ops::Deref for ExportsID {
     type Target = u32;
     fn deref(&self) -> &Self::Target {
