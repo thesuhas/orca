@@ -1,7 +1,7 @@
-use orca::ir::id::FunctionID;
-use orca::opcode::Instrumenter;
-use orca::Opcode;
-use orca::{Location, Module};
+use orca_wasm::ir::id::FunctionID;
+use orca_wasm::opcode::Instrumenter;
+use orca_wasm::Opcode;
+use orca_wasm::{Location, Module};
 use std::process::Command;
 
 // #[test]

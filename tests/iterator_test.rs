@@ -1,13 +1,13 @@
 use log::{debug, trace};
-use orca::ir::component::Component;
-use orca::ir::id::{FunctionID, ModuleID};
-use orca::ir::module::Module;
-use orca::ir::types::Location;
-use orca::iterator::component_iterator::ComponentIterator;
-use orca::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
-use orca::iterator::module_iterator::ModuleIterator;
-use orca::module_builder::AddLocal;
-use orca::opcode::Instrumenter;
+use orca_wasm::ir::component::Component;
+use orca_wasm::ir::id::{FunctionID, ModuleID};
+use orca_wasm::ir::module::Module;
+use orca_wasm::ir::types::Location;
+use orca_wasm::iterator::component_iterator::ComponentIterator;
+use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
+use orca_wasm::iterator::module_iterator::ModuleIterator;
+use orca_wasm::module_builder::AddLocal;
+use orca_wasm::opcode::Instrumenter;
 use std::collections::{HashMap, HashSet};
 use wasmparser::Operator;
 
@@ -128,8 +128,8 @@ fn test_it_add_local_diff_type() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    mod_it.add_local(orca::ir::types::DataType::I64);
-    mod_it.add_local(orca::ir::types::DataType::I32);
+    mod_it.add_local(orca_wasm::ir::types::DataType::I64);
+    mod_it.add_local(orca_wasm::ir::types::DataType::I32);
     let a = module.encode();
     let wat = wasmprinter::print_bytes(&a).unwrap();
     debug!("{}", wat);

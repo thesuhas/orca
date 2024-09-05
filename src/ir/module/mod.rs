@@ -101,7 +101,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca::Module;
+    /// use orca_wasm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -501,7 +501,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca::Module;
+    /// use orca_wasm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
