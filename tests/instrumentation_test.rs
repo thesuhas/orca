@@ -1,12 +1,12 @@
 use log::{error, trace};
-use orca::ir::id::FunctionID;
-use orca::ir::types::InstrumentationMode;
-use orca::iterator::component_iterator::ComponentIterator;
-use orca::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
-use orca::iterator::module_iterator::ModuleIterator;
-use orca::module_builder::AddLocal;
-use orca::opcode::{Inject, Instrumenter};
-use orca::{Component, Location, Module, Opcode};
+use orca_wasm::ir::id::FunctionID;
+use orca_wasm::ir::types::InstrumentationMode;
+use orca_wasm::iterator::component_iterator::ComponentIterator;
+use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
+use orca_wasm::iterator::module_iterator::ModuleIterator;
+use orca_wasm::module_builder::AddLocal;
+use orca_wasm::opcode::{Inject, Instrumenter};
+use orca_wasm::{Component, Location, Module, Opcode};
 use std::collections::HashMap;
 use std::mem::discriminant;
 use wasmparser::Operator;
@@ -210,12 +210,12 @@ fn test_inject_locals() {
             println!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             if mod_it.curr_op().unwrap() == &Operator::I32Add {
-                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
+                let local_id = mod_it.add_local(orca_wasm::ir::types::DataType::I32);
                 println!("new Local ID: {:?}", local_id);
             }
 
             if mod_it.curr_op().unwrap() == &(Operator::I32Const { value: 2 }) {
-                let local_id = mod_it.add_local(orca::ir::types::DataType::I32);
+                let local_id = mod_it.add_local(orca_wasm::ir::types::DataType::I32);
                 println!("new Local ID: {:?}", local_id);
             }
         } else {

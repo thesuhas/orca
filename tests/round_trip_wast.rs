@@ -1,4 +1,4 @@
-use orca::Component;
+use orca_wasm::Component;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;

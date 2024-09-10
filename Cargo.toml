@@ -1,6 +1,6 @@
 [package]
-name = "orca"
-version = "0.1.0"
+name = "orca-wasm"
+version = "0.1.1"
 edition = "2021"
 authors = ["Suhas Thalanki", "Alex Bai", "Elizabeth Gilbert"]
 description = "A lightweight WebAssembly Transformation Library for the Component Model"
@@ -10,6 +10,10 @@ repository = "https://github.com/thesuhas/orca"
 license = "Apache-2.0"
 categories = ["wasm"]
 keywords = ["wasm", "WebAssembly", "instrumentation"]
+include = [
+    "src/**/*.rs",
+    "Cargo.toml",
+]
 
 [dependencies]
 wasm-encoder = { version = "0.215.0", features = ["wasmparser"]}
