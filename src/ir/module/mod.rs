@@ -30,6 +30,7 @@ use crate::{InitExpr, Location, Opcode};
 use gimli::{Dwarf, EndianSlice, LittleEndian, SectionId};
 use log::{error, warn};
 use std::collections::HashMap;
+use std::ops::Range;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef};
@@ -138,6 +139,7 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
+        let mut code_section_offset: usize = 0;
 
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
@@ -246,10 +248,11 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionStart {
                     count,
-                    range: _,
+                    range,
                     size: _,
                 } => {
                     code_section_count = count as usize;
+                    code_section_offset = range.start;
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
@@ -284,14 +287,30 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool: Vec<_> =
-                        instructions.into_iter().map(Instruction::new).collect();
+                    let instructions_bool: Vec<_> = instructions
+                        .into_iter()
+                        .enumerate()
+                        .map(|(offset, instruction)| Instruction::new(instruction, offset))
+                        .collect();
+
+                    let function_body_size = body.range().end - body.range().start;
+                    let function_body_size_bit =
+                        (size_of::<usize>() as u32 * 8 - function_body_size.leading_zeros() - 1)
+                            / 7
+                            + 1;
+
                     code_sections.push(Body {
                         locals,
                         num_locals,
                         instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
                         name: None,
+                        range: Some(Range {
+                            start: body.range().start
+                                - code_section_offset
+                                - (function_body_size_bit as usize),
+                            end: body.range().end - code_section_offset,
+                        }),
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -467,6 +486,27 @@ impl<'a> Module<'a> {
             ));
         }
 
+        // Iterate over all compilation units.
+        let mut iter = debug.dwarf.units();
+        while let Some(header) = iter.next()? {
+            // Parse the abbreviations and other information for this compilation unit.
+            let unit = debug.dwarf.unit(header)?;
+
+            // Iterate over all of this compilation unit's entries.
+            let mut entries = unit.entries();
+            while let Some((_, entry)) = entries.next_dfs()? {
+                // If we find an entry for a function, print it.
+                if entry.tag() == gimli::DW_TAG_subprogram {
+                    println!("Found a function: {:?}", entry);
+                    let mut attrs = entry.attrs();
+                    while let Some(attr) = attrs.next().unwrap() {
+                        println!("Attribute name = {:?}", attr.name());
+                        println!("Attribute value = {:?}", attr.value());
+                    }
+                }
+            }
+        }
+
         let num_globals = globals.len() as u32;
         let num_memories = memories.len() as u32;
         let num_tables = tables.len() as u32;
@@ -474,7 +514,7 @@ impl<'a> Module<'a> {
         Ok(Module {
             types: ModuleTypes::new(types),
             imports,
-            functions: Functions::new(final_funcs),
+            functions: Functions::new(final_funcs, code_section_offset),
             tables: ModuleTables::new(tables),
             memories,
             globals: module_globals,
@@ -581,6 +621,7 @@ impl<'a> Module<'a> {
                     Instruction {
                         op,
                         instr_flag: instrumentation,
+                        ..
                     },
                 ) in readable_copy_of_body.iter().enumerate()
                 {
@@ -1148,6 +1189,7 @@ impl<'a> Module<'a> {
                     Instruction {
                         op,
                         instr_flag: instrument,
+                        ..
                     },
                 ) in instructions.iter_mut().enumerate()
                 {

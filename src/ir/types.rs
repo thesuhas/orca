@@ -6,6 +6,7 @@ use std::cmp::PartialEq;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
+use std::ops::Range;
 use std::slice::{Iter, IterMut};
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::AbstractHeapType;
@@ -837,6 +838,7 @@ pub struct Body<'a> {
     pub instructions: Vec<Instruction<'a>>,
     pub num_instructions: usize,
     pub name: Option<String>,
+    pub(crate) range: Option<Range<usize>>,
 }
 
 // 'b should outlive 'a
@@ -846,7 +848,9 @@ where
 {
     /// Push a new operator (instruction) to the end of the body
     pub fn push_op(&mut self, op: Operator<'b>) {
-        self.instructions.push(Instruction::new(op));
+        // TODO: See if an offset is needed for instrumented instruction or not
+        self.instructions
+            .push(Instruction::new(op, self.instructions.len()));
         self.num_instructions += 1;
     }
 
@@ -875,15 +879,18 @@ where
 pub struct Instruction<'a> {
     pub op: Operator<'a>,
     pub instr_flag: InstrumentationFlag<'a>,
+    // Represents offset in the function
+    pub(crate) offset: usize,
 }
 impl<'a, 'b> Instruction<'a>
 where
     'b: 'a,
 {
-    pub fn new(op: Operator<'b>) -> Self {
+    pub fn new(op: Operator<'b>, offset: usize) -> Self {
         Self {
             op,
             instr_flag: InstrumentationFlag::default(),
+            offset,
         }
     }
 
