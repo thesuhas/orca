@@ -42,13 +42,10 @@ jobs:
     needs: [ rustfmt, build_and_test ]
     runs-on: ubuntu-latest
     permissions:
-#      Gives write permisison to commit toml changes
+      # Gives write permisison to commit toml changes
       contents: write
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
 
@@ -59,11 +56,11 @@ jobs:
         with:
           release_type: 'patch'
 
-      - uses: stefanzweifel/git-auto-commit-action@v5
       - name: Commit updated toml
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Version Bump
-          file_pattern: '*toml *lock'
+          file_pattern: 'Cargo.toml Cargo.lock'
 
       - name: cargo publish
         run: cargo publish
