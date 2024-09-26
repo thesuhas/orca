@@ -59,8 +59,8 @@ jobs:
         with:
           release_type: 'patch'
 
-      - name: Commit updated toml
       - uses: stefanzweifel/git-auto-commit-action@v5
+      - name: Commit updated toml
         with:
           commit_message: Version Bump
           file_pattern: '*toml *lock'
