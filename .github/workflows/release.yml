@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "release-v*"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,6 +49,7 @@ jobs:
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
 
+      - uses: actions/checkout@v4
       - name: check contents
         run: ls -la
 
