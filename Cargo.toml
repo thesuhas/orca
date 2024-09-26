@@ -1,7 +1,7 @@
 [package]
 name = "orca-wasm"
 version = "0.1.1"
-edition = "2024"
+edition = "2021"
 authors = ["Suhas Thalanki", "Alex Bai", "Elizabeth Gilbert"]
 description = "A lightweight WebAssembly Transformation Library for the Component Model"
 readme = "README.md"
