@@ -50,10 +50,6 @@ jobs:
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
 
       - uses: actions/checkout@v4
-      - name: check contents
-        run: ls -la
-
-      - uses: actions/checkout@v4
       - name: Bump Version
         id: bump
         uses: tj-actions/cargo-bump@v3
