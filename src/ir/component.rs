@@ -17,7 +17,7 @@ use crate::ir::wrappers::{
 use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
 use crate::ir::types::CustomSections;
-use wasm_encoder::reencode::Reencode;
+use wasm_encoder::reencode::{Reencode, ReencodeComponent};
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
