@@ -43,15 +43,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
-
-      - uses: actions/checkout@v4
-      - name: check contents
-        run: ls -la
 
       - uses: actions/checkout@v4
       - name: Bump Version
