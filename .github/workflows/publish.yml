@@ -13,7 +13,7 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merge == true && github.event.pull_request.head == 'automated_release' && github.event.pull_request.base == 'main'
+    if: github.event.pull_request.merge == true && github.event.pull_request.head == 'automated_release'
     steps:
       - name: Publish Update
         run: cargo publish
