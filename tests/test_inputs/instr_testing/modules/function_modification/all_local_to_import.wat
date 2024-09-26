@@ -11,15 +11,15 @@
   ;; << (import "all" "local" (func (;0;) (type 2)))
   ;; << (import "to" "import" (func (;0;) (type 2)))
   ;; << (import "please" "work" (func (;0;) (type 2)))
-  (func (;3;) (type 0) ;; rm
+  (func $local (;3;) (type 0) ;; rm
      i32.const 1 ;; rm
      drop ;; rm
      ) ;; rm
-  (func (;4;) (type 0) ;; rm
+  (func $import (;4;) (type 0) ;; rm
     i32.const 2 ;; rm
     drop ;; rm
     ) ;; rm
-  (func (;5;) (type 0) ;; rm
+  (func $work (;5;) (type 0) ;; rm
     i32.const 3 ;; rm
     drop ;; rm
     ) ;; rm
