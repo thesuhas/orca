@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - "release"
+  pull_request:
+    branches: [ "main" ]
+    tags:
+      - "release"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Check Code style quickly by running `rustfmt` over all code
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all -- --check
+
+  build_and_test:
+    name: Build project and run all unit AND integration tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install wasm-tools
+        run: |
+          cargo install wasm-tools
+      - name: Build
+        run: |
+          cargo build --verbose --release
+      - name: Run tests
+        run: cargo test --verbose
+
+  release:
+    name: Release a new version of orca
+    needs: [ rustfmt, build_and_test ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: cargo login
+        run: cargo login ${{ secrets.ORCA_API_TOKEN }}
+
+      - name: Bump Version
+        id: bump
+        uses: tj-actions/cargo-bump@v3
+
+      - name: Test version bump
+        run: |
+          echo "Old: ${{ steps.bump.outputs.old_version}}"
+          echo "New: ${{ steps.bump.outputs.new_version}}"
+
+      - name: cargo publish
+        run: cargo publish
