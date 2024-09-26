@@ -44,6 +44,7 @@ jobs:
     permissions:
       # Gives write permisison to commit toml changes
       contents: write
+      pull-requests: write
 
     steps:
       - name: cargo login
@@ -61,7 +62,5 @@ jobs:
         with:
           commit_message: Version Bump
           file_pattern: 'Cargo.toml'
-          branch: main
-
-      - name: cargo publish
-        run: cargo publish
+          branch: automated-release
+          create_branch: 'true'
