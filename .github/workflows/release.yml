@@ -60,7 +60,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Version Bump
-          file_pattern: 'Cargo.toml Cargo.lock'
+          file_pattern: 'Cargo.toml'
 
       - name: cargo publish
         run: cargo publish
