@@ -48,6 +48,9 @@ jobs:
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
 
+      - name: check contents
+        run: ls -la
+
       - uses: actions/checkout@v4
       - name: Bump Version
         id: bump
