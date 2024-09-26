@@ -41,6 +41,9 @@ jobs:
     name: Release a new version of orca
     needs: [ rustfmt, build_and_test ]
     runs-on: ubuntu-latest
+    permissions:
+#      Gives write permisison to commit toml changes
+      contents: write
 
     steps:
       - name: Checkout Code
@@ -56,10 +59,11 @@ jobs:
         with:
           release_type: 'patch'
 
-      - name: Test version bump
-        run: |
-          echo "Old: ${{ steps.bump.outputs.old_version}}"
-          echo "New: ${{ steps.bump.outputs.new_version}}"
+      - name: Commit updated toml
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Version Bump
+          file_pattern: '*toml *lock'
 
       - name: cargo publish
         run: cargo publish
