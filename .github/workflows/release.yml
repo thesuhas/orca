@@ -57,6 +57,8 @@ jobs:
       - name: Bump Version
         id: bump
         uses: tj-actions/cargo-bump@v3
+        with:
+          release_type: 'patch'
 
       - name: Test version bump
         run: |
