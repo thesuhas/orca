@@ -50,8 +50,8 @@ jobs:
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
 
-      - name: Uninstall Existing cargo-bump
-        run: cargo uninstall cargo-bump || true
+      - name: Cargo clean
+        run: cargo clean
 
       - uses: actions/checkout@v4
       - name: Bump Version
