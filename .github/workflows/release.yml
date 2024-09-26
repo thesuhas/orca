@@ -61,6 +61,7 @@ jobs:
         with:
           commit_message: Version Bump
           file_pattern: 'Cargo.toml'
+          branch: main
 
       - name: cargo publish
         run: cargo publish
