@@ -2,7 +2,7 @@
 
 use gimli::SectionId;
 use std::collections::HashMap;
-use wasm_encoder::reencode::Reencode;
+use wasm_encoder::reencode::{Reencode, ReencodeComponent};
 use wasm_encoder::{
     Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
 };

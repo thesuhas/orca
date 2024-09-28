@@ -1531,7 +1531,7 @@ impl<'a> Module<'a> {
             deleted: false,
         });
         self.functions
-            .get_mut(function_id as FunctionID)
+            .get_mut(function_id)
             .set_kind(FuncKind::Import(ImportedFunction {
                 import_id,
                 import_fn_id: function_id,

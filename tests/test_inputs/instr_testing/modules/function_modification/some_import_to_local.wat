@@ -24,11 +24,11 @@
     call 4 ;; < call 2
     drop
     )
-   ;; << (func (;3;) (type 2) (param i32 i32)
+   ;; << (func $hi (;3;) (type 2) (param i32 i32)
    ;; <<   i32.const 1
    ;; <<   drop
    ;; <<   )
-   ;; << (func (;4;) (type 2) (param i32 i32)
+   ;; << (func $better (;4;) (type 2) (param i32 i32)
    ;; <<   i32.const 2
    ;; <<   drop
    ;; <<   )

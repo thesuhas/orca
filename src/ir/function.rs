@@ -55,15 +55,17 @@ impl<'a> FunctionBuilder<'a> {
         self.end();
 
         let err_msg = "Could not replace the specified import with this function,";
-        if let TypeRef::Func(imp_ty_id) = module.imports.get(import_id).ty {
+        let imp = module.imports.get(import_id);
+        if let TypeRef::Func(imp_ty_id) = imp.ty {
             if let Some(ty) = module.types.get(TypeID(imp_ty_id)) {
                 if *ty.params == self.params && *ty.results == self.results {
-                    let local_func = LocalFunction::new(
+                    let mut local_func = LocalFunction::new(
                         TypeID(imp_ty_id),
                         FunctionID(*import_id),
                         self.body.clone(),
                         self.params.len(),
                     );
+                    local_func.body.name = Some(imp.name.to_string());
                     module.convert_import_fn_to_local(import_id, local_func);
                 } else {
                     panic!("{err_msg} types are not equivalent.")
