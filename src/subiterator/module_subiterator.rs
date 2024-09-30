@@ -73,6 +73,9 @@ impl ModuleSubIterator {
 
     /// Goes to the next function in the module
     fn next_function(&mut self) -> bool {
+        if !self.has_next_function() {
+            return false;
+        }
         self.curr_idx += 1;
 
         // skip over configured funcs

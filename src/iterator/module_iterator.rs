@@ -32,9 +32,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
     }
 
     pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
-        if !self.mod_iterator.has_next_function() {
-            None
-        } else if let (
+        if let (
             Location::Module {
                 func_idx,
                 instr_idx,
@@ -43,7 +41,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
             ..,
         ) = self.mod_iterator.curr_loc()
         {
-            match &self.module.functions.get(func_idx as FunctionID).kind {
+            match &self.module.functions.get(func_idx).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
                 FuncKind::Local(l) => Some(l.body.instructions[instr_idx].op.clone()),
             }
@@ -236,7 +234,7 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
             ..
         } = loc
         {
-            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+            match self.module.functions.get_mut(func_idx).kind {
                 FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
                 FuncKind::Local(ref mut l) => {
                     l.body.instructions[instr_idx].instr_flag.alternate = Some(vec![])
@@ -332,9 +330,7 @@ impl<'a> Iterator for ModuleIterator<'_, 'a> {
 
     /// Returns the current instruction
     fn curr_op(&self) -> Option<&Operator<'a>> {
-        if !self.mod_iterator.has_next_function() {
-            None
-        } else if let (
+        if let (
             Location::Module {
                 func_idx,
                 instr_idx,
@@ -343,7 +339,7 @@ impl<'a> Iterator for ModuleIterator<'_, 'a> {
             ..,
         ) = self.mod_iterator.curr_loc()
         {
-            match &self.module.functions.get(func_idx as FunctionID).kind {
+            match &self.module.functions.get(func_idx).kind {
                 FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
                 FuncKind::Local(l) => Some(&l.body.instructions[instr_idx].op),
             }
