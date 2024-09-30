@@ -1,15 +1,14 @@
 //! Iterator to traverse a Module
 
 use crate::ir::id::{FunctionID, GlobalID, LocalID};
-use crate::ir::module::module_functions::{FuncKind, LocalFunction};
+use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
-use crate::ir::module::{Iter, Module};
+use crate::ir::module::Module;
 use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::subiterator::module_subiterator::ModuleSubIterator;
-use std::collections::HashMap;
 use wasmparser::Operator;
 
 /// Iterator for a Module.
@@ -25,25 +24,15 @@ pub struct ModuleIterator<'a, 'b> {
 impl<'a, 'b> ModuleIterator<'a, 'b> {
     /// Creates a new ModuleIterator
     pub fn new(module: &'a mut Module<'b>, skip_funcs: &Vec<FunctionID>) -> Self {
-        // Creates Function -> Number of Instructions
-        let mut metadata = HashMap::new();
-        for func in module.functions.iter() {
-            match &func.kind {
-                FuncKind::Import(_) => {}
-                FuncKind::Local(LocalFunction { func_id, body, .. }) => {
-                    metadata.insert(*func_id, body.num_instructions);
-                }
-            }
-        }
-        let num_funcs = module.num_local_functions;
+        let metadata = module.get_func_metadata();
         ModuleIterator {
             module,
-            mod_iterator: ModuleSubIterator::new(num_funcs, metadata, skip_funcs.to_owned()),
+            mod_iterator: ModuleSubIterator::new(metadata, skip_funcs.to_owned()),
         }
     }
 
     pub fn curr_op_owned(&self) -> Option<Operator<'b>> {
-        if self.mod_iterator.end() {
+        if !self.mod_iterator.has_next_function() {
             None
         } else if let (
             Location::Module {
@@ -343,7 +332,7 @@ impl<'a> Iterator for ModuleIterator<'_, 'a> {
 
     /// Returns the current instruction
     fn curr_op(&self) -> Option<&Operator<'a>> {
-        if self.mod_iterator.end() {
+        if !self.mod_iterator.has_next_function() {
             None
         } else if let (
             Location::Module {

@@ -13,8 +13,8 @@ pub struct ComponentSubIterator {
     num_mods: usize,
     /// The module iterator used to keep track of the location in the module.
     pub(crate) mod_iterator: ModuleSubIterator,
-    /// Metadata that maps Module Index -> Function Index -> Instruction Index
-    metadata: HashMap<ModuleID, HashMap<FunctionID, usize>>,
+    /// Metadata that maps Module Index -> Vec<(Function Index, Instruction Index)>
+    metadata: HashMap<ModuleID, Vec<(FunctionID, usize)>>,
     /// Map of Module -> Functions to skip in that module. Provide an empty HashMap if no functions are to be skipped.
     skip_funcs: HashMap<ModuleID, Vec<FunctionID>>,
 }
@@ -24,7 +24,7 @@ impl ComponentSubIterator {
     pub fn new(
         curr_mod: ModuleID,
         num_mods: usize,
-        metadata: HashMap<ModuleID, HashMap<FunctionID, usize>>,
+        metadata: HashMap<ModuleID, Vec<(FunctionID, usize)>>,
         skip_funcs: HashMap<ModuleID, Vec<FunctionID>>,
     ) -> Self {
         // Get current skip func
@@ -34,7 +34,6 @@ impl ComponentSubIterator {
             num_mods,
             metadata: metadata.clone(),
             mod_iterator: ModuleSubIterator::new(
-                metadata.get(&ModuleID(0)).unwrap().keys().len() as u32,
                 (*metadata.get(&curr_mod).unwrap()).clone(),
                 match skip_funcs.contains_key(&curr_mod) {
                     true => skip_funcs.get(&curr_mod).unwrap().clone(),
@@ -56,11 +55,9 @@ impl ComponentSubIterator {
     fn next_module(&mut self) -> bool {
         *self.curr_mod += 1;
         if *self.curr_mod < self.num_mods as u32 {
-            let num_funcs = self.metadata.get(&self.curr_mod).unwrap().keys().len() as u32;
             let met = self.metadata.get(&self.curr_mod).unwrap().clone();
             // If we're defining a new module, we have to reset function
             self.mod_iterator = ModuleSubIterator::new(
-                num_funcs,
                 met,
                 match self.skip_funcs.contains_key(&self.curr_mod) {
                     true => self.skip_funcs.get(&self.curr_mod).unwrap().clone(),
@@ -80,7 +77,7 @@ impl ComponentSubIterator {
 
     /// Gets the index of the current function in the current module
     pub fn curr_func_idx(&self) -> FunctionID {
-        self.mod_iterator.curr_func
+        self.mod_iterator.get_curr_func().0
     }
 
     /// Gets the index of the current instruction in the current function

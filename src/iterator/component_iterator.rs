@@ -2,9 +2,8 @@
 
 use crate::ir::component::Component;
 use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
-use crate::ir::module::module_functions::{FuncKind, LocalFunction};
+use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
-use crate::ir::module::Iter;
 use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
@@ -22,7 +21,7 @@ pub struct ComponentIterator<'a, 'b> {
     comp_iterator: ComponentSubIterator,
 }
 
-fn print_metadata(metadata: &HashMap<ModuleID, HashMap<FunctionID, usize>>) {
+fn print_metadata(metadata: &HashMap<ModuleID, Vec<(FunctionID, usize)>>) {
     for c in metadata.keys() {
         println!("Module: {:?}", c);
         for (m, i) in metadata.get(c).unwrap().iter() {
@@ -41,16 +40,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
         // Creates Module -> Function -> Number of Instructions
         let mut metadata = HashMap::new();
         for (mod_idx, m) in comp.modules.iter().enumerate() {
-            let mut mod_metadata = HashMap::new();
-            for func in m.functions.iter() {
-                match &func.kind {
-                    FuncKind::Import(_) => {}
-                    FuncKind::Local(LocalFunction { func_id, body, .. }) => {
-                        mod_metadata.insert(*func_id, body.num_instructions);
-                    }
-                }
-            }
-            metadata.insert(ModuleID(mod_idx as u32), mod_metadata);
+            metadata.insert(ModuleID(mod_idx as u32), m.get_func_metadata());
         }
         print_metadata(&metadata);
         let num_modules = comp.num_modules;
