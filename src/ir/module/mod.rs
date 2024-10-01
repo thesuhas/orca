@@ -488,6 +488,20 @@ impl<'a> Module<'a> {
         })
     }
 
+    /// Creates Vec of (Function, Number of Instructions)
+    pub fn get_func_metadata(&self) -> Vec<(FunctionID, usize)> {
+        let mut metadata = vec![];
+        for func in self.functions.iter() {
+            match &func.kind {
+                FuncKind::Import(_) => {}
+                FuncKind::Local(LocalFunction { func_id, body, .. }) => {
+                    metadata.push((*func_id, body.num_instructions));
+                }
+            }
+        }
+        metadata
+    }
+
     /// Emit the module into a wasm binary file.
     pub fn emit_wasm(&mut self, file_name: &str) -> Result<(), std::io::Error> {
         let module = self.encode_internal();
