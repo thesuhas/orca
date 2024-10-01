@@ -186,10 +186,10 @@ impl<'a> LocalFunction<'a> {
 pub(crate) fn add_local(
     ty: DataType,
     num_params: usize,
-    num_locals: &mut usize,
+    num_locals: &mut u32,
     locals: &mut Vec<(u32, DataType)>,
 ) -> LocalID {
-    let index = num_params + *num_locals;
+    let index = num_params + *num_locals as usize;
 
     let len = locals.len();
     *num_locals += 1;

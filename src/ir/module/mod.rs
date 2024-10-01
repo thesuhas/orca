@@ -243,13 +243,13 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
+                    let num_locals = locals_reader.get_count();
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let locals: Vec<(u32, DataType)> = locals
                         .iter()
                         .map(|(idx, val_type)| (*idx, DataType::from(*val_type)))
                         .collect();
-                    // TODO: can I just iter locals once?
-                    let num_locals = locals.iter().fold(0, |acc, x| acc + x.0) as usize;
+
                     let instructions = body
                         .get_operators_reader()?
                         .into_iter()
