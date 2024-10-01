@@ -57,7 +57,13 @@ jobs:
         with:
           release_type: 'patch'
 
+      - name: Echo versions
+        run: |
+          echo "New Version: ${{ steps.bump.outputs.new_version }}"
+          echo "Old Version: ${{ steps.bump.outputs.old_version }}"
+
       - name: Raise PR with changes
         uses: peter-evans/create-pull-request@v7
         with:
           branch: 'release/${{ steps.bump.outputs.new_version }}'
+
