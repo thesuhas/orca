@@ -1,12 +1,12 @@
+use log::trace;
+use orca_wasm::ir::function::FunctionBuilder;
 use orca_wasm::ir::id::{FunctionID, TypeID};
+use orca_wasm::iterator::iterator_trait::Iterator;
+use orca_wasm::iterator::module_iterator::ModuleIterator;
 use orca_wasm::opcode::Instrumenter;
 use orca_wasm::{DataType, Opcode};
 use orca_wasm::{Location, Module};
 use std::process::Command;
-use log::trace;
-use orca_wasm::ir::function::FunctionBuilder;
-use orca_wasm::iterator::iterator_trait::Iterator;
-use orca_wasm::iterator::module_iterator::ModuleIterator;
 
 // #[test]
 // build factorial from scratch
