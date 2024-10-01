@@ -60,4 +60,4 @@ jobs:
       - name: Raise PR with changes
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: 'release/${{ bump.new_version }}'
+          branch: 'release/${{ steps.bump.outputs.new_version }}'
