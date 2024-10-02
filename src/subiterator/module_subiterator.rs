@@ -65,8 +65,11 @@ impl ModuleSubIterator {
 
     fn handle_skips(&mut self) {
         let mut curr_fid = self.get_curr_func().0;
-        while self.has_next_function() && self.skip_funcs.contains(&curr_fid) {
+        while self.skip_funcs.contains(&curr_fid) {
             self.curr_idx += 1;
+            if self.curr_idx >= self.metadata.len() {
+                break;
+            }
             curr_fid = self.get_curr_func().0;
         }
     }
