@@ -60,6 +60,8 @@ jobs:
       - name: Create branch, commit, and raise PR
         run: |
           version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          git config --global user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git checkout -b release-v$version
           git add .
           git commit -m "Release Version v$version"
