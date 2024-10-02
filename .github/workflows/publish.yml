@@ -13,7 +13,7 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merge == true && github.event.pull_request.head == 'automated_release'
+    if: github.event.pull_request.merge == true && startsWith(github.head_ref, 'release-v')
     steps:
       - name: cargo login
         run: cargo login ${{ secrets.ORCA_API_TOKEN }}
