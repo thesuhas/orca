@@ -65,7 +65,7 @@ jobs:
           git checkout -b release-v$version
           git add .
           git commit -m "Release Version v$version"
-          git push
+          git push --set-upstream origin release-v$version
           gh pr create --title "Release v$version" --body "Creating a release for Orca v$version"
 
 
