@@ -51,18 +51,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Bump Version
-        id: bump
-        uses: tj-actions/cargo-bump@v3
-        with:
-          release_type: 'patch'
+      - name: Install cargo bump
+        run: cargo install cargo-bump
 
+      - name: Run Cargo Bump
+        run: cargo bump patch
 
-      - name: Raise PR with changes
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: 'release/${{ steps.bump.outputs.new_version }}'
-          base: main
-          title: 'Created release ${{ steps.bump.outputs.new_version }}'
+      - name: Create branch, commit, and raise PR
+        run: |
+          version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          git checkout -b release-v$version
+          git add .
+          git commit -m "Release Version v$version"
+          git push
+          gh pr create --title "Release v$version" --body "Creating a release for Orca v$version"
 
 
