@@ -159,9 +159,10 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         });
         func_modifier
     }
-
+}
+impl AddLocal for FunctionModifier<'_, '_> {
     /// add a local and return local index
-    pub fn add_local(&mut self, ty: DataType) -> LocalID {
+    fn add_local(&mut self, ty: DataType) -> LocalID {
         add_local(
             ty,
             self.args.len(),
