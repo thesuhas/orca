@@ -4,6 +4,7 @@ use super::types::{DataType, Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::dwarf::ModuleDebugData;
 use crate::ir::function::FunctionModifier;
+use crate::ir::helpers::get_size_of_local;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
@@ -27,12 +28,15 @@ use crate::ir::wrappers::{
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{InitExpr, Location, Opcode};
-use gimli::{Dwarf, EndianSlice, LittleEndian, SectionId};
+use gimli::write::LineProgram;
+use gimli::{Dwarf, EndianSlice, LineRow, LittleEndian, SectionId};
 use log::{error, warn};
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::ops::Range;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
+use wasm_encoder::Encode;
 use wasmparser::{ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef};
 
 pub mod module_exports;
@@ -256,6 +260,8 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
+                    let locals_size = get_size_of_local(body.as_bytes());
+                    // TODO: Can collapse these loops into one
                     let num_locals = locals_reader.get_count();
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let locals: Vec<(u32, DataType)> = locals
@@ -287,12 +293,22 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool: Vec<_> = instructions
-                        .into_iter()
-                        .enumerate()
-                        .map(|(offset, instruction)| Instruction::new(instruction, offset))
-                        .collect();
 
+                    // TODO: See if this can be optimized
+                    let mut instructions_bool = vec![];
+                    let mut buff = vec![]; // Size of the buffer will be used to determine the offset
+                    let mut reencode = RoundtripReencoder;
+                    let mut offset: usize = 0; // TODO: This needs to be initialised to the location of the first instruction. Must take into account initialisation space taken up by locals
+                    for instr in instructions.iter() {
+                        instructions_bool.push(Instruction::new(
+                            instr.clone(),
+                            offset + locals_size as usize + body.range().start,
+                        ));
+                        let i = reencode.instruction(instr.clone()).unwrap();
+                        i.encode(&mut buff);
+                        offset += buff.len();
+                        buff.clear();
+                    }
                     let function_body_size = body.range().end - body.range().start;
                     let function_body_size_bit =
                         (size_of::<usize>() as u32 * 8 - function_body_size.leading_zeros() - 1)
@@ -497,7 +513,11 @@ impl<'a> Module<'a> {
             while let Some((_, entry)) = entries.next_dfs()? {
                 // If we find an entry for a function, print it.
                 if entry.tag() == gimli::DW_TAG_subprogram {
-                    println!("Found a function: {:?}", entry);
+                    println!(
+                        "Found a function: {:?}. Offset: {:?}",
+                        entry,
+                        entry.offset()
+                    );
                     let mut attrs = entry.attrs();
                     while let Some(attr) = attrs.next().unwrap() {
                         println!("Attribute name = {:?}", attr.name());
@@ -1170,7 +1190,13 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
+        let mut instr_loc_map: HashMap<usize, usize> = HashMap::new();
+        let mut code_sec_decl_offset = 0; // Space taken by the code section declaration which is 0xa [size in bytes] [number of functions]
         if !self.num_local_functions > 0 {
+            // TODO Can calculate new offsets for everything here
+            // Can calculate the offset by using code_section_offset + current size of code_section + current size of function
+            let code_section_offset = module.as_slice().len();
+            code_sec_decl_offset = code_section_offset;
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in 0..self.functions.len() {
                 if self.functions.is_deleted(FunctionID(rel_func_idx as u32)) {
@@ -1203,7 +1229,7 @@ impl<'a> Module<'a> {
                     Instruction {
                         op,
                         instr_flag: instrument,
-                        ..
+                        offset,
                     },
                 ) in instructions.iter_mut().enumerate()
                 {
@@ -1214,6 +1240,11 @@ impl<'a> Module<'a> {
                         update_global_instr(op, &global_mapping);
                     }
                     if !instrument.has_instr() {
+                        let l = code.byte_len();
+                        instr_loc_map.insert(
+                            *offset,
+                            code_section_offset + code.byte_len() + function.byte_len(),
+                        );
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
                         // this instruction has instrumentation, handle it!
@@ -1265,6 +1296,10 @@ impl<'a> Module<'a> {
                                 );
                             }
                         } else {
+                            instr_loc_map.insert(
+                                *offset,
+                                code_section_offset + code.byte_len() + function.byte_len(),
+                            );
                             encode(&op.clone(), &mut function, &mut reencode);
                         }
 
@@ -1314,8 +1349,10 @@ impl<'a> Module<'a> {
                 }
                 code.function(&function);
             }
+            code_sec_decl_offset += code.byte_len();
             module.section(&code);
         }
+        code_sec_decl_offset = module.as_slice().len() - code_sec_decl_offset;
 
         if !self.data.is_empty() {
             let mut data = wasm_encoder::DataSection::new();
@@ -1334,6 +1371,29 @@ impl<'a> Module<'a> {
                 };
             }
             module.section(&data);
+        }
+
+        let mut unit_iter = self.debug.dwarf.units(); //
+        while let Ok(Some(unit)) = unit_iter.next() {
+            if let Ok(u) = self.debug.dwarf.unit(unit) {
+                println!("Unit: {:?}", u);
+                if let Some(ref program) = u.line_program {
+                    let mut rows = program.clone().rows();
+
+                    while let Some((_, row)) = rows.next_row().unwrap() {
+                        if let Some(file) = program.header().file(row.file_index()) {
+                            let file_name =
+                                self.debug.dwarf.attr_string(&u, file.path_name()).unwrap();
+                            println!(
+                                "Address: {:?} File: {:?} Line: {:?}",
+                                row.address(),
+                                file_name.to_string(),
+                                row.line().unwrap_or(NonZeroU64::new(1).expect("test"))
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         // the name section is not stored in self.custom_sections anymore
