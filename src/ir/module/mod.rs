@@ -243,7 +243,6 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
-                    // let num_locals = locals_reader.get_count();
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let mut num_locals = 0;
                     let locals: Vec<(u32, DataType)> = locals
