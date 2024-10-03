@@ -1,4 +1,3 @@
-use log::trace;
 use orca_wasm::ir::function::FunctionBuilder;
 use orca_wasm::ir::id::{FunctionID, TypeID};
 use orca_wasm::iterator::iterator_trait::Iterator;
