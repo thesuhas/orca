@@ -1,6 +1,7 @@
 //! The Intermediate Representation for components and modules.
 
 pub mod component;
+mod dwarf;
 pub mod function;
 mod helpers;
 pub mod id;

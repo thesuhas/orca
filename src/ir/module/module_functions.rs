@@ -233,6 +233,7 @@ impl ImportedFunction {
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
     pub(crate) recalculate_ids: bool,
+    pub(crate) code_section_offset: usize,
 }
 
 impl<'a> Iter<Function<'a>> for Functions<'a> {
@@ -266,10 +267,11 @@ impl<'a> ReIndexable<Function<'a>> for Functions<'a> {
 
 impl<'a> Functions<'a> {
     /// Create a new functions section
-    pub fn new(functions: Vec<Function<'a>>) -> Self {
+    pub fn new(functions: Vec<Function<'a>>, code_section_offset: usize) -> Self {
         Functions {
             functions,
             recalculate_ids: false,
+            code_section_offset,
         }
     }
 

@@ -131,3 +131,49 @@ pub fn print_component_import(imp: &ComponentImport) {
 pub fn print_component_export(exp: &ComponentExport) {
     eprintln!("Component Export: {:?}", exp.name.0);
 }
+
+pub fn decode_u32(pos: &mut u32, func: &&[u8]) -> u32 {
+    let byte = func[*pos as usize];
+    if (byte & 0x80) == 0 {
+        u32::from(byte)
+    } else {
+        *pos += 1; // Increment the position only when you have to read in another byte
+        decode_u32_big(pos, func, byte)
+    }
+}
+
+pub fn decode_u32_big(pos: &mut u32, func: &&[u8], byte: u8) -> u32 {
+    let mut result = (byte & 0x7F) as u32;
+    let mut shift = 7;
+    loop {
+        let byte = func[*pos as usize];
+        result |= ((byte & 0x7F) as u32) << shift;
+        if shift >= 25 && (byte >> (32 - shift)) != 0 {
+            panic!("!trap");
+        }
+        shift += 7;
+        if (byte & 0x80) == 0 {
+            break;
+        }
+        *pos += 1; // Increment the position only when you have to read in another byte
+    }
+    result
+}
+
+pub(crate) fn get_size_of_local(func: &[u8]) -> u32 {
+    // If the first byte is 0, there are no local declarations
+    let mut pos = 0;
+    let num_local_decl = decode_u32(&mut pos, &func);
+    for _ in 0..num_local_decl {
+        // Go to the next byte
+        pos += 1;
+        // First u32 is for count
+        decode_u32(&mut pos, &func);
+        // Go to the next byte
+        pos += 1;
+        // Now is valtype encoding
+        decode_u32(&mut pos, &func);
+    }
+    // The location of the current offset will be the size of locals
+    pos + 1 // + 1 as it points to the last byte of locals
+}

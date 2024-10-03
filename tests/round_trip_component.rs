@@ -30,7 +30,6 @@ fn round_trip_component(testname: &str, folder: &str) {
     );
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
     let mut component = Component::parse(&buff, false).expect("Unable to parse");
-    // component.print();
     let result = component.encode();
     write_to_file(
         &result,
@@ -38,7 +37,7 @@ fn round_trip_component(testname: &str, folder: &str) {
     );
     let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
     let original = wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
-
+    assert_eq!(out, original);
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
         write_to_file(
@@ -47,7 +46,6 @@ fn round_trip_component(testname: &str, folder: &str) {
         );
         write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
     }
-    assert_eq!(out, original);
 }
 
 macro_rules! make_round_trip_tests_component {

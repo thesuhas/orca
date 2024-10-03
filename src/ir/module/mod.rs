@@ -2,7 +2,9 @@
 
 use super::types::{DataType, Instruction, InstrumentationMode};
 use crate::error::Error;
+use crate::ir::dwarf::ModuleDebugData;
 use crate::ir::function::FunctionModifier;
+use crate::ir::helpers::get_size_of_local;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
 use crate::ir::module::module_exports::{Export, ModuleExports};
 use crate::ir::module::module_functions::{
@@ -19,16 +21,22 @@ use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
 };
+use crate::ir::wrappers::get_section_id;
 use crate::ir::wrappers::{
     indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, refers_to_global,
     update_fn_instr, update_global_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{InitExpr, Location, Opcode};
+use gimli::write::LineProgram;
+use gimli::{Dwarf, EndianSlice, LineRow, LittleEndian, SectionId};
 use log::{error, warn};
 use std::collections::HashMap;
+use std::num::NonZeroU64;
+use std::ops::Range;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
+use wasm_encoder::Encode;
 use wasmparser::{ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef};
 
 pub mod module_exports;
@@ -81,6 +89,10 @@ pub struct Module<'a> {
     /// Number of local memories (not counting imported memories)
     #[allow(dead_code)]
     pub(crate) num_local_memories: u32,
+    /// Dwarf debug data.
+    pub debug: ModuleDebugData<'a>,
+
+    pub(crate) num_imports_added: usize,
 
     // just a placeholder for round-trip
     pub(crate) local_names: wasm_encoder::IndirectNameMap,
@@ -131,6 +143,7 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
+        let mut code_section_offset: usize = 0;
 
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
@@ -144,6 +157,9 @@ impl<'a> Module<'a> {
         let mut data_names = wasm_encoder::NameMap::new();
         let mut field_names = wasm_encoder::IndirectNameMap::new();
         let mut tag_names = wasm_encoder::NameMap::new();
+
+        // Flag that indicates whether the first dwarf section was parsed or not
+        let mut debug_sections = vec![];
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -236,13 +252,16 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionStart {
                     count,
-                    range: _,
+                    range,
                     size: _,
                 } => {
                     code_section_count = count as usize;
+                    code_section_offset = range.start;
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
+                    let locals_size = get_size_of_local(body.as_bytes());
+                    // TODO: Can collapse these loops into one
                     let num_locals = locals_reader.get_count();
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let locals: Vec<(u32, DataType)> = locals
@@ -274,14 +293,40 @@ impl<'a> Module<'a> {
                             func_range: body.range(),
                         });
                     }
-                    let instructions_bool: Vec<_> =
-                        instructions.into_iter().map(Instruction::new).collect();
+
+                    // TODO: See if this can be optimized
+                    let mut instructions_bool = vec![];
+                    let mut buff = vec![]; // Size of the buffer will be used to determine the offset
+                    let mut reencode = RoundtripReencoder;
+                    let mut offset: usize = 0; // TODO: This needs to be initialised to the location of the first instruction. Must take into account initialisation space taken up by locals
+                    for instr in instructions.iter() {
+                        instructions_bool.push(Instruction::new(
+                            instr.clone(),
+                            offset + locals_size as usize + body.range().start,
+                        ));
+                        let i = reencode.instruction(instr.clone()).unwrap();
+                        i.encode(&mut buff);
+                        offset += buff.len();
+                        buff.clear();
+                    }
+                    let function_body_size = body.range().end - body.range().start;
+                    let function_body_size_bit =
+                        (size_of::<usize>() as u32 * 8 - function_body_size.leading_zeros() - 1)
+                            / 7
+                            + 1;
+
                     code_sections.push(Body {
                         locals,
                         num_locals,
                         instructions: instructions_bool.clone(),
                         num_instructions: instructions_bool.len(),
                         name: None,
+                        range: Some(Range {
+                            start: body.range().start
+                                - code_section_offset
+                                - (function_body_size_bit as usize),
+                            end: body.range().end - code_section_offset,
+                        }),
                     });
                 }
                 Payload::CustomSection(custom_section_reader) => {
@@ -352,23 +397,25 @@ impl<'a> Module<'a> {
                                 }
                             }
                         }
-                        wasmparser::KnownCustom::Producers(producer_section_reader) => {
-                            let field = producer_section_reader
-                                .into_iter()
-                                .next()
-                                .unwrap()
-                                .expect("producers field");
-                            let _value = field
-                                .values
-                                .into_iter()
-                                .collect::<Result<Vec<_>, _>>()
-                                .expect("values");
-                            custom_sections
-                                .push((custom_section_reader.name(), custom_section_reader.data()));
-                        }
                         _ => {
-                            custom_sections
-                                .push((custom_section_reader.name(), custom_section_reader.data()));
+                            // If it's a dwarf section
+                            match get_section_id(custom_section_reader.name()) {
+                                None => custom_sections.push((
+                                    custom_section_reader.name(),
+                                    custom_section_reader.data(),
+                                )),
+                                Some(_section_id) => {
+                                    debug_sections.push((
+                                        custom_section_reader.name(),
+                                        custom_section_reader.data(),
+                                    ));
+                                    // Do it regardless for now
+                                    custom_sections.push((
+                                        custom_section_reader.name(),
+                                        custom_section_reader.data(),
+                                    ));
+                                }
+                            }
                         }
                     }
                 }
@@ -407,6 +454,9 @@ impl<'a> Module<'a> {
                 | Payload::End(_) => {}
             }
         }
+        let debug_vec = CustomSections::new(debug_sections);
+        let debug = Module::parse_debug_sections(debug_vec)?;
+
         if code_section_count != code_sections.len() || code_section_count != functions.len() {
             return Err(Error::IncorrectCodeCounts {
                 function_section_count: functions.len(),
@@ -452,6 +502,31 @@ impl<'a> Module<'a> {
             ));
         }
 
+        // Iterate over all compilation units.
+        let mut iter = debug.dwarf.units();
+        while let Some(header) = iter.next()? {
+            // Parse the abbreviations and other information for this compilation unit.
+            let unit = debug.dwarf.unit(header)?;
+
+            // Iterate over all of this compilation unit's entries.
+            let mut entries = unit.entries();
+            while let Some((_, entry)) = entries.next_dfs()? {
+                // If we find an entry for a function, print it.
+                if entry.tag() == gimli::DW_TAG_subprogram {
+                    println!(
+                        "Found a function: {:?}. Offset: {:?}",
+                        entry,
+                        entry.offset()
+                    );
+                    let mut attrs = entry.attrs();
+                    while let Some(attr) = attrs.next().unwrap() {
+                        println!("Attribute name = {:?}", attr.name());
+                        println!("Attribute value = {:?}", attr.value());
+                    }
+                }
+            }
+        }
+
         let num_globals = globals.len() as u32;
         let num_memories = memories.len() as u32;
         let num_tables = tables.len() as u32;
@@ -459,7 +534,7 @@ impl<'a> Module<'a> {
         Ok(Module {
             types: ModuleTypes::new(types),
             imports,
-            functions: Functions::new(final_funcs),
+            functions: Functions::new(final_funcs, code_section_offset),
             tables: ModuleTables::new(tables),
             memories,
             globals: module_globals,
@@ -485,6 +560,8 @@ impl<'a> Module<'a> {
             field_names,
             tag_names,
             label_names,
+            debug,
+            num_imports_added: 0,
         })
     }
 
@@ -539,8 +616,9 @@ impl<'a> Module<'a> {
 
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
-                if let FuncKind::Local(LocalFunction { instr_flag, .. }) =
-                    self.functions.get_kind_mut(func_idx)
+                if let FuncKind::Local(LocalFunction {
+                    ref mut instr_flag, ..
+                }) = self.functions.get_kind_mut(func_idx)
                 {
                     if !instr_flag.has_special_instr {
                         // skip functions without special instrumentation!
@@ -577,6 +655,7 @@ impl<'a> Module<'a> {
                     Instruction {
                         op,
                         instr_flag: instrumentation,
+                        ..
                     },
                 ) in readable_copy_of_body.iter().enumerate()
                 {
@@ -1111,7 +1190,13 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
+        let mut instr_loc_map: HashMap<usize, usize> = HashMap::new();
+        let mut code_sec_decl_offset = 0; // Space taken by the code section declaration which is 0xa [size in bytes] [number of functions]
         if !self.num_local_functions > 0 {
+            // TODO Can calculate new offsets for everything here
+            // Can calculate the offset by using code_section_offset + current size of code_section + current size of function
+            let code_section_offset = module.as_slice().len();
+            code_sec_decl_offset = code_section_offset;
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in 0..self.functions.len() {
                 if self.functions.is_deleted(FunctionID(rel_func_idx as u32)) {
@@ -1144,6 +1229,7 @@ impl<'a> Module<'a> {
                     Instruction {
                         op,
                         instr_flag: instrument,
+                        offset,
                     },
                 ) in instructions.iter_mut().enumerate()
                 {
@@ -1154,6 +1240,11 @@ impl<'a> Module<'a> {
                         update_global_instr(op, &global_mapping);
                     }
                     if !instrument.has_instr() {
+                        let l = code.byte_len();
+                        instr_loc_map.insert(
+                            *offset,
+                            code_section_offset + code.byte_len() + function.byte_len(),
+                        );
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
                         // this instruction has instrumentation, handle it!
@@ -1205,6 +1296,10 @@ impl<'a> Module<'a> {
                                 );
                             }
                         } else {
+                            instr_loc_map.insert(
+                                *offset,
+                                code_section_offset + code.byte_len() + function.byte_len(),
+                            );
                             encode(&op.clone(), &mut function, &mut reencode);
                         }
 
@@ -1254,8 +1349,10 @@ impl<'a> Module<'a> {
                 }
                 code.function(&function);
             }
+            code_sec_decl_offset += code.byte_len();
             module.section(&code);
         }
+        code_sec_decl_offset = module.as_slice().len() - code_sec_decl_offset;
 
         if !self.data.is_empty() {
             let mut data = wasm_encoder::DataSection::new();
@@ -1274,6 +1371,29 @@ impl<'a> Module<'a> {
                 };
             }
             module.section(&data);
+        }
+
+        let mut unit_iter = self.debug.dwarf.units(); //
+        while let Ok(Some(unit)) = unit_iter.next() {
+            if let Ok(u) = self.debug.dwarf.unit(unit) {
+                println!("Unit: {:?}", u);
+                if let Some(ref program) = u.line_program {
+                    let mut rows = program.clone().rows();
+
+                    while let Some((_, row)) = rows.next_row().unwrap() {
+                        if let Some(file) = program.header().file(row.file_index()) {
+                            let file_name =
+                                self.debug.dwarf.attr_string(&u, file.path_name()).unwrap();
+                            println!(
+                                "Address: {:?} File: {:?} Line: {:?}",
+                                row.address(),
+                                file_name.to_string(),
+                                row.line().unwrap_or(NonZeroU64::new(1).expect("test"))
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         // the name section is not stored in self.custom_sections anymore
@@ -1313,6 +1433,27 @@ impl<'a> Module<'a> {
         let index = self.data.len();
         self.data.push(data);
         DataSegmentID(index as u32)
+    }
+
+    pub(crate) fn parse_debug_sections(
+        mut debug_sections: CustomSections,
+    ) -> Result<ModuleDebugData, Error> {
+        let load_section = |id: SectionId| -> Result<EndianSlice<'_, LittleEndian>, Error> {
+            match debug_sections
+                .iter_mut()
+                .find(|section| section.name == id.name())
+            {
+                Some(section) => {
+                    let data = std::mem::take(&mut section.data);
+                    Ok(EndianSlice::new(&data[..], LittleEndian)) // Return the slice wrapped in Ok
+                }
+                None => Ok(EndianSlice::new(&[], LittleEndian)), // Return an empty slice wrapped in Ok
+            }
+        };
+
+        let dwarf = Dwarf::load(load_section)?; // Propagate the error if any
+
+        Ok(ModuleDebugData { dwarf })
     }
 
     /// Get the memory ID of a module. Does not support multiple memories
@@ -1551,6 +1692,29 @@ impl<'a> Module<'a> {
         ))));
         self.globals.recalculate_ids = true;
         (GlobalID(imp_global_id), imp_id)
+    }
+
+    pub fn print_dwarf(&self) {
+        println!("Debug Info:");
+        let mut iter = self.debug.dwarf.debug_info.units();
+        while let Some(unit) = iter.next().unwrap() {
+            println!("unit's length is {}", unit.unit_length());
+        }
+        println!("####################");
+
+        println!("Debug Header:");
+        let mut head_iter = self.debug.dwarf.debug_aranges.headers();
+        while let Some(header) = head_iter.next().unwrap() {
+            println!("Header length is {}", header.length());
+        }
+        println!("####################");
+
+        println!("Debug Types:");
+        let mut iter_types = self.debug.dwarf.debug_types.units();
+        while let Some(unit) = iter_types.next().unwrap() {
+            println!("Types's length is {}", unit.unit_length());
+        }
+        println!("####################");
     }
 
     /// Delete a global from the module (can either be an imported or locally-defined global).
