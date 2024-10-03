@@ -1,4 +1,4 @@
-name: Release Patch
+name: Release Major
 
 on:
   workflow_dispatch:
