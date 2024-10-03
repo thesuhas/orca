@@ -3,18 +3,13 @@
 use crate::ir::id::FunctionID;
 use crate::ir::types::Location;
 use crate::subiterator::function_subiterator::FuncSubIterator;
-use std::collections::HashMap;
 
 /// Sub-iterator for a Module. Keeps track of current location in a Module.
 pub struct ModuleSubIterator {
     /// The current function the SubIterator is at
-    pub(crate) curr_func: FunctionID,
-    /// The number of functions that have been visited thus far
-    visited_funcs: u32,
-    /// Number of functions in this module
-    num_funcs: u32,
-    /// Metadata that maps Function Index -> Instruction Index
-    metadata: HashMap<FunctionID, usize>,
+    pub(crate) curr_idx: usize,
+    /// Metadata containing a functions index and number_of_instructions
+    metadata: Vec<(FunctionID, usize)>,
     /// The function iterator used to keep track of the location in the function.
     pub(crate) func_iterator: FuncSubIterator,
     /// Functions to skip. Provide an empty vector if no functions are to be skipped.
@@ -23,34 +18,23 @@ pub struct ModuleSubIterator {
 
 impl ModuleSubIterator {
     /// Creates a new ModuleSubIterator
-    pub fn new(
-        num_funcs: u32,
-        metadata: HashMap<FunctionID, usize>,
-        skip_funcs: Vec<FunctionID>,
-    ) -> Self {
+    pub fn new(metadata: Vec<(FunctionID, usize)>, skip_funcs: Vec<FunctionID>) -> Self {
+        let curr_idx = 0;
+
+        let (_curr_fid, curr_num_instrs) = metadata[curr_idx];
         let mut mod_it = ModuleSubIterator {
-            curr_func: *metadata.keys().min().unwrap(),
-            visited_funcs: 0,
-            num_funcs,
-            metadata: metadata.clone(),
-            func_iterator: FuncSubIterator::new(
-                *metadata.get(metadata.keys().min().unwrap()).unwrap(),
-            ),
+            curr_idx,
+            metadata,
+            func_iterator: FuncSubIterator::new(curr_num_instrs),
             skip_funcs,
         };
-        // In case 0 is in skip func
-        while mod_it
-            .skip_funcs
-            .contains(&(mod_it.curr_func as FunctionID))
-        {
-            mod_it.next_function();
-        }
+        mod_it.handle_skips();
+
         mod_it
     }
 
-    /// Checks if the SubIterator has finished traversing all the functions
-    pub fn end(&self) -> bool {
-        self.visited_funcs == self.num_funcs
+    pub fn get_curr_func(&self) -> (FunctionID, usize) {
+        self.metadata[self.curr_idx]
     }
 
     /// Returns the current Location in the Module as a Location
@@ -59,7 +43,7 @@ impl ModuleSubIterator {
         let curr_instr = self.func_iterator.curr_instr;
         (
             Location::Module {
-                func_idx: self.curr_func,
+                func_idx: self.get_curr_func().0,
                 instr_idx: curr_instr,
             },
             self.func_iterator.is_end(curr_instr),
@@ -67,47 +51,49 @@ impl ModuleSubIterator {
     }
 
     /// Resets the ModuleSubIterator when it is a Child SubIterator of a ComponentSubIterator
-    pub(crate) fn reset_from_comp_iterator(&mut self, metadata: HashMap<FunctionID, usize>) {
-        *self.curr_func = 0;
+    pub(crate) fn reset_from_comp_iterator(&mut self, metadata: Vec<(FunctionID, usize)>) {
         self.metadata = metadata;
-        self.func_iterator.reset(
-            *self
-                .metadata
-                .get(self.metadata.keys().min().unwrap())
-                .unwrap(),
-        );
+        self.reset();
     }
 
     /// Resets the ModuleSubIterator when it is not a Child SubIterator
     pub fn reset(&mut self) {
-        *self.curr_func = 0;
-        self.func_iterator
-            .reset(*self.metadata.get(&FunctionID(0)).unwrap());
+        self.curr_idx = 0;
+        self.handle_skips();
+        self.func_iterator.reset(self.get_curr_func().1);
     }
 
-    /// Checks if there are functions left to visit
-    pub fn has_next_function(&self) -> bool {
-        *self.curr_func + 1 < self.num_funcs
+    fn handle_skips(&mut self) {
+        let mut curr_fid = self.get_curr_func().0;
+        while self.skip_funcs.contains(&curr_fid) {
+            self.curr_idx += 1;
+            if self.curr_idx >= self.metadata.len() {
+                break;
+            }
+            curr_fid = self.get_curr_func().0;
+        }
     }
 
     /// Goes to the next function in the module
     fn next_function(&mut self) -> bool {
-        *self.curr_func += 1;
-        self.visited_funcs += 1;
+        if !self.has_next_function() {
+            return false;
+        }
+        self.curr_idx += 1;
 
         // skip over configured funcs
-        while self.visited_funcs < self.num_funcs
-            && self.skip_funcs.contains(&(self.curr_func as FunctionID))
-        {
-            *self.curr_func += 1;
-            self.visited_funcs += 1;
-        }
-        if self.visited_funcs < self.num_funcs {
-            self.func_iterator = FuncSubIterator::new(*self.metadata.get(&self.curr_func).unwrap());
+        self.handle_skips();
+        if self.curr_idx < self.metadata.len() {
+            self.func_iterator = FuncSubIterator::new(self.get_curr_func().1);
             true
         } else {
             false
         }
+    }
+
+    /// Checks if there are functions left to visit
+    pub fn has_next_function(&self) -> bool {
+        self.curr_idx + 1 < self.metadata.len()
     }
 
     /// Checks if there are functions left to visit

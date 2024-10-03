@@ -1,9 +1,6 @@
-name: Release
+name: Release Patch
 
 on:
-  push:
-    tags:
-      - "release-v*"
   workflow_dispatch:
 
 env:
@@ -42,7 +39,7 @@ jobs:
     needs: [ rustfmt, build_and_test ]
     runs-on: ubuntu-latest
     permissions:
-      # Gives write permisison to commit toml changes
+      # Gives write permission to commit toml changes
       contents: write
       pull-requests: write
 
@@ -54,15 +51,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Bump Version
-        uses: tj-actions/cargo-bump@v3
-        with:
-          release_type: 'patch'
+      - name: Install cargo bump
+        run: cargo install cargo-bump
 
-      - name: Push changes to main
+      - name: Run Cargo Bump
+        run: cargo bump major
+
+      - name: Create branch, commit, and raise PR
         run: |
-          git config user.name "thesuhas"
-          git config user.email "suhastvs@gmail.com"
+          version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          git config --global user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b release-v$version
           git add .
-          git commit -m "Version Bump"
-          git push --force origin HEAD:main
+          git commit -m "Release Version v$version"
+          git push --set-upstream origin release-v$version
+          gh pr create --title "Release v$version" --body "Creating a release for Orca v$version"
+        env:
+          GH_TOKEN: ${{ github.token }}
+

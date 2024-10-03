@@ -1,0 +1,72 @@
+name: Release Patch
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Check Code style quickly by running `rustfmt` over all code
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all -- --check
+
+  build_and_test:
+    name: Build project and run all unit AND integration tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install wasm-tools
+        run: |
+          cargo install wasm-tools
+      - name: Build
+        run: |
+          cargo build --verbose --release
+      - name: Run tests
+        run: cargo test --verbose
+
+  release:
+    name: Release a new version of orca
+    needs: [ rustfmt, build_and_test ]
+    runs-on: ubuntu-latest
+    permissions:
+      # Gives write permission to commit toml changes
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: cargo login
+        run: cargo login ${{ secrets.ORCA_API_TOKEN }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cargo bump
+        run: cargo install cargo-bump
+
+      - name: Run Cargo Bump
+        run: cargo bump patch
+
+      - name: Create branch, commit, and raise PR
+        run: |
+          version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          git config --global user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b release-v$version
+          git add .
+          git commit -m "Release Version v$version"
+          git push --set-upstream origin release-v$version
+          gh pr create --title "Release v$version" --body "Creating a release for Orca v$version"
+        env:
+          GH_TOKEN: ${{ github.token }}
+

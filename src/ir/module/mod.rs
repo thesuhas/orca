@@ -256,13 +256,13 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionEntry(body) => {
                     let locals_reader = body.get_locals_reader()?;
+                    let num_locals = locals_reader.get_count();
                     let locals = locals_reader.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let locals: Vec<(u32, DataType)> = locals
                         .iter()
                         .map(|(idx, val_type)| (*idx, DataType::from(*val_type)))
                         .collect();
-                    // TODO: can I just iter locals once?
-                    let num_locals = locals.iter().fold(0, |acc, x| acc + x.0) as usize;
+
                     let instructions = body
                         .get_operators_reader()?
                         .into_iter()
@@ -543,6 +543,20 @@ impl<'a> Module<'a> {
             debug,
             num_imports_added: 0,
         })
+    }
+
+    /// Creates Vec of (Function, Number of Instructions)
+    pub fn get_func_metadata(&self) -> Vec<(FunctionID, usize)> {
+        let mut metadata = vec![];
+        for func in self.functions.iter() {
+            match &func.kind {
+                FuncKind::Import(_) => {}
+                FuncKind::Local(LocalFunction { func_id, body, .. }) => {
+                    metadata.push((*func_id, body.num_instructions));
+                }
+            }
+        }
+        metadata
     }
 
     /// Emit the module into a wasm binary file.
