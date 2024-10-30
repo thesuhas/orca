@@ -156,10 +156,23 @@ pub fn encode_core_type_subtype(
                     .collect::<Vec<_>>(),
             );
         }
-        wasmparser::CompositeInnerType::Array(_)
-        | wasmparser::CompositeInnerType::Struct(_)
-        | wasmparser::CompositeInnerType::Cont(_) => {
-            panic!("Still in GC Proposal")
+        wasmparser::CompositeInnerType::Array(array_ty) => {
+            enc.array(
+                &reencode.storage_type(array_ty.0.element_type).unwrap(),
+                array_ty.0.mutable,
+            );
+        }
+        wasmparser::CompositeInnerType::Struct(struct_ty) => {
+            enc.struct_(
+                struct_ty
+                    .fields
+                    .iter()
+                    .map(|field_ty| reencode.field_type(*field_ty).unwrap())
+                    .collect::<Vec<_>>(),
+            );
+        }
+        wasmparser::CompositeInnerType::Cont(_) => {
+            todo!()
         }
     }
 }
