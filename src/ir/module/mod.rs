@@ -28,8 +28,8 @@ use crate::ir::wrappers::{
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{InitExpr, Location, Opcode};
-use gimli::write::LineProgram;
-use gimli::{Dwarf, EndianSlice, LineRow, LittleEndian, SectionId};
+use gimli::write::{LineProgram, LineStringTable, StringTable};
+use gimli::{write, Dwarf, EndianSlice, LineRow, LittleEndian, SectionId};
 use log::{error, warn};
 use std::collections::HashMap;
 use std::num::NonZeroU64;
@@ -410,10 +410,10 @@ impl<'a> Module<'a> {
                                         custom_section_reader.data(),
                                     ));
                                     // Do it regardless for now
-                                    custom_sections.push((
-                                        custom_section_reader.name(),
-                                        custom_section_reader.data(),
-                                    ));
+                                    // custom_sections.push((
+                                    //     custom_section_reader.name(),
+                                    //     custom_section_reader.data(),
+                                    // ));
                                 }
                             }
                         }
@@ -1373,6 +1373,19 @@ impl<'a> Module<'a> {
             module.section(&data);
         }
 
+        let sections = self.debug.convert(instr_loc_map);
+        sections
+            .for_each(
+                |id: SectionId, data: &write::EndianVec<LittleEndian>| -> Result<(), Error> {
+                    module.section(&wasm_encoder::CustomSection {
+                        name: std::borrow::Cow::Borrowed(id.name().into()),
+                        data: std::borrow::Cow::Borrowed(data.slice().into()),
+                    });
+                    Ok(())
+                },
+            )
+            .expect("error in writing dwarf data");
+
         let mut unit_iter = self.debug.dwarf.units(); //
         while let Ok(Some(unit)) = unit_iter.next() {
             if let Ok(u) = self.debug.dwarf.unit(unit) {
@@ -1453,7 +1466,11 @@ impl<'a> Module<'a> {
 
         let dwarf = Dwarf::load(load_section)?; // Propagate the error if any
 
-        Ok(ModuleDebugData { dwarf })
+        Ok(ModuleDebugData {
+            dwarf,
+            strings: StringTable::default(),
+            line_strings: LineStringTable::default(),
+        })
     }
 
     /// Get the memory ID of a module. Does not support multiple memories
