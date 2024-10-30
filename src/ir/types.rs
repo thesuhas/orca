@@ -38,6 +38,8 @@ pub enum DataType {
     Module(ModuleID),
     RecGroup(u32),
     CoreTypeId(u32), // TODO: Look at this
+    Cont,
+    NoCont,
 }
 
 impl fmt::Display for DataType {
@@ -63,6 +65,8 @@ impl fmt::Display for DataType {
             DataType::Module(idx) => write!(f, "DataType: Module {:?}", idx),
             DataType::RecGroup(idx) => write!(f, "DataType: RecGroup {:?}", idx),
             DataType::CoreTypeId(idx) => write!(f, "DataType: CoreTypeId {:?}", idx),
+            DataType::Cont => write!(f, "DataType: Cont"),
+            DataType::NoCont => write!(f, "DataType: NoCont"),
         }
     }
 }
@@ -89,6 +93,8 @@ impl From<ValType> for DataType {
                     wasmparser::AbstractHeapType::I31 => DataType::I31,
                     wasmparser::AbstractHeapType::Exn => DataType::Exn,
                     wasmparser::AbstractHeapType::NoExn => DataType::NoExn,
+                    wasmparser::AbstractHeapType::Cont => DataType::Cont,
+                    wasmparser::AbstractHeapType::NoCont => DataType::NoCont,
                 },
                 wasmparser::HeapType::Concrete(u) => match u {
                     wasmparser::UnpackedIndex::Module(idx) => DataType::Module(ModuleID(idx)),
@@ -194,6 +200,20 @@ impl From<&DataType> for wasm_encoder::ValType {
             DataType::CoreTypeId(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
                 heap_type: wasm_encoder::HeapType::Concrete(*idx),
+            }),
+            DataType::Cont => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Cont,
+                },
+            }),
+            DataType::NoCont => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoCont,
+                },
             }),
         }
     }
@@ -324,6 +344,26 @@ impl From<&DataType> for ValType {
                 .unwrap(),
             ),
             DataType::CoreTypeId(_idx) => panic!("Not Supported Yet!"),
+            DataType::Cont => ValType::Ref(
+                RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Cont,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::NoCont => ValType::Ref(
+                RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoCont,
+                    },
+                )
+                .unwrap(),
+            ),
         }
     }
 }

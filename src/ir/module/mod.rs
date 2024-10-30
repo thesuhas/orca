@@ -26,6 +26,7 @@ use crate::ir::wrappers::{
 use crate::opcode::{Inject, Instrumenter};
 use crate::{InitExpr, Location, Opcode};
 use log::{error, warn};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
@@ -408,6 +409,7 @@ impl<'a> Module<'a> {
                 | Payload::ComponentImportSection(_)
                 | Payload::ComponentExportSection(_)
                 | Payload::End(_) => {}
+                _ => todo!(),
             }
         }
         if code_section_count != code_sections.len() || code_section_count != functions.len() {
@@ -918,8 +920,7 @@ impl<'a> Module<'a> {
                     .iter()
                     .map(wasm_encoder::ValType::from)
                     .collect::<Vec<_>>();
-
-                types.function(params, results);
+                types.ty().function(params, results);
             }
             module.section(&types);
         }
@@ -1062,7 +1063,7 @@ impl<'a> Module<'a> {
                             .iter()
                             .map(|f| *func_mapping.get(f).unwrap())
                             .collect();
-                        wasm_encoder::Elements::Functions(element_items.as_slice())
+                        wasm_encoder::Elements::Functions(Cow::from(element_items.as_slice()))
                     }
                     ElementItems::ConstExprs { ty, exprs } => {
                         temp_const_exprs.reserve(exprs.len());
@@ -1078,7 +1079,7 @@ impl<'a> Module<'a> {
                                 nullable: ty.is_nullable(),
                                 heap_type: reencode.heap_type(ty.heap_type()).unwrap(),
                             },
-                            &temp_const_exprs,
+                            Cow::from(&temp_const_exprs),
                         )
                     }
                 };

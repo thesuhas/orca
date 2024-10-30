@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 use wasm_encoder::reencode::{Reencode, ReencodeComponent};
 use wasm_encoder::{
-    Alias, ComponentFuncTypeEncoder, ComponentTypeEncoder, CoreTypeEncoder, InstanceType,
+    Alias, ComponentCoreTypeEncoder, ComponentFuncTypeEncoder, ComponentTypeEncoder,
+    CoreTypeEncoder, InstanceType,
 };
 use wasmparser::{
     ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
@@ -14,15 +15,17 @@ use wasmparser::{
 /// Convert ModuleTypeDeclaration to ModuleType
 pub fn convert_module_type_declaration(
     module: &[wasmparser::ModuleTypeDeclaration],
-    enc: CoreTypeEncoder,
+    enc: ComponentCoreTypeEncoder,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
     let mut mty = wasm_encoder::ModuleType::new();
     for m in module.iter() {
         match m {
-            wasmparser::ModuleTypeDeclaration::Type(sub) => {
-                let enc_mty = mty.ty();
-                encode_core_type_subtype(enc_mty, sub, reencode);
+            wasmparser::ModuleTypeDeclaration::Type(recgroup) => {
+                for subtype in recgroup.types() {
+                    let enc_mty = mty.ty();
+                    encode_core_type_subtype(enc_mty, subtype, reencode);
+                }
             }
             wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
                 mty.export(name, reencode.entity_type(*ty).unwrap());
@@ -56,9 +59,11 @@ pub fn convert_instance_type(
     for value in instance.iter() {
         match value {
             InstanceTypeDeclaration::CoreType(core_type) => match core_type {
-                CoreType::Sub(sub) => {
-                    let enc = ity.core_type();
-                    encode_core_type_subtype(enc, sub, reencode);
+                CoreType::Rec(recgroup) => {
+                    for sub in recgroup.types() {
+                        let enc = ity.core_type().core();
+                        encode_core_type_subtype(enc, sub, reencode);
+                    }
                 }
                 CoreType::Module(module) => {
                     let enc = ity.core_type();
@@ -151,7 +156,9 @@ pub fn encode_core_type_subtype(
                     .collect::<Vec<_>>(),
             );
         }
-        wasmparser::CompositeInnerType::Array(_) | wasmparser::CompositeInnerType::Struct(_) => {
+        wasmparser::CompositeInnerType::Array(_)
+        | wasmparser::CompositeInnerType::Struct(_)
+        | wasmparser::CompositeInnerType::Cont(_) => {
             panic!("Still in GC Proposal")
         }
     }
@@ -259,9 +266,11 @@ pub fn convert_component_type(
             for c in comp.iter() {
                 match c {
                     ComponentTypeDeclaration::CoreType(core) => match core {
-                        CoreType::Sub(sub) => {
-                            let enc = new_comp.core_type();
-                            encode_core_type_subtype(enc, sub, reencode);
+                        CoreType::Rec(recgroup) => {
+                            for sub in recgroup.types() {
+                                let enc = new_comp.core_type().core();
+                                encode_core_type_subtype(enc, sub, reencode);
+                            }
                         }
                         CoreType::Module(module) => {
                             let enc = new_comp.core_type();
