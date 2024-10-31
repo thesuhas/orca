@@ -142,7 +142,6 @@ pub fn encode_core_type_subtype(
     subtype: &SubType,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
-    // TODO: Struct and Arrays once added to wasm_encoder - still in GC Proposal
     match &subtype.composite_type.inner {
         wasmparser::CompositeInnerType::Func(func) => {
             enc.function(

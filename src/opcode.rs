@@ -970,6 +970,17 @@ pub trait Opcode<'a>: Inject<'a> {
         self.inject(Operator::GlobalSet { global_index: *idx });
         self
     }
+
+    // GC Instructions
+    // fn ref_null(&mut self) -> &mut Self {
+    //     self.inject(Operator::RefNull {});
+    //     self
+    // }
+
+    fn ref_eq(&mut self) -> &mut Self {
+        self.inject(Operator::RefEq);
+        self
+    }
 }
 
 #[allow(dead_code)]

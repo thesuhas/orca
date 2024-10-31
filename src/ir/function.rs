@@ -58,7 +58,7 @@ impl<'a> FunctionBuilder<'a> {
         let imp = module.imports.get(import_id);
         if let TypeRef::Func(imp_ty_id) = imp.ty {
             if let Some(ty) = module.types.get(TypeID(imp_ty_id)) {
-                if *ty.params == self.params && *ty.results == self.results {
+                if *ty.params() == self.params && *ty.results() == self.results {
                     let mut local_func = LocalFunction::new(
                         TypeID(imp_ty_id),
                         FunctionID(*import_id),

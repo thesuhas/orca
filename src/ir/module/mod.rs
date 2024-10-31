@@ -13,7 +13,7 @@ use crate::ir::module::module_globals::{
 };
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_tables::ModuleTables;
-use crate::ir::module::module_types::{FuncType, ModuleTypes};
+use crate::ir::module::module_types::{ModuleTypes, Types};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
@@ -30,7 +30,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
-use wasmparser::{ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef};
+use wasmparser::{
+    CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef,
+};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -119,7 +121,7 @@ impl<'a> Module<'a> {
         parser: Parser,
     ) -> Result<Self, Error> {
         let mut imports: ModuleImports = ModuleImports::default();
-        let mut types: Vec<FuncType> = vec![];
+        let mut types: Vec<Types> = vec![];
         let mut data = vec![];
         let mut tables = vec![];
         let mut memories = vec![];
@@ -159,22 +161,31 @@ impl<'a> Module<'a> {
                     imports = ModuleImports::new(temp);
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    for ty in type_section_reader.into_iter_err_on_gc_types() {
-                        let fun_ty = ty?;
-                        let params = fun_ty
-                            .params()
-                            .iter()
-                            .map(|x| DataType::from(*x))
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice();
-                        let results = fun_ty
-                            .results()
-                            .iter()
-                            .map(|x| DataType::from(*x))
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice();
+                    for ty in type_section_reader.into_iter() {
+                        for subtype in ty?.types() {
+                            match subtype.composite_type.inner.clone() {
+                                CompositeInnerType::Func(fty) => {
+                                    let fun_ty = fty;
+                                    let params = fun_ty
+                                        .params()
+                                        .iter()
+                                        .map(|x| DataType::from(*x))
+                                        .collect::<Vec<_>>()
+                                        .into_boxed_slice();
+                                    let results = fun_ty
+                                        .results()
+                                        .iter()
+                                        .map(|x| DataType::from(*x))
+                                        .collect::<Vec<_>>()
+                                        .into_boxed_slice();
 
-                        types.push(FuncType::new(params, results));
+                                    types.push(Types::FuncType { params, results });
+                                }
+                                CompositeInnerType::Array(_) => {}
+                                CompositeInnerType::Struct(_) => {}
+                                CompositeInnerType::Cont(_) => {}
+                            }
+                        }
                     }
                 }
                 Payload::DataSection(data_section_reader) => {
@@ -451,7 +462,7 @@ impl<'a> Module<'a> {
                     functions[index],
                     FunctionID(imports.num_funcs + index as u32),
                     (*code_sec).clone(),
-                    types[*functions[index] as usize].params.len(),
+                    types[*functions[index] as usize].params().len(),
                 )),
                 (*code_sec).clone().name,
             ));
@@ -911,12 +922,12 @@ impl<'a> Module<'a> {
 
             for ty in self.types.iter() {
                 let params = ty
-                    .params
+                    .params()
                     .iter()
                     .map(wasm_encoder::ValType::from)
                     .collect::<Vec<_>>();
                 let results = ty
-                    .results
+                    .results()
                     .iter()
                     .map(wasm_encoder::ValType::from)
                     .collect::<Vec<_>>();
