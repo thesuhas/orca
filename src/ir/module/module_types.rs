@@ -4,7 +4,7 @@ use crate::ir::id::TypeID;
 use crate::DataType;
 use std::collections::HashMap;
 use std::hash::Hash;
-use wasmparser::FieldType;
+use wasmparser::{PackedIndex, StorageType};
 
 // Orca's representation of function types, shortened from [Walrus' Representation].
 //
@@ -17,12 +17,15 @@ pub enum Types {
         results: Box<[DataType]>,
     },
     ArrayType {
-        fields: FieldType,
+        fields: StorageType,
         mutable: bool,
     },
     StructType {
-        fields: Vec<FieldType>,
-        mutable: bool,
+        fields: Vec<StorageType>,
+        mutable: Vec<bool>,
+    },
+    ContType {
+        packed_index: PackedIndex,
     },
 }
 

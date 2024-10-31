@@ -181,9 +181,31 @@ impl<'a> Module<'a> {
 
                                     types.push(Types::FuncType { params, results });
                                 }
-                                CompositeInnerType::Array(_) => {}
-                                CompositeInnerType::Struct(_) => {}
-                                CompositeInnerType::Cont(_) => {}
+                                CompositeInnerType::Array(aty) => {
+                                    types.push(Types::ArrayType {
+                                        mutable: aty.0.mutable,
+                                        fields: aty.0.element_type,
+                                    });
+                                }
+                                CompositeInnerType::Struct(sty) => {
+                                    types.push(Types::StructType {
+                                        mutable: sty
+                                            .fields
+                                            .iter()
+                                            .map(|field| field.mutable)
+                                            .collect::<Vec<_>>(),
+                                        fields: sty
+                                            .fields
+                                            .iter()
+                                            .map(|field| field.element_type)
+                                            .collect::<Vec<_>>(),
+                                    });
+                                }
+                                CompositeInnerType::Cont(cty) => {
+                                    types.push(Types::ContType {
+                                        packed_index: cty.0,
+                                    });
+                                }
                             }
                         }
                     }
