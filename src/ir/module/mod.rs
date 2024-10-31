@@ -943,17 +943,37 @@ impl<'a> Module<'a> {
             let mut types = wasm_encoder::TypeSection::new();
 
             for ty in self.types.iter() {
-                let params = ty
-                    .params()
-                    .iter()
-                    .map(wasm_encoder::ValType::from)
-                    .collect::<Vec<_>>();
-                let results = ty
-                    .results()
-                    .iter()
-                    .map(wasm_encoder::ValType::from)
-                    .collect::<Vec<_>>();
-                types.ty().function(params, results);
+                match ty {
+                    Types::FuncType { params, results } => {
+                        let params = params
+                            .iter()
+                            .map(wasm_encoder::ValType::from)
+                            .collect::<Vec<_>>();
+                        let results = results
+                            .iter()
+                            .map(wasm_encoder::ValType::from)
+                            .collect::<Vec<_>>();
+                        types.ty().function(params, results);
+                    }
+                    Types::ArrayType { fields, mutable } => {
+                        types
+                            .ty()
+                            .array(&reencode.storage_type(*fields).unwrap(), *mutable);
+                    }
+                    Types::StructType { fields, mutable } => {
+                        let mut encoded_fields: Vec<wasm_encoder::FieldType> = vec![];
+                        for (idx, sty) in fields.iter().enumerate() {
+                            encoded_fields.push(wasm_encoder::FieldType {
+                                element_type: reencode.storage_type(*sty).unwrap(),
+                                mutable: mutable[idx],
+                            });
+                        }
+                        types.ty().struct_(encoded_fields);
+                    }
+                    Types::ContType { .. } => {
+                        todo!()
+                    }
+                }
             }
             module.section(&types);
         }
