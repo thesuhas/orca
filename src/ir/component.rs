@@ -7,7 +7,7 @@ use crate::ir::helpers::{
     print_core_type,
 };
 use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID};
-use crate::ir::module::{Iter, Module};
+use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::wrappers::{
     add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
