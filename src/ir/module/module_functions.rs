@@ -235,6 +235,16 @@ pub struct Functions<'a> {
     pub(crate) recalculate_ids: bool,
 }
 
+impl<'a> Functions<'a> {
+    /// Iterate over functions present in the module
+    ///
+    /// Note: Functions returned by this iterator *may* be deleted.
+    #[must_use]
+    pub fn iter(&self) -> impl Iterator<Item = &Function<'a>> {
+        Iter::<Function<'a>>::iter(self)
+    }
+}
+
 impl<'a> Iter<Function<'a>> for Functions<'a> {
     /// Get an iterator for the functions.
     fn iter(&self) -> std::slice::Iter<'_, Function<'a>> {

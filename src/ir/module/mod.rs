@@ -890,7 +890,7 @@ impl<'a> Module<'a> {
                 &mut self.functions,
             )
         } else {
-            Self::get_mapping_generic(self.functions.iter())
+            Self::get_mapping_generic(Iter::<Function<'a>>::iter(&self.functions))
         };
         let global_mapping = if self.globals.recalculate_ids {
             Self::recalculate_ids(
@@ -1572,8 +1572,12 @@ pub trait GetID {
     fn get_id(&self) -> u32;
 }
 
+/// Facilitates iteration on types that hold `T`
 pub(crate) trait Iter<T> {
+    /// Iterate over references of `T`
     fn iter(&self) -> std::slice::Iter<'_, T>;
+
+    /// Clone and build an iterator
     fn get_into_iter(&self) -> IntoIter<T>;
 }
 
