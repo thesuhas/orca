@@ -147,6 +147,7 @@ impl<'a> Module<'a> {
         let mut data_names = wasm_encoder::NameMap::new();
         let mut field_names = wasm_encoder::IndirectNameMap::new();
         let mut tag_names = wasm_encoder::NameMap::new();
+        let mut recgroup_map = HashMap::new();
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -161,7 +162,9 @@ impl<'a> Module<'a> {
                     imports = ModuleImports::new(temp);
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    for ty in type_section_reader.into_iter() {
+                    let mut ty_idx: u32 = 0;
+                    for (id, ty) in type_section_reader.into_iter().enumerate() {
+                        let rec_group = ty.clone()?.is_explicit_rec_group();
                         for subtype in ty?.types() {
                             match subtype.composite_type.inner.clone() {
                                 CompositeInnerType::Func(fty) => {
@@ -178,17 +181,35 @@ impl<'a> Module<'a> {
                                         .map(|x| DataType::from(*x))
                                         .collect::<Vec<_>>()
                                         .into_boxed_slice();
+                                    let final_ty = Types::FuncType {
+                                        params,
+                                        results,
+                                        super_type: subtype.supertype_idx,
+                                        is_final: subtype.is_final,
+                                        shared: subtype.composite_type.shared,
+                                    };
+                                    types.push(final_ty.clone());
 
-                                    types.push(Types::FuncType { params, results });
+                                    if rec_group {
+                                        recgroup_map.insert(ty_idx, id as u32);
+                                    }
                                 }
                                 CompositeInnerType::Array(aty) => {
-                                    types.push(Types::ArrayType {
+                                    let array_ty = Types::ArrayType {
                                         mutable: aty.0.mutable,
                                         fields: aty.0.element_type,
-                                    });
+                                        super_type: subtype.supertype_idx,
+                                        is_final: subtype.is_final,
+                                        shared: subtype.composite_type.shared,
+                                    };
+                                    types.push(array_ty.clone());
+
+                                    if rec_group {
+                                        recgroup_map.insert(ty_idx, id as u32);
+                                    }
                                 }
                                 CompositeInnerType::Struct(sty) => {
-                                    types.push(Types::StructType {
+                                    let struct_ty = Types::StructType {
                                         mutable: sty
                                             .fields
                                             .iter()
@@ -199,14 +220,29 @@ impl<'a> Module<'a> {
                                             .iter()
                                             .map(|field| field.element_type)
                                             .collect::<Vec<_>>(),
-                                    });
+                                        super_type: subtype.supertype_idx,
+                                        is_final: subtype.is_final,
+                                        shared: subtype.composite_type.shared,
+                                    };
+                                    types.push(struct_ty.clone());
+                                    if rec_group {
+                                        recgroup_map.insert(ty_idx, id as u32);
+                                    }
                                 }
                                 CompositeInnerType::Cont(cty) => {
-                                    types.push(Types::ContType {
+                                    let cont_ty = Types::ContType {
                                         packed_index: cty.0,
-                                    });
+                                        super_type: subtype.supertype_idx,
+                                        is_final: subtype.is_final,
+                                        shared: subtype.composite_type.shared,
+                                    };
+                                    types.push(cont_ty.clone());
+                                    if rec_group {
+                                        recgroup_map.insert(ty_idx, id as u32);
+                                    }
                                 }
                             }
+                            ty_idx += 1;
                         }
                     }
                 }
@@ -495,7 +531,7 @@ impl<'a> Module<'a> {
         let num_tables = tables.len() as u32;
         let module_globals = ModuleGlobals::new(&imports, globals);
         Ok(Module {
-            types: ModuleTypes::new(types),
+            types: ModuleTypes::new(types, recgroup_map),
             imports,
             functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
@@ -913,6 +949,92 @@ impl<'a> Module<'a> {
         id_mapping
     }
 
+    fn encode_type(&self, ty: &Types, reencode: &mut RoundtripReencoder) -> wasm_encoder::SubType {
+        match ty {
+            Types::FuncType {
+                params,
+                results,
+                super_type,
+                is_final,
+                shared,
+            } => {
+                let params = params
+                    .iter()
+                    .map(wasm_encoder::ValType::from)
+                    .collect::<Vec<_>>();
+                let results = results
+                    .iter()
+                    .map(wasm_encoder::ValType::from)
+                    .collect::<Vec<_>>();
+                let fty = wasm_encoder::FuncType::new(params, results);
+                wasm_encoder::SubType {
+                    is_final: *is_final,
+                    supertype_idx: match super_type {
+                        None => None,
+                        Some(idx) => idx.as_module_index(),
+                    },
+                    composite_type: wasm_encoder::CompositeType {
+                        inner: wasm_encoder::CompositeInnerType::Func(fty),
+                        shared: *shared,
+                    },
+                }
+            }
+            Types::ArrayType {
+                fields,
+                mutable,
+                super_type,
+                is_final,
+                shared,
+            } => wasm_encoder::SubType {
+                is_final: *is_final,
+                supertype_idx: match super_type {
+                    None => None,
+                    Some(idx) => idx.as_module_index(),
+                },
+                composite_type: wasm_encoder::CompositeType {
+                    inner: wasm_encoder::CompositeInnerType::Array(wasm_encoder::ArrayType(
+                        wasm_encoder::FieldType {
+                            element_type: reencode.storage_type(*fields).unwrap(),
+                            mutable: *mutable,
+                        },
+                    )),
+                    shared: *shared,
+                },
+            },
+            Types::StructType {
+                fields,
+                mutable,
+                super_type,
+                is_final,
+                shared,
+            } => {
+                let mut encoded_fields: Vec<wasm_encoder::FieldType> = vec![];
+                for (idx, sty) in fields.iter().enumerate() {
+                    encoded_fields.push(wasm_encoder::FieldType {
+                        element_type: reencode.storage_type(*sty).unwrap(),
+                        mutable: mutable[idx],
+                    });
+                }
+                wasm_encoder::SubType {
+                    is_final: *is_final,
+                    supertype_idx: match super_type {
+                        None => None,
+                        Some(idx) => idx.as_module_index(),
+                    },
+                    composite_type: wasm_encoder::CompositeType {
+                        inner: wasm_encoder::CompositeInnerType::Struct(wasm_encoder::StructType {
+                            fields: Box::from(encoded_fields),
+                        }),
+                        shared: *shared,
+                    },
+                }
+            }
+            Types::ContType { .. } => {
+                todo!()
+            }
+        }
+    }
+
     /// Encodes an Orca Module to a wasm_encoder Module.
     /// This requires a mutable reference to self due to the special instrumentation resolution step.
     pub(crate) fn encode_internal(&mut self) -> wasm_encoder::Module {
@@ -941,39 +1063,35 @@ impl<'a> Module<'a> {
 
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
-
-            for ty in self.types.iter() {
-                match ty {
-                    Types::FuncType { params, results } => {
-                        let params = params
-                            .iter()
-                            .map(wasm_encoder::ValType::from)
-                            .collect::<Vec<_>>();
-                        let results = results
-                            .iter()
-                            .map(wasm_encoder::ValType::from)
-                            .collect::<Vec<_>>();
-                        types.ty().function(params, results);
+            let mut last_rg = None;
+            let mut rg_types = vec![];
+            for (idx, ty) in self.types.iter().enumerate() {
+                let curr_rg = self.types.recgroup_map.get(&(idx as u32));
+                // If current one is not the same as last one and it is not the first rg, encode it
+                // If it is a new one
+                if curr_rg != last_rg {
+                    // If the previous one was an explicit rec group
+                    if let Some(_) = last_rg {
+                        // Encode the last one as a recgroup
+                        types.ty().rec(rg_types.clone());
+                        // Reset the vector
+                        rg_types.clear();
                     }
-                    Types::ArrayType { fields, mutable } => {
-                        types
-                            .ty()
-                            .array(&reencode.storage_type(*fields).unwrap(), *mutable);
-                    }
-                    Types::StructType { fields, mutable } => {
-                        let mut encoded_fields: Vec<wasm_encoder::FieldType> = vec![];
-                        for (idx, sty) in fields.iter().enumerate() {
-                            encoded_fields.push(wasm_encoder::FieldType {
-                                element_type: reencode.storage_type(*sty).unwrap(),
-                                mutable: mutable[idx],
-                            });
-                        }
-                        types.ty().struct_(encoded_fields);
-                    }
-                    Types::ContType { .. } => {
-                        todo!()
-                    }
+                    // If it was not, then it was already encoded
                 }
+                match curr_rg {
+                    // If it is part of an explicit rec group
+                    Some(_) => {
+                        rg_types.push(self.encode_type(ty, &mut reencode));
+                        // first_rg = false;
+                    }
+                    None => types.ty().subtype(&self.encode_type(ty, &mut reencode)),
+                }
+                last_rg = curr_rg;
+            }
+            // If the last rg was a none, it was encoded in the binary, if it was an explicit rec group, was not encoded
+            if let Some(_) = last_rg {
+                types.ty().rec(rg_types.clone());
             }
             module.section(&types);
         }

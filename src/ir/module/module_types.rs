@@ -15,17 +15,29 @@ pub enum Types {
     FuncType {
         params: Box<[DataType]>,
         results: Box<[DataType]>,
+        super_type: Option<PackedIndex>,
+        is_final: bool,
+        shared: bool,
     },
     ArrayType {
         fields: StorageType,
         mutable: bool,
+        super_type: Option<PackedIndex>,
+        is_final: bool,
+        shared: bool,
     },
     StructType {
         fields: Vec<StorageType>,
         mutable: Vec<bool>,
+        super_type: Option<PackedIndex>,
+        is_final: bool,
+        shared: bool,
     },
     ContType {
         packed_index: PackedIndex,
+        super_type: Option<PackedIndex>,
+        is_final: bool,
+        shared: bool,
     },
 }
 
@@ -51,16 +63,22 @@ pub struct ModuleTypes {
     pub types: Vec<Types>,
     /// This enables us to quickly do a lookup to determine if a type has already been added
     pub types_map: HashMap<Types, TypeID>,
+    // Mapping between recursive group and TypeID
+    pub(crate) recgroup_map: HashMap<u32, u32>,
 }
 
 impl ModuleTypes {
     /// Create a new Module Types section
-    pub fn new(types: Vec<Types>) -> Self {
+    pub fn new(types: Vec<Types>, recgroup_map: HashMap<u32, u32>) -> Self {
         let mut types_map = HashMap::default();
         for (id, ty) in types.iter().enumerate() {
             types_map.insert(ty.clone(), TypeID(id as u32));
         }
-        ModuleTypes { types, types_map }
+        ModuleTypes {
+            types,
+            types_map,
+            recgroup_map,
+        }
     }
 
     /// Check if there are any types in this module
@@ -68,12 +86,15 @@ impl ModuleTypes {
         self.types.is_empty()
     }
 
-    /// Add a new type to the module, returns the index of the new type.
+    /// Add a new type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `false`, and `is_final` as false  for now.
     pub fn add(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
         let index = self.types.len();
         let ty = Types::FuncType {
             params: param.to_vec().into_boxed_slice(),
             results: ret.to_vec().into_boxed_slice(),
+            super_type: None,
+            is_final: false,
+            shared: false,
         };
 
         if !self.types_map.contains_key(&ty) {

@@ -24,18 +24,25 @@ pub enum DataType {
     F64,
     V128,
     FuncRef,
+    FuncRefNull,
     ExternRef,
+    ExternRefNull,
     Any,
+    AnyNull,
     None,
     NoExtern,
     NoFunc,
     Eq,
+    EqNull,
     Struct,
+    StructNull,
     Array,
+    ArrayNull,
     I31,
+    I31Null,
     Exn,
     NoExn,
-    Module(ModuleID),
+    Module { ty_id: u32, nullable: bool },
     RecGroup(u32),
     CoreTypeId(u32), // TODO: Look at this
     Cont,
@@ -62,11 +69,20 @@ impl fmt::Display for DataType {
             DataType::I31 => write!(f, "DataType: I31"),
             DataType::Exn => write!(f, "DataType: Exn"),
             DataType::NoExn => write!(f, "DataType: NoExn"),
-            DataType::Module(idx) => write!(f, "DataType: Module {:?}", idx),
+            DataType::Module { ty_id, nullable } => {
+                write!(f, "DataType: Module {:?} Nullable: {:?}", ty_id, nullable)
+            }
             DataType::RecGroup(idx) => write!(f, "DataType: RecGroup {:?}", idx),
             DataType::CoreTypeId(idx) => write!(f, "DataType: CoreTypeId {:?}", idx),
             DataType::Cont => write!(f, "DataType: Cont"),
             DataType::NoCont => write!(f, "DataType: NoCont"),
+            DataType::FuncRefNull => write!(f, "DataType: FuncRef Null"),
+            DataType::ExternRefNull => write!(f, "DataType: ExternRef Null"),
+            DataType::AnyNull => write!(f, "DataType: Any Null"),
+            DataType::EqNull => write!(f, "DataType: Eq Null"),
+            DataType::StructNull => write!(f, "DataType: Struct Null"),
+            DataType::ArrayNull => write!(f, "DataType: Array Null"),
+            DataType::I31Null => write!(f, "DataType: I31 Null"),
         }
     }
 }
@@ -81,23 +97,68 @@ impl From<ValType> for DataType {
             ValType::V128 => DataType::V128,
             ValType::Ref(ref_type) => match ref_type.heap_type() {
                 wasmparser::HeapType::Abstract { shared: _, ty } => match ty {
-                    wasmparser::AbstractHeapType::Func => DataType::FuncRef,
-                    wasmparser::AbstractHeapType::Extern => DataType::ExternRef,
-                    wasmparser::AbstractHeapType::Any => DataType::Any,
+                    wasmparser::AbstractHeapType::Func => {
+                        if ref_type.is_nullable() {
+                            DataType::FuncRefNull
+                        } else {
+                            DataType::FuncRef
+                        }
+                    }
+                    wasmparser::AbstractHeapType::Extern => {
+                        if ref_type.is_nullable() {
+                            DataType::ExternRefNull
+                        } else {
+                            DataType::ExternRef
+                        }
+                    }
+                    wasmparser::AbstractHeapType::Any => {
+                        if ref_type.is_nullable() {
+                            DataType::AnyNull
+                        } else {
+                            DataType::Any
+                        }
+                    }
                     wasmparser::AbstractHeapType::None => DataType::None,
                     wasmparser::AbstractHeapType::NoExtern => DataType::NoExtern,
                     wasmparser::AbstractHeapType::NoFunc => DataType::NoFunc,
-                    wasmparser::AbstractHeapType::Eq => DataType::Eq,
-                    wasmparser::AbstractHeapType::Struct => DataType::Struct,
-                    wasmparser::AbstractHeapType::Array => DataType::Array,
-                    wasmparser::AbstractHeapType::I31 => DataType::I31,
+                    wasmparser::AbstractHeapType::Eq => {
+                        if ref_type.is_nullable() {
+                            DataType::EqNull
+                        } else {
+                            DataType::Eq
+                        }
+                    }
+                    wasmparser::AbstractHeapType::Struct => {
+                        if ref_type.is_nullable() {
+                            DataType::StructNull
+                        } else {
+                            DataType::Struct
+                        }
+                    }
+                    wasmparser::AbstractHeapType::Array => {
+                        if ref_type.is_nullable() {
+                            DataType::ArrayNull
+                        } else {
+                            DataType::Array
+                        }
+                    }
+                    wasmparser::AbstractHeapType::I31 => {
+                        if ref_type.is_nullable() {
+                            DataType::I31Null
+                        } else {
+                            DataType::I31
+                        }
+                    }
                     wasmparser::AbstractHeapType::Exn => DataType::Exn,
                     wasmparser::AbstractHeapType::NoExn => DataType::NoExn,
                     wasmparser::AbstractHeapType::Cont => DataType::Cont,
                     wasmparser::AbstractHeapType::NoCont => DataType::NoCont,
                 },
                 wasmparser::HeapType::Concrete(u) => match u {
-                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module(ModuleID(idx)),
+                    wasmparser::UnpackedIndex::Module(idx) => DataType::Module {
+                        ty_id: *ModuleID(idx),
+                        nullable: ref_type.is_nullable(),
+                    },
                     wasmparser::UnpackedIndex::RecGroup(idx) => DataType::RecGroup(idx),
                     wasmparser::UnpackedIndex::Id(_id) => panic!("Not supported yet!"),
                 },
@@ -117,8 +178,20 @@ impl From<&DataType> for wasm_encoder::ValType {
             DataType::F32 => wasm_encoder::ValType::F32,
             DataType::F64 => wasm_encoder::ValType::F64,
             DataType::V128 => wasm_encoder::ValType::V128,
-            DataType::FuncRef => wasm_encoder::ValType::FUNCREF,
-            DataType::ExternRef => wasm_encoder::ValType::EXTERNREF,
+            DataType::FuncRef => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Func,
+                },
+            }),
+            DataType::ExternRef => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Extern,
+                },
+            }),
             DataType::Any => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
                 heap_type: wasm_encoder::HeapType::Abstract {
@@ -189,10 +262,12 @@ impl From<&DataType> for wasm_encoder::ValType {
                     ty: AbstractHeapType::NoExn,
                 },
             }),
-            DataType::Module(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
-                nullable: false,
-                heap_type: wasm_encoder::HeapType::Concrete(**idx),
-            }),
+            DataType::Module { ty_id, nullable } => {
+                wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                    nullable: *nullable,
+                    heap_type: wasm_encoder::HeapType::Concrete(*ty_id),
+                })
+            }
             DataType::RecGroup(idx) => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
                 heap_type: wasm_encoder::HeapType::Concrete(*idx),
@@ -213,6 +288,55 @@ impl From<&DataType> for wasm_encoder::ValType {
                 heap_type: wasm_encoder::HeapType::Abstract {
                     shared: false,
                     ty: AbstractHeapType::NoCont,
+                },
+            }),
+            DataType::FuncRefNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Func,
+                },
+            }),
+            DataType::ExternRefNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Extern,
+                },
+            }),
+            DataType::AnyNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Any,
+                },
+            }),
+            DataType::EqNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Eq,
+                },
+            }),
+            DataType::StructNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Struct,
+                },
+            }),
+            DataType::ArrayNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::Array,
+                },
+            }),
+            DataType::I31Null => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::I31,
                 },
             }),
         }
@@ -329,10 +453,10 @@ impl From<&DataType> for ValType {
                 )
                 .unwrap(),
             ),
-            DataType::Module(idx) => ValType::Ref(
+            DataType::Module { ty_id, nullable } => ValType::Ref(
                 RefType::new(
-                    false,
-                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(**idx)),
+                    *nullable,
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(*ty_id)),
                 )
                 .unwrap(),
             ),
@@ -360,6 +484,76 @@ impl From<&DataType> for ValType {
                     wasmparser::HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::NoCont,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::FuncRefNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Func,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::ExternRefNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Extern,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::AnyNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Any,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::EqNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Eq,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::StructNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Struct,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::ArrayNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Array,
+                    },
+                )
+                .unwrap(),
+            ),
+            DataType::I31Null => ValType::Ref(
+                RefType::new(
+                    true,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::I31,
                     },
                 )
                 .unwrap(),
