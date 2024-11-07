@@ -8,7 +8,7 @@ use std::fmt::{self};
 use std::mem::discriminant;
 use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
-use wasm_encoder::AbstractHeapType;
+use wasm_encoder::{AbstractHeapType, Encode};
 use wasmparser::{ConstExpr, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -1128,8 +1128,13 @@ where
 
 /// A constant which is produced in WebAssembly, typically used in global
 /// initializers or element/data offsets.
+#[derive(Debug, Clone)]
+pub struct InitExpr {
+    exprs: Vec<Instructions>,
+}
+
 #[derive(Debug, Copy, Clone)]
-pub enum InitExpr {
+pub enum Instructions {
     /// An immediate constant value
     Value(Value),
     /// A constant value referenced by the global specified
@@ -1138,57 +1143,171 @@ pub enum InitExpr {
     RefNull(RefType),
     /// A function initializer
     RefFunc(FunctionID),
+    /// Struct Initializer
+    StructNew(TypeID),
+    /// Struct Default
+    StructNewDefault(TypeID),
+    /// Array Initializer
+    ArrayNew(TypeID),
+    /// Default Initialisation
+    ArrayNewDefault(TypeID),
+    /// Fixed Array
+    RefArrayFixed {
+        array_type_index: u32,
+        array_size: u32,
+    },
+    /// Array from Data
+    RefArrayData {
+        array_type_index: u32,
+        array_data_index: u32,
+    },
+    /// Array from Elem
+    RefArrayElem {
+        array_type_index: u32,
+        array_elem_index: u32,
+    },
+    RefI31,
 }
 
 impl InitExpr {
     pub(crate) fn eval(init: &ConstExpr) -> InitExpr {
         use wasmparser::Operator::*;
         let mut reader = init.get_operators_reader();
-        let val = match reader.read().unwrap() {
-            I32Const { value } => InitExpr::Value(Value::I32(value)),
-            I64Const { value } => InitExpr::Value(Value::I64(value)),
-            F32Const { value } => InitExpr::Value(Value::F32(f32::from_bits(value.bits()))),
-            F64Const { value } => InitExpr::Value(Value::F64(f64::from_bits(value.bits()))),
-            V128Const { value } => InitExpr::Value(Value::V128(v128_to_u128(&value))),
-            GlobalGet { global_index } => InitExpr::Global(GlobalID(global_index)),
-            // Marking nullable as true as it's a null reference
-            RefNull { hty } => InitExpr::RefNull(RefType::new(true, hty).unwrap()),
-            RefFunc { function_index } => InitExpr::RefFunc(FunctionID(function_index)),
-            _ => panic!("invalid constant expression"),
-        };
-        match reader.read().unwrap() {
-            End => {}
-            _ => panic!("invalid constant expression"),
+        let mut instrs = vec![];
+        loop {
+            let val = match reader.read().unwrap() {
+                I32Const { value } => Instructions::Value(Value::I32(value)),
+                I64Const { value } => Instructions::Value(Value::I64(value)),
+                F32Const { value } => Instructions::Value(Value::F32(f32::from_bits(value.bits()))),
+                F64Const { value } => Instructions::Value(Value::F64(f64::from_bits(value.bits()))),
+                V128Const { value } => Instructions::Value(Value::V128(v128_to_u128(&value))),
+                GlobalGet { global_index } => Instructions::Global(GlobalID(global_index)),
+                // Marking nullable as true as it's a null reference
+                RefNull { hty } => Instructions::RefNull(RefType::new(true, hty).unwrap()),
+                RefFunc { function_index } => Instructions::RefFunc(FunctionID(function_index)),
+                StructNew { struct_type_index } => {
+                    Instructions::StructNew(TypeID(struct_type_index))
+                }
+                StructNewDefault { struct_type_index } => {
+                    Instructions::StructNewDefault(TypeID(struct_type_index))
+                }
+                ArrayNew { array_type_index } => Instructions::ArrayNew(TypeID(array_type_index)),
+                ArrayNewDefault { array_type_index } => {
+                    Instructions::ArrayNewDefault(TypeID(array_type_index))
+                }
+                ArrayNewFixed {
+                    array_type_index,
+                    array_size,
+                } => Instructions::RefArrayFixed {
+                    array_type_index,
+                    array_size,
+                },
+                ArrayNewData {
+                    array_type_index,
+                    array_data_index,
+                } => Instructions::RefArrayData {
+                    array_data_index,
+                    array_type_index,
+                },
+                ArrayNewElem {
+                    array_type_index,
+                    array_elem_index,
+                } => Instructions::RefArrayElem {
+                    array_type_index,
+                    array_elem_index,
+                },
+                RefI31 => Instructions::RefI31,
+                End => break,
+                _ => panic!("Invalid constant expression"),
+            };
+            instrs.push(val);
         }
         reader.ensure_end().unwrap();
-        val
+        InitExpr { exprs: instrs }
     }
 
-    pub(crate) fn to_wasmencoder_type(self) -> wasm_encoder::ConstExpr {
-        match self {
-            InitExpr::Value(v) => match v {
-                Value::I32(v) => wasm_encoder::ConstExpr::i32_const(v),
-                Value::I64(v) => wasm_encoder::ConstExpr::i64_const(v),
-                Value::F32(v) => wasm_encoder::ConstExpr::f32_const(v),
-                Value::F64(v) => wasm_encoder::ConstExpr::f64_const(v),
-                Value::V128(v) => wasm_encoder::ConstExpr::v128_const(v as i128),
-            },
-            InitExpr::Global(g) => wasm_encoder::ConstExpr::global_get(*g),
-            InitExpr::RefNull(ty) => wasm_encoder::ConstExpr::ref_null(if ty.is_func_ref() {
-                wasm_encoder::HeapType::Abstract {
-                    shared: false,
-                    ty: AbstractHeapType::Func,
+    pub(crate) fn to_wasmencoder_type(&self) -> wasm_encoder::ConstExpr {
+        let mut bytes = vec![];
+        for instr in self.exprs.iter() {
+            match instr {
+                Instructions::Value(v) => match v {
+                    Value::I32(v) => wasm_encoder::Instruction::I32Const(*v).encode(&mut bytes),
+                    Value::I64(v) => wasm_encoder::Instruction::I64Const(*v).encode(&mut bytes),
+                    Value::F32(v) => wasm_encoder::Instruction::F32Const(*v).encode(&mut bytes),
+                    Value::F64(v) => wasm_encoder::Instruction::F64Const(*v).encode(&mut bytes),
+                    Value::V128(v) => {
+                        wasm_encoder::Instruction::V128Const(*v as i128).encode(&mut bytes)
+                    }
+                },
+                Instructions::Global(g) => {
+                    wasm_encoder::Instruction::GlobalGet(**g).encode(&mut bytes)
                 }
-            } else if ty.is_extern_ref() {
-                wasm_encoder::HeapType::Abstract {
-                    shared: false,
-                    ty: AbstractHeapType::Extern,
+                Instructions::RefNull(ty) => {
+                    wasm_encoder::Instruction::RefNull(if ty.is_func_ref() {
+                        wasm_encoder::HeapType::Abstract {
+                            shared: false,
+                            ty: AbstractHeapType::Func,
+                        }
+                    } else if ty.is_extern_ref() {
+                        wasm_encoder::HeapType::Abstract {
+                            shared: false,
+                            ty: AbstractHeapType::Extern,
+                        }
+                    } else {
+                        unreachable!()
+                    })
+                    .encode(&mut bytes)
                 }
-            } else {
-                unreachable!()
-            }),
-            InitExpr::RefFunc(f) => wasm_encoder::ConstExpr::ref_func(*f),
+                Instructions::RefFunc(f) => {
+                    wasm_encoder::Instruction::RefFunc(**f).encode(&mut bytes)
+                }
+                Instructions::StructNew(id) => {
+                    wasm_encoder::Instruction::StructNew(**id).encode(&mut bytes);
+                }
+                Instructions::ArrayNew(id) => {
+                    wasm_encoder::Instruction::ArrayNew(**id).encode(&mut bytes);
+                }
+
+                Instructions::StructNewDefault(id) => {
+                    wasm_encoder::Instruction::StructNewDefault(**id).encode(&mut bytes);
+                }
+                Instructions::ArrayNewDefault(id) => {
+                    wasm_encoder::Instruction::ArrayNewDefault(**id).encode(&mut bytes);
+                }
+                Instructions::RefArrayFixed {
+                    array_type_index,
+                    array_size,
+                } => {
+                    wasm_encoder::Instruction::ArrayNewFixed {
+                        array_size: *array_size,
+                        array_type_index: *array_type_index,
+                    }
+                    .encode(&mut bytes);
+                }
+                Instructions::RefArrayData {
+                    array_type_index,
+                    array_data_index,
+                } => {
+                    wasm_encoder::Instruction::ArrayNewData {
+                        array_data_index: *array_data_index,
+                        array_type_index: *array_type_index,
+                    }
+                    .encode(&mut bytes);
+                }
+                Instructions::RefArrayElem {
+                    array_type_index,
+                    array_elem_index,
+                } => {
+                    wasm_encoder::Instruction::ArrayNewElem {
+                        array_elem_index: *array_elem_index,
+                        array_type_index: *array_type_index,
+                    }
+                    .encode(&mut bytes);
+                }
+                Instructions::RefI31 => wasm_encoder::Instruction::RefI31.encode(&mut bytes),
+            }
         }
+        wasm_encoder::ConstExpr::raw(bytes)
     }
 }
 

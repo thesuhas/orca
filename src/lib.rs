@@ -19,5 +19,5 @@ pub use crate::ir::module::Module;
 pub use crate::ir::types::DataSegment;
 pub use crate::ir::types::DataSegmentKind;
 pub use crate::ir::types::DataType;
-pub use crate::ir::types::InitExpr;
+pub use crate::ir::types::Instructions;
 pub use crate::ir::types::Location;

@@ -4,7 +4,7 @@ use orca_wasm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
 use orca_wasm::ir::module::module_functions::FuncKind::{Import, Local};
 use orca_wasm::ir::module::module_functions::{ImportedFunction, LocalFunction};
 use orca_wasm::ir::types::{Body, Value};
-use orca_wasm::{DataType, InitExpr, Module, Opcode};
+use orca_wasm::{DataType, Instructions, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -674,7 +674,12 @@ fn add_global_with_import() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add new global
-    let gid = module.add_global(InitExpr::Value(Value::I32(0)), DataType::I32, true, false);
+    let gid = module.add_global(
+        Instructions::Value(Value::I32(0)),
+        DataType::I32,
+        true,
+        false,
+    );
     assert_eq!(1, *gid);
 
     let result = module.encode();

@@ -1,6 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::{DataType, Instruction, InstrumentationMode};
+use super::types::{DataType, InitExpr, Instruction, InstrumentationMode};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
@@ -24,7 +24,7 @@ use crate::ir::wrappers::{
     update_fn_instr, update_global_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
-use crate::{InitExpr, Location, Opcode};
+use crate::{Location, Opcode};
 use log::{error, warn};
 use std::borrow::Cow;
 use std::collections::HashMap;
