@@ -42,6 +42,7 @@ pub enum Types {
 }
 
 impl Types {
+    /// Return the params of a Function Type
     pub fn params(&self) -> Vec<DataType> {
         match &self {
             Types::FuncType { params, .. } => params.to_vec(),
@@ -49,6 +50,7 @@ impl Types {
         }
     }
 
+    /// Return the params of a Function Type
     pub fn results(&self) -> Vec<DataType> {
         match &self {
             Types::FuncType { results, .. } => results.to_vec(),
