@@ -1543,7 +1543,7 @@ impl<'a> Module<'a> {
         results: &[DataType],
         body: Body<'a>,
     ) -> FunctionID {
-        let ty = self.types.add(params, results);
+        let ty = self.types.add_func_type(params, results);
         let local_func = LocalFunction::new(
             ty,
             FunctionID(0), // will be fixed

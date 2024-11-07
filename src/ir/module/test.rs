@@ -4,12 +4,12 @@
 
 use crate::ir::function::FunctionBuilder;
 use crate::ir::id::{ExportsID, FunctionID, GlobalID, ImportsID, TypeID};
+use crate::ir::types::InitExpr;
 use crate::{DataType, Instructions, Module, Opcode};
 use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
-use crate::ir::types::InitExpr;
 
 // FUNCTIONS
 #[test]

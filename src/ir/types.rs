@@ -1171,7 +1171,9 @@ pub enum Instructions {
 
 impl InitExpr {
     pub fn new(instructions: Vec<Instructions>) -> Self {
-        InitExpr {exprs: instructions}
+        InitExpr {
+            exprs: instructions,
+        }
     }
 
     pub(crate) fn eval(init: &ConstExpr) -> InitExpr {

@@ -86,14 +86,14 @@ impl ModuleTypes {
         self.types.is_empty()
     }
 
-    /// Add a new type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `false`, and `is_final` as false  for now.
-    pub fn add(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
+    /// Add a new type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
+    pub fn add_func_type(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
         let index = self.types.len();
         let ty = Types::FuncType {
             params: param.to_vec().into_boxed_slice(),
             results: ret.to_vec().into_boxed_slice(),
             super_type: None,
-            is_final: false,
+            is_final: true,
             shared: false,
         };
 
