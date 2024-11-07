@@ -527,9 +527,11 @@ impl<'a> Component<'a> {
                     let mut type_section = wasm_encoder::CoreTypeSection::new();
                     for cty_idx in last_processed_core_ty..last_processed_core_ty + num {
                         match &self.core_types[cty_idx as usize] {
-                            CoreType::Sub(subtype) => {
-                                let enc = type_section.ty();
-                                encode_core_type_subtype(enc, subtype, &mut reencode);
+                            CoreType::Rec(recgroup) => {
+                                for subtype in recgroup.types() {
+                                    let enc = type_section.ty().core();
+                                    encode_core_type_subtype(enc, subtype, &mut reencode);
+                                }
                             }
                             CoreType::Module(module) => {
                                 let enc = type_section.ty();
@@ -612,9 +614,15 @@ impl<'a> Component<'a> {
                                 for c in comp.iter() {
                                     match c {
                                         ComponentTypeDeclaration::CoreType(core) => match core {
-                                            CoreType::Sub(sub) => {
-                                                let enc = new_comp.core_type();
-                                                encode_core_type_subtype(enc, sub, &mut reencode);
+                                            CoreType::Rec(recgroup) => {
+                                                for sub in recgroup.types() {
+                                                    let enc = new_comp.core_type().core();
+                                                    encode_core_type_subtype(
+                                                        enc,
+                                                        sub,
+                                                        &mut reencode,
+                                                    );
+                                                }
                                             }
                                             CoreType::Module(module) => {
                                                 let enc = new_comp.core_type();
@@ -803,6 +811,12 @@ impl<'a> Component<'a> {
                             }
                             CanonicalFunction::ResourceRep { resource } => {
                                 canon_sec.resource_rep(*resource);
+                            }
+                            CanonicalFunction::ThreadSpawn { func_ty_index } => {
+                                canon_sec.thread_spawn(*func_ty_index);
+                            }
+                            CanonicalFunction::ThreadHwConcurrency => {
+                                canon_sec.thread_hw_concurrency();
                             }
                         }
                         last_processed_canon += 1;

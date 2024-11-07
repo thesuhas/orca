@@ -184,3 +184,31 @@ impl std::ops::DerefMut for MemoryID {
         &mut self.0
     }
 }
+
+/// Field ID in a Struct or Array
+pub struct FieldID(pub u32);
+impl std::ops::Deref for FieldID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for FieldID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// ID of an element in the Elements Section
+pub struct ElementID(pub u32);
+impl std::ops::Deref for ElementID {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ElementID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}

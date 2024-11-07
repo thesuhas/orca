@@ -1,4 +1,5 @@
 use orca_wasm::Component;
+use orca_wasm::Module;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -8,23 +9,28 @@ fn wasm_tools() -> Command {
     Command::new("wasm-tools")
 }
 
-fn roundtrip(filename: String) {
+fn roundtrip(filename: String, component: bool) {
     println!("filename: {:?}", filename);
     let buff = wat::parse_file(filename).expect("couldn't convert the input wat to Wasm");
-    let mut component = Component::parse(&buff, false).expect("Unable to parse");
+    if component {
+        let mut parser = Component::parse(&buff, false).expect("Unable to parse");
+        let result = parser.encode();
+        let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
+        let original =
+            wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
+        assert_eq!(out, original);
+    } else {
+        let mut parser = Module::parse(&buff, false).expect("Unable to parse");
+        let result = parser.encode();
+        let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
+        let original =
+            wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
+        assert_eq!(out, original);
+    }
     // component.print();
-    let result = component.encode();
-    let out = wasmprinter::print_bytes(result.clone()).expect("couldn't translate Wasm to wat");
-    let original = wasmprinter::print_bytes(&buff).expect("couldn't convert original Wasm to wat");
-    assert_eq!(out, original);
 }
 
-#[test]
-fn test_wast() {
-    let path = Path::new("./tests/wasm-tools/component-model/");
-    // Generate the same output on windows and unix
-    let path = path.to_str().unwrap().replace("\\", "/");
-
+fn test_wast(path: String, component: bool) {
     for entry in fs::read_dir(path).unwrap() {
         let file = entry.unwrap();
         match file.path().extension() {
@@ -44,13 +50,13 @@ fn test_wast() {
             .arg(td.path())
             .arg("-o")
             .arg(td.path().join(format!(
-                    "{:?}.json",
-                    Path::new(&file.path())
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                )));
+                "{:?}.json",
+                Path::new(&file.path())
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+            )));
         let output = cmd.output().unwrap();
         let stdout = String::from_utf8_lossy(&output.stdout);
         if !output.status.success() {
@@ -79,18 +85,21 @@ fn test_wast() {
                             // If assert is not in the string, that means it is a valid test case
                             if let Value::String(ty) = testcase.get_key_value("type").unwrap().1 {
                                 if !ty.contains("assert") {
-                                    if let Value::String(test_file) =
-                                        testcase.get_key_value("filename").unwrap().1
-                                    {
-                                        // Do round-trip
-                                        roundtrip(
-                                            Path::new(td.path())
-                                                .join(test_file)
-                                                .to_str()
-                                                .unwrap()
-                                                .parse()
-                                                .unwrap(),
-                                        );
+                                    if testcase.contains_key("filename") {
+                                        if let Value::String(test_file) =
+                                            testcase.get_key_value("filename").unwrap().1
+                                        {
+                                            // Do round-trip
+                                            roundtrip(
+                                                Path::new(td.path())
+                                                    .join(test_file)
+                                                    .to_str()
+                                                    .unwrap()
+                                                    .parse()
+                                                    .unwrap(),
+                                                component,
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -100,4 +109,22 @@ fn test_wast() {
             }
         }
     }
+}
+
+#[test]
+fn test_wast_components() {
+    let path = Path::new("./tests/wasm-tools/component-model/");
+    // Generate the same output on windows and unix
+    let path = path.to_str().unwrap().replace("\\", "/");
+
+    test_wast(path, true);
+}
+
+#[test]
+fn test_wast_gc() {
+    let path = Path::new("./tests/wasm-tools/gc/");
+    // Generate the same output on windows and unix
+    let path = path.to_str().unwrap().replace("\\", "/");
+
+    test_wast(path, false);
 }

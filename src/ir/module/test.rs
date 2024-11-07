@@ -4,7 +4,8 @@
 
 use crate::ir::function::FunctionBuilder;
 use crate::ir::id::{ExportsID, FunctionID, GlobalID, ImportsID, TypeID};
-use crate::{DataType, InitExpr, Module, Opcode};
+use crate::ir::types::InitExpr;
+use crate::{DataType, Instructions, Module, Opcode};
 use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -417,7 +418,7 @@ fn test_create_and_add_global() {
 
     // add a local global
     let gid = module.add_global(
-        InitExpr::Value(crate::ir::types::Value::I32(0)),
+        InitExpr::new(vec![Instructions::Value(crate::ir::types::Value::I32(0))]),
         DataType::I32,
         true,
         false,

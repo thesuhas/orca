@@ -29,15 +29,18 @@ pub fn print_subtype(ty: &SubType) {
         CompositeInnerType::Array(_) => eprintln!("SubType Array"),
         CompositeInnerType::Func(_) => eprintln!("SubType Func"),
         CompositeInnerType::Struct(_) => eprintln!("SubType Struct"),
+        CompositeInnerType::Cont(_) => eprintln!("SubType Cont"),
     }
 }
 
 pub fn print_module_ty_declaration(ty: &ModuleTypeDeclaration) {
     eprint!("Module: ");
     match ty {
-        ModuleTypeDeclaration::Type(subtype) => {
-            eprint!("SubType: ");
-            print_subtype(subtype)
+        ModuleTypeDeclaration::Type(recgroup) => {
+            for subtype in recgroup.types() {
+                eprint!("SubType: ");
+                print_subtype(subtype)
+            }
         }
         ModuleTypeDeclaration::Export {
             name: _name,
@@ -55,7 +58,11 @@ pub fn print_module_ty_declaration(ty: &ModuleTypeDeclaration) {
 pub fn print_core_type(ty: &CoreType) {
     eprint!("CoreType: ");
     match ty {
-        CoreType::Sub(subtype) => print_subtype(subtype),
+        CoreType::Rec(recgroup) => {
+            for subtype in recgroup.types() {
+                print_subtype(subtype);
+            }
+        }
         CoreType::Module(module) => {
             for m in module.iter() {
                 print_module_ty_declaration(m);

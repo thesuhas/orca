@@ -4,7 +4,8 @@
 // note that the location of the injection is handled specific implementation
 // for iterators, we inject at the location the iterator is pointing at (curr_loc)
 // for FunctionBuilder, we inject at the end of the function
-use crate::ir::id::{FunctionID, GlobalID, LocalID};
+use crate::ir::id::{DataSegmentID, ElementID, FieldID, FunctionID, GlobalID, LocalID, TypeID};
+use crate::ir::module::module_types::HeapType;
 use crate::ir::types::{BlockType, FuncInstrMode, InstrumentationMode};
 use crate::Location;
 use wasmparser::MemArg;
@@ -968,6 +969,256 @@ pub trait Opcode<'a>: Inject<'a> {
     /// Inject a global.set
     fn global_set(&mut self, idx: GlobalID) -> &mut Self {
         self.inject(Operator::GlobalSet { global_index: *idx });
+        self
+    }
+
+    // GC Instructions
+    fn ref_null(&mut self, heap_type: HeapType) -> &mut Self {
+        self.inject(Operator::RefNull {
+            hty: wasmparser::HeapType::from(heap_type),
+        });
+        self
+    }
+
+    fn ref_is_null(&mut self) -> &mut Self {
+        self.inject(Operator::RefIsNull);
+        self
+    }
+
+    fn ref_func(&mut self, function_index: u32) -> &mut Self {
+        self.inject(Operator::RefFunc { function_index });
+        self
+    }
+
+    fn ref_eq(&mut self) -> &mut Self {
+        self.inject(Operator::RefEq);
+        self
+    }
+
+    fn ref_as_non_null(&mut self) -> &mut Self {
+        self.inject(Operator::RefAsNonNull);
+        self
+    }
+
+    fn struct_new(&mut self, struct_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::StructNew {
+            struct_type_index: *struct_type_index,
+        });
+        self
+    }
+
+    fn struct_new_default(&mut self, struct_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::StructNewDefault {
+            struct_type_index: *struct_type_index,
+        });
+        self
+    }
+
+    fn struct_get(&mut self, struct_type_index: TypeID, field_index: FieldID) -> &mut Self {
+        self.inject(Operator::StructGet {
+            struct_type_index: *struct_type_index,
+            field_index: *field_index,
+        });
+        self
+    }
+
+    fn struct_get_s(&mut self, struct_type_index: TypeID, field_index: FieldID) -> &mut Self {
+        self.inject(Operator::StructGetS {
+            struct_type_index: *struct_type_index,
+            field_index: *field_index,
+        });
+        self
+    }
+
+    fn struct_get_u(&mut self, struct_type_index: TypeID, field_index: FieldID) -> &mut Self {
+        self.inject(Operator::StructGetU {
+            struct_type_index: *struct_type_index,
+            field_index: *field_index,
+        });
+        self
+    }
+
+    fn struct_set(&mut self, struct_type_index: TypeID, field_index: FieldID) -> &mut Self {
+        self.inject(Operator::StructSet {
+            struct_type_index: *struct_type_index,
+            field_index: *field_index,
+        });
+        self
+    }
+
+    fn array_new(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayNew {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_new_default(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayNewDefault {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_new_fixed(&mut self, array_type_index: TypeID, array_size: u32) -> &mut Self {
+        self.inject(Operator::ArrayNewFixed {
+            array_type_index: *array_type_index,
+            array_size,
+        });
+        self
+    }
+
+    // TODO: Check the arguments
+    fn array_new_data(
+        &mut self,
+        array_type_index: TypeID,
+        array_data_index: DataSegmentID,
+    ) -> &mut Self {
+        self.inject(Operator::ArrayNewData {
+            array_type_index: *array_type_index,
+            array_data_index: *array_data_index,
+        });
+        self
+    }
+
+    fn array_new_elem(
+        &mut self,
+        array_type_index: TypeID,
+        array_elem_index: ElementID,
+    ) -> &mut Self {
+        self.inject(Operator::ArrayNewElem {
+            array_type_index: *array_type_index,
+            array_elem_index: *array_elem_index,
+        });
+        self
+    }
+
+    fn array_get(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayGet {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_get_s(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayGetS {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_get_u(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayGetU {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_set(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArraySet {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_len(&mut self) -> &mut Self {
+        self.inject(Operator::ArrayLen);
+        self
+    }
+
+    fn array_fill(&mut self, array_type_index: TypeID) -> &mut Self {
+        self.inject(Operator::ArrayFill {
+            array_type_index: *array_type_index,
+        });
+        self
+    }
+
+    fn array_copy(
+        &mut self,
+        array_type_index_dest: TypeID,
+        array_type_index_src: TypeID,
+    ) -> &mut Self {
+        self.inject(Operator::ArrayCopy {
+            array_type_index_dst: *array_type_index_dest,
+            array_type_index_src: *array_type_index_src,
+        });
+        self
+    }
+
+    fn array_init_data(
+        &mut self,
+        array_type_index: TypeID,
+        array_data_index: DataSegmentID,
+    ) -> &mut Self {
+        self.inject(Operator::ArrayInitData {
+            array_type_index: *array_type_index,
+            array_data_index: *array_data_index,
+        });
+        self
+    }
+
+    fn array_init_elem(
+        &mut self,
+        array_type_index: TypeID,
+        array_elem_index: ElementID,
+    ) -> &mut Self {
+        self.inject(Operator::ArrayInitElem {
+            array_type_index: *array_type_index,
+            array_elem_index: *array_elem_index,
+        });
+        self
+    }
+
+    fn ref_test(&mut self, heap_type: HeapType) -> &mut Self {
+        self.inject(Operator::RefTestNonNull {
+            hty: wasmparser::HeapType::from(heap_type),
+        });
+        self
+    }
+
+    fn ref_test_null(&mut self, heap_type: HeapType) -> &mut Self {
+        self.inject(Operator::RefTestNullable {
+            hty: wasmparser::HeapType::from(heap_type),
+        });
+        self
+    }
+
+    fn ref_cast(&mut self, heap_type: HeapType) -> &mut Self {
+        self.inject(Operator::RefCastNonNull {
+            hty: wasmparser::HeapType::from(heap_type),
+        });
+        self
+    }
+
+    fn ref_cast_null(&mut self, heap_type: HeapType) -> &mut Self {
+        self.inject(Operator::RefCastNullable {
+            hty: wasmparser::HeapType::from(heap_type),
+        });
+        self
+    }
+
+    fn any_convert_extern(&mut self) -> &mut Self {
+        self.inject(Operator::AnyConvertExtern);
+        self
+    }
+
+    fn extern_convert_any(&mut self) -> &mut Self {
+        self.inject(Operator::ExternConvertAny);
+        self
+    }
+
+    fn ref_i31(&mut self) -> &mut Self {
+        self.inject(Operator::RefI31);
+        self
+    }
+
+    fn i31_get_s(&mut self) -> &mut Self {
+        self.inject(Operator::I31GetS);
+        self
+    }
+
+    fn i31_get_u(&mut self) -> &mut Self {
+        self.inject(Operator::I31GetU);
         self
     }
 }

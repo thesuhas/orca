@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::ir::id::{GlobalID, ImportsID};
 use crate::ir::module::module_imports::ModuleImports;
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::InitExpr;
+use crate::ir::types::InitExpr;
 use std::vec::IntoIter;
 use wasmparser::{GlobalType, TypeRef};
 
