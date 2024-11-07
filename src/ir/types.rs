@@ -1126,13 +1126,14 @@ where
     }
 }
 
-/// A constant which is produced in WebAssembly, typically used in global
+/// A constant expression which is produced in WebAssembly, typically used in global
 /// initializers or element/data offsets.
 #[derive(Debug, Clone)]
 pub struct InitExpr {
     exprs: Vec<Instructions>,
 }
 
+/// Set of instructions that can be used in Initialisatin Expressions
 #[derive(Debug, Copy, Clone)]
 pub enum Instructions {
     /// An immediate constant value
@@ -1170,6 +1171,7 @@ pub enum Instructions {
 }
 
 impl InitExpr {
+    /// Create a new initialisation expression given a vector of Instructions
     pub fn new(instructions: Vec<Instructions>) -> Self {
         InitExpr {
             exprs: instructions,
