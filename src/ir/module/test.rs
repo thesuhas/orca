@@ -9,6 +9,7 @@ use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
+use crate::ir::types::InitExpr;
 
 // FUNCTIONS
 #[test]
@@ -417,7 +418,7 @@ fn test_create_and_add_global() {
 
     // add a local global
     let gid = module.add_global(
-        Instructions::Value(crate::ir::types::Value::I32(0)),
+        InitExpr::new(vec![Instructions::Value(crate::ir::types::Value::I32(0))]),
         DataType::I32,
         true,
         false,

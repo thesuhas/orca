@@ -3,7 +3,7 @@ use orca_wasm::ir::function::FunctionBuilder;
 use orca_wasm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
 use orca_wasm::ir::module::module_functions::FuncKind::{Import, Local};
 use orca_wasm::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca_wasm::ir::types::{Body, Value};
+use orca_wasm::ir::types::{Body, InitExpr, Value};
 use orca_wasm::{DataType, Instructions, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
@@ -675,7 +675,7 @@ fn add_global_with_import() {
 
     // add new global
     let gid = module.add_global(
-        Instructions::Value(Value::I32(0)),
+        InitExpr::new(vec![Instructions::Value(Value::I32(0))]),
         DataType::I32,
         true,
         false,

@@ -1170,6 +1170,10 @@ pub enum Instructions {
 }
 
 impl InitExpr {
+    pub fn new(instructions: Vec<Instructions>) -> Self {
+        InitExpr {exprs: instructions}
+    }
+
     pub(crate) fn eval(init: &ConstExpr) -> InitExpr {
         use wasmparser::Operator::*;
         let mut reader = init.get_operators_reader();
