@@ -4,12 +4,11 @@ use crate::ir::id::TypeID;
 use crate::DataType;
 use std::collections::HashMap;
 use std::hash::Hash;
-use wasmparser::{FieldType, PackedIndex, StorageType, UnpackedIndex};
+use wasmparser::{PackedIndex, StorageType, UnpackedIndex};
 
-// Orca's representation of function types, shortened from [Walrus' Representation].
-//
-// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-
+/// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
+///
+/// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Types {
     FuncType {
@@ -123,7 +122,7 @@ impl ModuleTypes {
             results: ret.to_vec().into_boxed_slice(),
             super_type: match super_type {
                 None => None,
-                Some(id) => Some(PackedIndex(*id)),
+                Some(id) => PackedIndex::from_module_index(*id),
             },
             is_final,
             shared,
@@ -174,7 +173,7 @@ impl ModuleTypes {
             mutable,
             super_type: match super_type {
                 None => None,
-                Some(id) => Some(PackedIndex(*id)),
+                Some(id) => PackedIndex::from_module_index(*id),
             },
             is_final,
             shared,
@@ -226,7 +225,7 @@ impl ModuleTypes {
             mutable,
             super_type: match super_type {
                 None => None,
-                Some(id) => Some(PackedIndex(*id)),
+                Some(id) => PackedIndex::from_module_index(*id),
             },
             is_final,
             shared,
