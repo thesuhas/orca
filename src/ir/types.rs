@@ -1124,6 +1124,10 @@ where
     pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
         self.instr_flag.add_instr(&self.op, val)
     }
+
+    pub fn extract_op(&'a self) -> Operator {
+        self.op.clone()
+    }
 }
 
 /// A constant expression which is produced in WebAssembly, typically used in global
