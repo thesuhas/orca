@@ -209,11 +209,12 @@ pub(crate) fn add_local(
 }
 
 pub(crate) fn add_locals(
-    types: Vec<DataType>,
+    types: &Vec<DataType>,
     num_params: usize,
     num_locals: &mut u32,
     locals: &mut Vec<(u32, DataType)>,
 ) {
+    // TODO: Make this more efficient instead of just iterating
     for ty in types.iter() {
         add_local(*ty, num_params, num_locals, locals);
     }
