@@ -1,7 +1,7 @@
 //! Function Builder
 
 use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
-use crate::ir::module::module_functions::{add_local, LocalFunction};
+use crate::ir::module::module_functions::{add_local, add_locals, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
 use crate::ir::types::DataType;
 use crate::ir::types::InstrumentationMode;
@@ -158,6 +158,15 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
             instr_idx,
         });
         func_modifier
+    }
+
+    pub fn add_locals(&mut self, types: Vec<DataType>) {
+        add_locals(
+            types,
+            self.args.len(),
+            &mut self.body.num_locals,
+            &mut self.body.locals,
+        );
     }
 }
 impl AddLocal for FunctionModifier<'_, '_> {
