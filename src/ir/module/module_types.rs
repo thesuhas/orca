@@ -4,7 +4,7 @@ use crate::ir::id::TypeID;
 use crate::DataType;
 use std::collections::HashMap;
 use std::hash::Hash;
-use wasmparser::{PackedIndex, StorageType, UnpackedIndex};
+use wasmparser::{PackedIndex, UnpackedIndex};
 
 /// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
 ///
@@ -19,14 +19,14 @@ pub enum Types {
         shared: bool,
     },
     ArrayType {
-        fields: StorageType,
+        fields: DataType,
         mutable: bool,
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
     },
     StructType {
-        fields: Vec<StorageType>,
+        fields: Vec<DataType>,
         mutable: Vec<bool>,
         super_type: Option<PackedIndex>,
         is_final: bool,
@@ -138,7 +138,7 @@ impl ModuleTypes {
     }
 
     /// Add a new array type to the module. Assumes no `super_type` and `is_final` is `true`
-    pub fn add_array_type(&mut self, field_type: StorageType, mutable: bool) -> TypeID {
+    pub fn add_array_type(&mut self, field_type: DataType, mutable: bool) -> TypeID {
         let index = self.types.len();
         let ty = Types::ArrayType {
             fields: field_type,
@@ -161,7 +161,7 @@ impl ModuleTypes {
     /// Add a new array type with all parameters.
     pub fn add_array_type_with_params(
         &mut self,
-        field_type: StorageType,
+        field_type: DataType,
         mutable: bool,
         super_type: Option<TypeID>,
         is_final: bool,
@@ -190,7 +190,7 @@ impl ModuleTypes {
     }
 
     /// Add a new struct type to the module. Assumes no `super_type` and `is_final` is `true`
-    pub fn add_struct_type(&mut self, field_type: Vec<StorageType>, mutable: Vec<bool>) -> TypeID {
+    pub fn add_struct_type(&mut self, field_type: Vec<DataType>, mutable: Vec<bool>) -> TypeID {
         let index = self.types.len();
         let ty = Types::StructType {
             fields: field_type,
@@ -213,7 +213,7 @@ impl ModuleTypes {
     /// Add a new array type with all parameters.
     pub fn add_struct_type_with_params(
         &mut self,
-        field_type: Vec<StorageType>,
+        field_type: Vec<DataType>,
         mutable: Vec<bool>,
         super_type: Option<TypeID>,
         is_final: bool,

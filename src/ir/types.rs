@@ -18,6 +18,8 @@ type Result<T> = std::result::Result<T, Error>;
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum DataType {
+    I8,
+    I16,
     I32,
     I64,
     F32,
@@ -52,6 +54,8 @@ pub enum DataType {
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
+            DataType::I8 => write!(f, "DataType: I8"),
+            DataType::I16 => write!(f, "DataType: I16"),
             DataType::I32 => write!(f, "DataType: I32"),
             DataType::I64 => write!(f, "DataType: I64"),
             DataType::F32 => write!(f, "DataType: F32"),
@@ -83,6 +87,26 @@ impl fmt::Display for DataType {
             DataType::StructNull => write!(f, "DataType: Struct Null"),
             DataType::ArrayNull => write!(f, "DataType: Array Null"),
             DataType::I31Null => write!(f, "DataType: I31 Null"),
+        }
+    }
+}
+
+impl From<wasmparser::StorageType> for DataType {
+    fn from(value: wasmparser::StorageType) -> Self {
+        match value {
+            wasmparser::StorageType::I8 => DataType::I8,
+            wasmparser::StorageType::I16 => DataType::I16,
+            wasmparser::StorageType::Val(val) => DataType::from(val),
+        }
+    }
+}
+
+impl From<DataType> for wasm_encoder::StorageType {
+    fn from(value: DataType) -> Self {
+        match value {
+            DataType::I8 => wasm_encoder::StorageType::I8,
+            DataType::I16 => wasm_encoder::StorageType::I16,
+            _ => wasm_encoder::StorageType::Val(wasm_encoder::ValType::from(&value)),
         }
     }
 }
@@ -173,6 +197,7 @@ impl From<ValType> for DataType {
 impl From<&DataType> for wasm_encoder::ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
+            DataType::I8 | DataType::I16 => panic!("Not valtype equivalent!"),
             DataType::I32 => wasm_encoder::ValType::I32,
             DataType::I64 => wasm_encoder::ValType::I64,
             DataType::F32 => wasm_encoder::ValType::F32,
@@ -346,6 +371,7 @@ impl From<&DataType> for wasm_encoder::ValType {
 impl From<&DataType> for ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
+            DataType::I8 | DataType::I16 => panic!("No valtype equivalent!"),
             DataType::I32 => ValType::I32,
             DataType::I64 => ValType::I64,
             DataType::F32 => ValType::F32,

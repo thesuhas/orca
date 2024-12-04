@@ -197,7 +197,7 @@ impl<'a> Module<'a> {
                                 CompositeInnerType::Array(aty) => {
                                     let array_ty = Types::ArrayType {
                                         mutable: aty.0.mutable,
-                                        fields: aty.0.element_type,
+                                        fields: DataType::from(aty.0.element_type),
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
@@ -218,7 +218,7 @@ impl<'a> Module<'a> {
                                         fields: sty
                                             .fields
                                             .iter()
-                                            .map(|field| field.element_type)
+                                            .map(|field| DataType::from(field.element_type))
                                             .collect::<Vec<_>>(),
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
@@ -949,7 +949,7 @@ impl<'a> Module<'a> {
         id_mapping
     }
 
-    fn encode_type(&self, ty: &Types, reencode: &mut RoundtripReencoder) -> wasm_encoder::SubType {
+    fn encode_type(&self, ty: &Types) -> wasm_encoder::SubType {
         match ty {
             Types::FuncType {
                 params,
@@ -994,7 +994,7 @@ impl<'a> Module<'a> {
                 composite_type: wasm_encoder::CompositeType {
                     inner: wasm_encoder::CompositeInnerType::Array(wasm_encoder::ArrayType(
                         wasm_encoder::FieldType {
-                            element_type: reencode.storage_type(*fields).unwrap(),
+                            element_type: wasm_encoder::StorageType::from(*fields),
                             mutable: *mutable,
                         },
                     )),
@@ -1011,7 +1011,7 @@ impl<'a> Module<'a> {
                 let mut encoded_fields: Vec<wasm_encoder::FieldType> = vec![];
                 for (idx, sty) in fields.iter().enumerate() {
                     encoded_fields.push(wasm_encoder::FieldType {
-                        element_type: reencode.storage_type(*sty).unwrap(),
+                        element_type: wasm_encoder::StorageType::from(*sty),
                         mutable: mutable[idx],
                     });
                 }
@@ -1082,10 +1082,10 @@ impl<'a> Module<'a> {
                 match curr_rg {
                     // If it is part of an explicit rec group
                     Some(_) => {
-                        rg_types.push(self.encode_type(ty, &mut reencode));
+                        rg_types.push(self.encode_type(ty));
                         // first_rg = false;
                     }
-                    None => types.ty().subtype(&self.encode_type(ty, &mut reencode)),
+                    None => types.ty().subtype(&self.encode_type(ty)),
                 }
                 last_rg = curr_rg;
             }
