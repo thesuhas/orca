@@ -889,6 +889,14 @@ pub trait Opcode<'a>: Inject<'a> {
         self.inject(Operator::I32Store { memarg });
         self
     }
+    fn i32_store8(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::I32Store8 { memarg });
+        self
+    }
+    fn i32_store16(&mut self, memarg: MemArg) -> &mut Self {
+        self.inject(Operator::I32Store16 { memarg });
+        self
+    }
 
     /// load 1 byte and sign-extend i8 to i64
     fn i64_load8_s(&mut self, memarg: MemArg) -> &mut Self {
