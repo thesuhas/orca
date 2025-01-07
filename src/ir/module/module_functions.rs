@@ -239,7 +239,6 @@ impl<'a> Functions<'a> {
     /// Iterate over functions present in the module
     ///
     /// Note: Functions returned by this iterator *may* be deleted.
-    #[must_use]
     pub fn iter(&self) -> impl Iterator<Item = &Function<'a>> {
         Iter::<Function<'a>>::iter(self)
     }
