@@ -1071,7 +1071,7 @@ impl<'a> Module<'a> {
                 // If it is a new one
                 if curr_rg != last_rg {
                     // If the previous one was an explicit rec group
-                    if let Some(_) = last_rg {
+                    if last_rg.is_some() {
                         // Encode the last one as a recgroup
                         types.ty().rec(rg_types.clone());
                         // Reset the vector
@@ -1090,7 +1090,7 @@ impl<'a> Module<'a> {
                 last_rg = curr_rg;
             }
             // If the last rg was a none, it was encoded in the binary, if it was an explicit rec group, was not encoded
-            if let Some(_) = last_rg {
+            if last_rg.is_some() {
                 types.ty().rec(rg_types.clone());
             }
             module.section(&types);
