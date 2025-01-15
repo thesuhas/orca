@@ -1064,13 +1064,11 @@ impl<'a> Module<'a> {
         let new_start = if let Some(start_fn) = self.start {
             // fix the start function mapping
             match func_mapping.get(&*start_fn) {
-                Some(new_index) => {
-                    Some(FunctionID(*new_index))
-                }
+                Some(new_index) => Some(FunctionID(*new_index)),
                 None => {
                     warn!("Deleted the start function!");
                     None
-                },
+                }
             }
         } else {
             None
