@@ -1061,6 +1061,20 @@ impl<'a> Module<'a> {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = RoundtripReencoder;
 
+        let new_start = if let Some(start_fn) = self.start {
+            // fix the start function mapping
+            match func_mapping.get(&*start_fn) {
+                Some(new_index) => Some(FunctionID(*new_index)),
+                None => {
+                    warn!("Deleted the start function!");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        self.start = new_start;
+
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
             let mut last_rg = None;

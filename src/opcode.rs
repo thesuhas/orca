@@ -385,6 +385,48 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a i32.extend_8s instruction
+    fn i32_extend_8s(&mut self) -> &mut Self {
+        self.inject(Operator::I32Extend8S);
+        self
+    }
+
+    /// Inject a i32.extend_16s instruction
+    fn i32_extend_16s(&mut self) -> &mut Self {
+        self.inject(Operator::I32Extend16S);
+        self
+    }
+
+    /// Inject a i32.trunc_f32s instruction
+    fn i32_trunc_f32s(&mut self) -> &mut Self {
+        self.inject(Operator::I32TruncF32S);
+        self
+    }
+
+    /// Inject a i32.trunc_f32u instruction
+    fn i32_trunc_f32u(&mut self) -> &mut Self {
+        self.inject(Operator::I32TruncF32U);
+        self
+    }
+
+    /// Inject a i32.trunc_f64s instruction
+    fn i32_trunc_f64s(&mut self) -> &mut Self {
+        self.inject(Operator::I32TruncF64S);
+        self
+    }
+
+    /// Inject a i32.trunc_f64u instruction
+    fn i32_trunc_f64u(&mut self) -> &mut Self {
+        self.inject(Operator::I32TruncF64U);
+        self
+    }
+
+    /// Inject a i32.reinterpret_f32 instruction
+    fn i32_reinterpret_f32(&mut self) -> &mut Self {
+        self.inject(Operator::I32ReinterpretF32);
+        self
+    }
+
     /// Inject an i64.const
     fn i64_const(&mut self, value: i64) -> &mut Self {
         self.inject(Operator::I64Const { value });
@@ -547,8 +589,45 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a i64.extend_i32_u instruction
     fn i64_extend_i32u(&mut self) -> &mut Self {
         self.inject(Operator::I64ExtendI32U);
+        self
+    }
+
+    /// Inject a i64.extend_i32_s instruction
+    fn i64_extend_i32s(&mut self) -> &mut Self {
+        self.inject(Operator::I64ExtendI32S);
+        self
+    }
+
+    /// Inject a i64.trunc_f32s instruction
+    fn i64_trunc_f32s(&mut self) -> &mut Self {
+        self.inject(Operator::I64TruncF32S);
+        self
+    }
+
+    /// Inject a i64.trunc_f32u instruction
+    fn i64_trunc_f32u(&mut self) -> &mut Self {
+        self.inject(Operator::I64TruncF32U);
+        self
+    }
+
+    /// Inject a i64.trunc_f64s instruction
+    fn i64_trunc_f64s(&mut self) -> &mut Self {
+        self.inject(Operator::I64TruncF64S);
+        self
+    }
+
+    /// Inject a i64.trunc_f64u instruction
+    fn i64_trunc_f64u(&mut self) -> &mut Self {
+        self.inject(Operator::I64TruncF64U);
+        self
+    }
+
+    /// Inject a i64.reinterpret_f64 instruction
+    fn i64_reinterpret_f64(&mut self) -> &mut Self {
+        self.inject(Operator::I64ReinterpretF64);
         self
     }
 
@@ -669,9 +748,39 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a f32_convert_i32u instruction
+    fn f32_convert_i32u(&mut self) -> &mut Self {
+        self.inject(Operator::F32ConvertI32U);
+        self
+    }
+
+    /// Inject a f32_convert_i64s instruction
+    fn f32_convert_i64s(&mut self) -> &mut Self {
+        self.inject(Operator::F32ConvertI64S);
+        self
+    }
+
+    /// Inject a f32_convert_i64u instruction
+    fn f32_convert_i64u(&mut self) -> &mut Self {
+        self.inject(Operator::F32ConvertI64U);
+        self
+    }
+
     /// Inject a f32_demote_f64 instruction
     fn f32_demote_f64(&mut self) -> &mut Self {
         self.inject(Operator::F32DemoteF64);
+        self
+    }
+
+    /// Inject a f32.reinterpret_i32 instruction
+    fn f32_reinterpret_i32(&mut self) -> &mut Self {
+        self.inject(Operator::F32ReinterpretI32);
+        self
+    }
+
+    /// Inject a f32.copysign instruction
+    fn f32_copysign(&mut self) -> &mut Self {
+        self.inject(Operator::F32Copysign);
         self
     }
 
@@ -800,6 +909,30 @@ pub trait Opcode<'a>: Inject<'a> {
     /// Inject a f64_convert_i32s instruction
     fn f64_convert_i32s(&mut self) -> &mut Self {
         self.inject(Operator::F64ConvertI32S);
+        self
+    }
+
+    /// Inject a f64_convert_i32u instruction
+    fn f64_convert_i32u(&mut self) -> &mut Self {
+        self.inject(Operator::F64ConvertI32U);
+        self
+    }
+
+    /// Inject a f64_convert_i64s instruction
+    fn f64_convert_i64s(&mut self) -> &mut Self {
+        self.inject(Operator::F64ConvertI64S);
+        self
+    }
+
+    /// Inject a f64_convert_i64u instruction
+    fn f64_convert_i64u(&mut self) -> &mut Self {
+        self.inject(Operator::F64ConvertI64U);
+        self
+    }
+
+    /// Inject a f64.copysign instruction
+    fn f64_copysign(&mut self) -> &mut Self {
+        self.inject(Operator::F64Copysign);
         self
     }
 
