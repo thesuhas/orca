@@ -778,6 +778,12 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a f32.copysign instruction
+    fn f32_copysign(&mut self) -> &mut Self {
+        self.inject(Operator::F32Copysign);
+        self
+    }
+
     /// Inject a f64.const instruction
     fn f64_const(&mut self, val: f64) -> &mut Self {
         self.inject(Operator::F64Const {
@@ -921,6 +927,12 @@ pub trait Opcode<'a>: Inject<'a> {
     /// Inject a f64_convert_i64u instruction
     fn f64_convert_i64u(&mut self) -> &mut Self {
         self.inject(Operator::F64ConvertI64U);
+        self
+    }
+
+    /// Inject a f64.copysign instruction
+    fn f64_copysign(&mut self) -> &mut Self {
+        self.inject(Operator::F64Copysign);
         self
     }
 
