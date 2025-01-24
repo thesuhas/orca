@@ -1752,6 +1752,11 @@ impl<'a> Module<'a> {
             self.imports.delete(*import_id);
         }
     }
+
+    /// Change a locally-defined global's init expression.
+    pub fn mod_global_init_expr(&mut self, global_id: GlobalID, new_expr: InitExpr) {
+        self.globals.mod_global_init_expr(*global_id, new_expr);
+    }
 }
 
 pub trait GetID {

@@ -227,4 +227,15 @@ impl ModuleGlobals {
         self.globals.push(global);
         id
     }
+    pub(crate) fn mod_global_init_expr(&mut self, global_id: u32, new_expr: InitExpr) {
+        if let Some(Global {
+            kind: GlobalKind::Local(LocalGlobal { init_expr, .. }),
+            ..
+        }) = self.globals.get_mut(global_id as usize)
+        {
+            *init_expr = new_expr;
+        } else {
+            panic!("Cannot update requested global's init_expr, id: {global_id}")
+        }
+    }
 }
