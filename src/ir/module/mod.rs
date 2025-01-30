@@ -1535,7 +1535,11 @@ impl<'a> Module<'a> {
             ),
             TypeRef::Table(..) => todo!(),
             TypeRef::Tag(..) => todo!(),
-            TypeRef::Memory(..) => todo!(),
+            TypeRef::Memory(..) => {
+                // TODO -- this still doesn't work in the generic case...fix this!
+                let imported = self.imports.num_memories;
+                return (imported, self.imports.add(import));
+            }
         };
 
         let id = if num_local > 0 {
@@ -1544,6 +1548,27 @@ impl<'a> Module<'a> {
             num_imported
         };
         (id, self.imports.add(import))
+    }
+
+    // ===========================
+    // ==== Memory Management ====
+    // ===========================
+
+    pub fn add_import_memory(
+        &mut self,
+        module: String,
+        name: String,
+        ty: MemoryType,
+    ) -> (MemoryID, ImportsID) {
+        let (mem_id, imp_id) = self.add_import(Import {
+            module: module.leak(),
+            name: name.clone().leak(),
+            ty: TypeRef::Memory(ty),
+            custom_name: None,
+            deleted: false,
+        });
+
+        (MemoryID(mem_id), imp_id)
     }
 
     // =============================
