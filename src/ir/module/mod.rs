@@ -1538,8 +1538,8 @@ impl<'a> Module<'a> {
             TypeRef::Memory(..) => {
                 // TODO -- this still doesn't work in the generic case...fix this!
                 let imported = self.imports.num_memories;
-                return (imported, self.imports.add(import));
-            }
+                return (imported, self.imports.add(import))
+            },
         };
 
         let id = if num_local > 0 {
@@ -1558,7 +1558,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType,
+        ty: MemoryType
     ) -> (MemoryID, ImportsID) {
         let (mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
