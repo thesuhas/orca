@@ -1869,7 +1869,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType,
+        ty: MemoryType
     ) -> (MemoryID, ImportsID) {
         self.add_import_memory_with_tag(module, name, ty, Tag::default())
     }
