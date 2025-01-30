@@ -1663,7 +1663,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType,
+        ty: MemoryType
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
