@@ -33,11 +33,13 @@ use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{
     CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef,
 };
+use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 
 pub mod module_exports;
 pub mod module_functions;
 pub mod module_globals;
 pub mod module_imports;
+pub mod module_memories;
 pub mod module_tables;
 pub mod module_types;
 #[cfg(test)]
@@ -60,7 +62,7 @@ pub struct Module<'a> {
     /// Each table has a type and optional initialization expression.
     pub tables: ModuleTables<'a>,
     /// Memories
-    pub memories: Vec<MemoryType>,
+    pub memories: Memories,
     /// Globals
     pub globals: ModuleGlobals,
     /// Data Sections
@@ -526,6 +528,31 @@ impl<'a> Module<'a> {
             ));
         }
 
+        // Process the imported memories
+        let mut final_mems = vec![];
+        let mut imp_mem_id = 0;
+        for (index, imp) in imports.iter().enumerate() {
+            if let TypeRef::Memory(ty) = imp.ty {
+                final_mems.push(Memory::new(
+                    ty,
+                    MemKind::Import(ImportedMemory {
+                        import_id: ImportsID(index as u32),
+                        import_mem_id: MemoryID(imp_mem_id),
+                    })
+                ));
+                imp_mem_id += 1;
+            }
+        }
+        // Process the Local memories
+        for (index, ty) in memories.iter().enumerate() {
+            final_mems.push(Memory::new(
+                ty.to_owned(),
+                MemKind::Local(LocalMemory {
+                    mem_id: MemoryID(imports.num_memories + index as u32),
+                })
+            ));
+        }
+
         let num_globals = globals.len() as u32;
         let num_memories = memories.len() as u32;
         let num_tables = tables.len() as u32;
@@ -535,7 +562,7 @@ impl<'a> Module<'a> {
             imports,
             functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
-            memories,
+            memories: Memories::new(final_mems),
             globals: module_globals,
             exports: ModuleExports::new(exports),
             start,
@@ -1178,7 +1205,9 @@ impl<'a> Module<'a> {
         if !self.memories.is_empty() {
             let mut memories = wasm_encoder::MemorySection::new();
             for memory in self.memories.iter() {
-                memories.memory(wasm_encoder::MemoryType::from(*memory));
+                if memory.is_local() {
+                    memories.memory(wasm_encoder::MemoryType::from(memory.ty));
+                }
             }
             module.section(&memories);
         }
@@ -1537,11 +1566,11 @@ impl<'a> Module<'a> {
             ),
             TypeRef::Table(..) => todo!(),
             TypeRef::Tag(..) => todo!(),
-            TypeRef::Memory(..) => {
-                // TODO -- this still doesn't work in the generic case...fix this!
-                let imported = self.imports.num_memories;
-                return (imported, self.imports.add(import))
-            },
+            TypeRef::Memory(..) => (
+                self.num_local_memories,
+                self.imports.num_memories,
+                self.memories.len() as u32,
+            ),
         };
 
         let id = if num_local > 0 {
@@ -1803,7 +1832,7 @@ pub(crate) trait ReIndexable<T> {
     fn len(&self) -> usize;
     fn remove(&mut self, id: u32) -> T;
     fn insert(&mut self, id: u32, val: T);
-    fn push(&mut self, func: T);
+    fn push(&mut self, item: T);
 }
 
 pub trait Push<T> {

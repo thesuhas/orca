@@ -228,7 +228,6 @@ impl ImportedFunction {
 }
 
 /// Intermediate representation of all the functions in a module.
-#[allow(dead_code)] // may use num_import_fns in the future
 #[derive(Clone, Debug, Default)]
 pub struct Functions<'a> {
     functions: Vec<Function<'a>>,
