@@ -1853,7 +1853,7 @@ fn resolve_function_entry<'a, 'b, 'c>(
 
 fn resolve_function_exit<'a, 'b, 'c>(
     builder: &mut FunctionModifier<'a, 'b>,
-    instr_func_on_entry: &mut InstrBody<'c>,
+    instr_func_on_exit: &mut InstrBody<'c>,
     idx: usize,
 ) where
     'c: 'b,
@@ -1864,10 +1864,10 @@ fn resolve_function_exit<'a, 'b, 'c>(
             func_idx: FunctionID(0), // not used
             instr_idx: idx,
         });
-        builder.inject_all(instr_func_on_entry);
+        builder.inject_all(instr_func_on_exit);
 
         // remove the contents of the body now that it's been resolved
-        instr_func_on_entry.clear();
+        instr_func_on_exit.clear();
     }
 }
 
