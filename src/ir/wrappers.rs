@@ -7,8 +7,8 @@ use wasm_encoder::{
     CoreTypeEncoder, InstanceType,
 };
 use wasmparser::{
-    ComponentAlias, ComponentFuncResult, ComponentType,
-    ComponentTypeDeclaration, CoreType, InstanceTypeDeclaration, Operator, SubType,
+    ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
+    InstanceTypeDeclaration, Operator, SubType,
 };
 
 // Not added to wasm-tools
