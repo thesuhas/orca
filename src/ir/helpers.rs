@@ -85,6 +85,9 @@ pub fn print_component_defined_type(ty: &ComponentDefinedType) {
         ComponentDefinedType::Result { ok: _ok, err: _err } => eprintln!("Result"),
         ComponentDefinedType::Own(_) => eprintln!("Own"),
         ComponentDefinedType::Borrow(_) => eprintln!("Borrow"),
+        ComponentDefinedType::Future(_) => eprintln!("Future"),
+        ComponentDefinedType::Stream(_) => eprintln!("Stream"),
+        ComponentDefinedType::ErrorContext => eprintln!("Error Context"),
     }
 }
 
