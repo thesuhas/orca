@@ -12,6 +12,7 @@ use crate::ir::module::module_globals::{
     Global, GlobalKind, ImportedGlobal, LocalGlobal, ModuleGlobals,
 };
 use crate::ir::module::module_imports::{Import, ModuleImports};
+use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{ModuleTypes, Types};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
@@ -21,7 +22,7 @@ use crate::ir::types::{
 };
 use crate::ir::wrappers::{
     indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, refers_to_global,
-    update_fn_instr, update_global_instr,
+    refers_to_memory, update_fn_instr, update_global_instr, update_memory_instr,
 };
 use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
@@ -40,6 +41,7 @@ pub mod module_exports;
 pub mod module_functions;
 pub mod module_globals;
 pub mod module_imports;
+pub mod module_memories;
 pub mod module_tables;
 pub mod module_types;
 #[cfg(test)]
@@ -62,7 +64,7 @@ pub struct Module<'a> {
     /// Each table has a type and optional initialization expression.
     pub tables: ModuleTables<'a>,
     /// Memories
-    pub memories: Vec<MemoryType>,
+    pub memories: Memories,
     /// Globals
     pub globals: ModuleGlobals,
     /// Data Sections
@@ -538,6 +540,31 @@ impl<'a> Module<'a> {
             ));
         }
 
+        // Process the imported memories
+        let mut final_mems = vec![];
+        let mut imp_mem_id = 0;
+        for (index, imp) in imports.iter().enumerate() {
+            if let TypeRef::Memory(ty) = imp.ty {
+                final_mems.push(Memory::new(
+                    ty,
+                    MemKind::Import(ImportedMemory {
+                        import_id: ImportsID(index as u32),
+                        import_mem_id: MemoryID(imp_mem_id),
+                    }),
+                ));
+                imp_mem_id += 1;
+            }
+        }
+        // Process the Local memories
+        for (index, ty) in memories.iter().enumerate() {
+            final_mems.push(Memory::new(
+                ty.to_owned(),
+                MemKind::Local(LocalMemory {
+                    mem_id: MemoryID(imports.num_memories + index as u32),
+                }),
+            ));
+        }
+
         let num_globals = globals.len() as u32;
         let num_memories = memories.len() as u32;
         let num_tables = tables.len() as u32;
@@ -547,7 +574,7 @@ impl<'a> Module<'a> {
             imports,
             functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
-            memories,
+            memories: Memories::new(final_mems),
             globals: module_globals,
             exports: ModuleExports::new(exports),
             start,
@@ -1072,6 +1099,14 @@ impl<'a> Module<'a> {
         } else {
             Self::get_mapping_generic(self.globals.iter())
         };
+        let memory_mapping = if self.memories.recalculate_ids {
+            Self::recalculate_ids(
+                self.imports.num_memories - self.imports.num_memories_added,
+                &mut self.memories,
+            )
+        } else {
+            Self::get_mapping_generic(self.memories.iter())
+        };
 
         let mut module = wasm_encoder::Module::new();
         let mut reencode = RoundtripReencoder;
@@ -1191,7 +1226,9 @@ impl<'a> Module<'a> {
         if !self.memories.is_empty() {
             let mut memories = wasm_encoder::MemorySection::new();
             for memory in self.memories.iter() {
-                memories.memory(wasm_encoder::MemoryType::from(*memory));
+                if memory.is_local() {
+                    memories.memory(wasm_encoder::MemoryType::from(memory.ty));
+                }
             }
             module.section(&memories);
         }
@@ -1222,12 +1259,19 @@ impl<'a> Module<'a> {
                 if !export.deleted {
                     match export.kind {
                         ExternalKind::Func => {
-                            // println!("Export updation {:?}", export.index);
                             // Update the function indices
                             exports.export(
                                 &export.name,
                                 wasm_encoder::ExportKind::from(export.kind),
                                 *func_mapping.get(&(export.index)).unwrap(),
+                            );
+                        }
+                        ExternalKind::Memory => {
+                            // Update the memory indices
+                            exports.export(
+                                &export.name,
+                                wasm_encoder::ExportKind::from(export.kind),
+                                *memory_mapping.get(&(export.index)).unwrap(),
                             );
                         }
                         _ => {
@@ -1368,6 +1412,9 @@ impl<'a> Module<'a> {
                     if refers_to_global(op) {
                         update_global_instr(op, &global_mapping);
                     }
+                    if refers_to_memory(op) {
+                        update_memory_instr(op, &memory_mapping);
+                    }
                     if !instrument.has_instr() {
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
@@ -1404,6 +1451,7 @@ impl<'a> Module<'a> {
                             before,
                             &func_mapping,
                             &global_mapping,
+                            &memory_mapping,
                             &mut function,
                             &mut reencode,
                         );
@@ -1415,6 +1463,7 @@ impl<'a> Module<'a> {
                                     alt,
                                     &func_mapping,
                                     &global_mapping,
+                                    &memory_mapping,
                                     &mut function,
                                     &mut reencode,
                                 );
@@ -1429,6 +1478,7 @@ impl<'a> Module<'a> {
                                 after,
                                 &func_mapping,
                                 &global_mapping,
+                                &memory_mapping,
                                 &mut function,
                                 &mut reencode,
                             );
@@ -1439,6 +1489,7 @@ impl<'a> Module<'a> {
                         instrs: &mut Vec<Operator>,
                         func_mapping: &HashMap<u32, u32>,
                         global_mapping: &HashMap<u32, u32>,
+                        memory_mapping: &HashMap<u32, u32>,
                         function: &mut wasm_encoder::Function,
                         reencode: &mut RoundtripReencoder,
                     ) {
@@ -1448,6 +1499,9 @@ impl<'a> Module<'a> {
                             }
                             if refers_to_global(instr) {
                                 update_global_instr(instr, global_mapping);
+                            }
+                            if refers_to_memory(instr) {
+                                update_memory_instr(instr, memory_mapping);
                             }
                             encode(instr, function, reencode);
                         }
@@ -1474,18 +1528,23 @@ impl<'a> Module<'a> {
 
         if !self.data.is_empty() {
             let mut data = wasm_encoder::DataSection::new();
-            for segment in self.data.iter() {
+            for segment in self.data.iter_mut() {
                 let segment_data = segment.data.iter().copied();
-                match (*segment).clone().kind {
+                match &mut segment.kind {
                     DataSegmentKind::Passive => data.passive(segment_data),
                     DataSegmentKind::Active {
                         memory_index,
                         offset_expr,
-                    } => data.active(
-                        memory_index,
-                        &offset_expr.to_wasmencoder_type(),
-                        segment_data,
-                    ),
+                    } => {
+                        let new_idx = match memory_mapping.get(memory_index) {
+                            Some(new_index) => *new_index,
+                            None => panic!(
+                                "Attempting to reference a deleted memory, ID: {}",
+                                memory_index
+                            ),
+                        };
+                        data.active(new_idx, &offset_expr.to_wasmencoder_type(), segment_data)
+                    }
                 };
             }
             module.section(&data);
@@ -1561,11 +1620,11 @@ impl<'a> Module<'a> {
             ),
             TypeRef::Table(..) => todo!(),
             TypeRef::Tag(..) => todo!(),
-            TypeRef::Memory(..) => {
-                // TODO -- this still doesn't work in the generic case...fix this!
-                let imported = self.imports.num_memories;
-                return (imported, self.imports.add(import));
-            }
+            TypeRef::Memory(..) => (
+                self.num_local_memories,
+                self.imports.num_memories,
+                self.memories.len() as u32,
+            ),
         };
 
         let id = if num_local > 0 {
@@ -1580,13 +1639,22 @@ impl<'a> Module<'a> {
     // ==== Memory Management ====
     // ===========================
 
+    pub fn add_local_memory(&mut self, ty: MemoryType) -> MemoryID {
+        let local_mem = LocalMemory {
+            mem_id: MemoryID(0), // will be fixed
+        };
+
+        self.num_local_memories += 1;
+        self.memories.add_local_mem(local_mem, ty)
+    }
+
     pub fn add_import_memory(
         &mut self,
         module: String,
         name: String,
         ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
-        let (mem_id, imp_id) = self.add_import(Import {
+        let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
             name: name.clone().leak(),
             ty: TypeRef::Memory(ty),
@@ -1594,7 +1662,17 @@ impl<'a> Module<'a> {
             deleted: false,
         });
 
-        (MemoryID(mem_id), imp_id)
+        // Add to memories as well as it has imported memories
+        self.memories.add_import_mem(imp_id, ty, imp_mem_id);
+        (MemoryID(imp_mem_id), imp_id)
+    }
+
+    /// Delete a memory from the module.
+    pub fn delete_memory(&mut self, mem_id: MemoryID) {
+        self.memories.delete(mem_id);
+        if let MemKind::Import(ImportedMemory { import_id, .. }) = self.memories.get_kind(mem_id) {
+            self.imports.delete(*import_id);
+        }
     }
 
     // =============================
@@ -1827,7 +1905,7 @@ pub(crate) trait ReIndexable<T> {
     fn len(&self) -> usize;
     fn remove(&mut self, id: u32) -> T;
     fn insert(&mut self, id: u32, val: T);
-    fn push(&mut self, func: T);
+    fn push(&mut self, item: T);
 }
 
 pub trait Push<T> {
