@@ -16,13 +16,13 @@ include = [
 ]
 
 [dependencies]
-wasm-encoder = { version = "0.219.1", features = ["wasmparser"]}
-wasmparser = "0.219.1"
+wasm-encoder = { version = "0.221.2", features = ["wasmparser"]}
+wasmparser = "0.221.2"
 tempfile = "3.10.1"
 serde_json = "1.0.121"
 log = "0.4.22"
 gimli = "0.31.0"
 
 [dev-dependencies]
-wasmprinter = "0.219.1"
+wasmprinter = "0.221.2"
 wat = "1.219.1"

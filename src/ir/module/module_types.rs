@@ -4,12 +4,11 @@ use crate::ir::id::TypeID;
 use crate::DataType;
 use std::collections::HashMap;
 use std::hash::Hash;
-use wasmparser::{PackedIndex, StorageType, UnpackedIndex};
+use wasmparser::{PackedIndex, UnpackedIndex};
 
-// Orca's representation of function types, shortened from [Walrus' Representation].
-//
-// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-
+/// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
+///
+/// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Types {
     FuncType {
@@ -20,14 +19,14 @@ pub enum Types {
         shared: bool,
     },
     ArrayType {
-        fields: StorageType,
+        fields: DataType,
         mutable: bool,
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
     },
     StructType {
-        fields: Vec<StorageType>,
+        fields: Vec<DataType>,
         mutable: Vec<bool>,
         super_type: Option<PackedIndex>,
         is_final: bool,
@@ -88,7 +87,7 @@ impl ModuleTypes {
         self.types.is_empty()
     }
 
-    /// Add a new type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
+    /// Add a new function type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
     pub fn add_func_type(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
         let index = self.types.len();
         let ty = Types::FuncType {
@@ -102,6 +101,140 @@ impl ModuleTypes {
         if !self.types_map.contains_key(&ty) {
             self.types.push(ty.clone());
         }
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
+    }
+
+    /// Add a new function type to the module with all parameters.
+    pub fn add_func_type_with_params(
+        &mut self,
+        param: &[DataType],
+        ret: &[DataType],
+        super_type: Option<TypeID>,
+        is_final: bool,
+        shared: bool,
+    ) -> TypeID {
+        let index = self.types.len();
+        let ty = Types::FuncType {
+            params: param.to_vec().into_boxed_slice(),
+            results: ret.to_vec().into_boxed_slice(),
+            super_type: match super_type {
+                None => None,
+                Some(id) => PackedIndex::from_module_index(*id),
+            },
+            is_final,
+            shared,
+        };
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
+    }
+
+    /// Add a new array type to the module. Assumes no `super_type` and `is_final` is `true`
+    pub fn add_array_type(&mut self, field_type: DataType, mutable: bool) -> TypeID {
+        let index = self.types.len();
+        let ty = Types::ArrayType {
+            fields: field_type,
+            mutable,
+            super_type: None,
+            is_final: true,
+            shared: false,
+        };
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
+    }
+
+    /// Add a new array type with all parameters.
+    pub fn add_array_type_with_params(
+        &mut self,
+        field_type: DataType,
+        mutable: bool,
+        super_type: Option<TypeID>,
+        is_final: bool,
+        shared: bool,
+    ) -> TypeID {
+        let index = self.types.len();
+        let ty = Types::ArrayType {
+            fields: field_type,
+            mutable,
+            super_type: match super_type {
+                None => None,
+                Some(id) => PackedIndex::from_module_index(*id),
+            },
+            is_final,
+            shared,
+        };
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
+    }
+
+    /// Add a new struct type to the module. Assumes no `super_type` and `is_final` is `true`
+    pub fn add_struct_type(&mut self, field_type: Vec<DataType>, mutable: Vec<bool>) -> TypeID {
+        let index = self.types.len();
+        let ty = Types::StructType {
+            fields: field_type,
+            mutable,
+            super_type: None,
+            is_final: true,
+            shared: false,
+        };
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+
+        *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(index as u32))
+    }
+
+    /// Add a new array type with all parameters.
+    pub fn add_struct_type_with_params(
+        &mut self,
+        field_type: Vec<DataType>,
+        mutable: Vec<bool>,
+        super_type: Option<TypeID>,
+        is_final: bool,
+        shared: bool,
+    ) -> TypeID {
+        let index = self.types.len();
+        let ty = Types::StructType {
+            fields: field_type,
+            mutable,
+            super_type: match super_type {
+                None => None,
+                Some(id) => PackedIndex::from_module_index(*id),
+            },
+            is_final,
+            shared,
+        };
+
+        if !self.types_map.contains_key(&ty) {
+            self.types.push(ty.clone());
+        }
+
         *self
             .types_map
             .entry(ty.clone())

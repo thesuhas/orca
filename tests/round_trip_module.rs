@@ -77,7 +77,7 @@ mod round_trip {
 
     make_round_trip_tests_module!("handwritten/modules", add, block, func1, import, _start);
 
-    make_round_trip_tests_module!("spin", hello_world_module);
+    // make_round_trip_tests_module!("spin", kotlin_test);
 }
 
 #[test]

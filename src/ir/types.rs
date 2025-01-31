@@ -9,7 +9,8 @@ use std::mem::discriminant;
 use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{AbstractHeapType, Encode};
-use wasmparser::{ConstExpr, Operator, RefType, ValType};
+use wasmparser::types::TypeIdentifier;
+use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -18,6 +19,8 @@ type Result<T> = std::result::Result<T, Error>;
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum DataType {
+    I8,
+    I16,
     I32,
     I64,
     F32,
@@ -52,23 +55,25 @@ pub enum DataType {
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
-            DataType::I32 => write!(f, "i32"),
-            DataType::I64 => write!(f, "i64"),
-            DataType::F32 => write!(f, "f32"),
-            DataType::F64 => write!(f, "f64"),
-            DataType::V128 => write!(f, "v128"),
-            DataType::FuncRef => write!(f, "funcref"),
-            DataType::ExternRef => write!(f, "externref"),
-            DataType::Any => write!(f, "any"),
-            DataType::None => write!(f, "none"),
-            DataType::NoExtern => write!(f, "noextern"),
-            DataType::NoFunc => write!(f, "nounc"),
-            DataType::Eq => write!(f, "eq"),
-            DataType::Struct => write!(f, "struct"),
-            DataType::Array => write!(f, "array"),
-            DataType::I31 => write!(f, "i31"),
-            DataType::Exn => write!(f, "exn"),
-            DataType::NoExn => write!(f, "noexn"),
+            DataType::I8 => write!(f, "DataType: I8"),
+            DataType::I16 => write!(f, "DataType: I16"),
+            DataType::I32 => write!(f, "DataType: I32"),
+            DataType::I64 => write!(f, "DataType: I64"),
+            DataType::F32 => write!(f, "DataType: F32"),
+            DataType::F64 => write!(f, "DataType: F64"),
+            DataType::V128 => write!(f, "DataType: V128"),
+            DataType::FuncRef => write!(f, "DataType: FuncRef"),
+            DataType::ExternRef => write!(f, "DataType: ExternRef"),
+            DataType::Any => write!(f, "DataType: Any"),
+            DataType::None => write!(f, "DataType: None"),
+            DataType::NoExtern => write!(f, "DataType: NoExtern"),
+            DataType::NoFunc => write!(f, "DataType: NoFunc"),
+            DataType::Eq => write!(f, "DataType: Eq"),
+            DataType::Struct => write!(f, "DataType: Struct"),
+            DataType::Array => write!(f, "DataType: Array"),
+            DataType::I31 => write!(f, "DataType: I31"),
+            DataType::Exn => write!(f, "DataType: Exn"),
+            DataType::NoExn => write!(f, "DataType: NoExn"),
             DataType::Module { ty_id, nullable } => {
                 write!(f, "module: {ty_id}, nullable: {nullable}",)
             }
@@ -83,6 +88,26 @@ impl fmt::Display for DataType {
             DataType::StructNull => write!(f, "struct: null"),
             DataType::ArrayNull => write!(f, "array: null"),
             DataType::I31Null => write!(f, "i31: null"),
+        }
+    }
+}
+
+impl From<wasmparser::StorageType> for DataType {
+    fn from(value: wasmparser::StorageType) -> Self {
+        match value {
+            wasmparser::StorageType::I8 => DataType::I8,
+            wasmparser::StorageType::I16 => DataType::I16,
+            wasmparser::StorageType::Val(val) => DataType::from(val),
+        }
+    }
+}
+
+impl From<DataType> for wasm_encoder::StorageType {
+    fn from(value: DataType) -> Self {
+        match value {
+            DataType::I8 => wasm_encoder::StorageType::I8,
+            DataType::I16 => wasm_encoder::StorageType::I16,
+            _ => wasm_encoder::StorageType::Val(wasm_encoder::ValType::from(&value)),
         }
     }
 }
@@ -173,6 +198,7 @@ impl From<ValType> for DataType {
 impl From<&DataType> for wasm_encoder::ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
+            DataType::I8 | DataType::I16 => panic!("Not valtype equivalent!"),
             DataType::I32 => wasm_encoder::ValType::I32,
             DataType::I64 => wasm_encoder::ValType::I64,
             DataType::F32 => wasm_encoder::ValType::F32,
@@ -346,6 +372,7 @@ impl From<&DataType> for wasm_encoder::ValType {
 impl From<&DataType> for ValType {
     fn from(ty: &DataType) -> Self {
         match ty {
+            DataType::I8 | DataType::I16 => panic!("No valtype equivalent!"),
             DataType::I32 => ValType::I32,
             DataType::I64 => ValType::I64,
             DataType::F32 => ValType::F32,
@@ -1134,6 +1161,10 @@ where
     pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
         self.instr_flag.add_instr(&self.op, val)
     }
+
+    pub fn extract_op(&'a self) -> Operator {
+        self.op.clone()
+    }
 }
 
 /// A constant expression which is produced in WebAssembly, typically used in global
@@ -1261,18 +1292,96 @@ impl InitExpr {
                     wasm_encoder::Instruction::GlobalGet(**g).encode(&mut bytes)
                 }
                 Instructions::RefNull(ty) => {
-                    wasm_encoder::Instruction::RefNull(if ty.is_func_ref() {
-                        wasm_encoder::HeapType::Abstract {
-                            shared: false,
-                            ty: AbstractHeapType::Func,
+                    wasm_encoder::Instruction::RefNull(match ty.heap_type() {
+                        HeapType::Abstract { shared, ty } => match ty {
+                            wasmparser::AbstractHeapType::Func => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Func,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Extern => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Extern,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Any => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Any,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::None => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::None,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoExtern => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoExtern,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoFunc => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoFunc,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Eq => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Eq,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::Struct => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Struct,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Array => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Array,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::I31 => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::I31,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::Exn => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Exn,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::NoExn => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoExn,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Cont => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Cont,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoCont => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoCont,
+                                    shared,
+                                }
+                            }
+                        },
+                        HeapType::Concrete(id) => {
+                            if let Some(mod_id) = id.as_module_index() {
+                                wasm_encoder::HeapType::Concrete(mod_id)
+                            } else if let Some(rg_id) = id.as_rec_group_index() {
+                                wasm_encoder::HeapType::Concrete(rg_id)
+                            } else if let Some(core) = id.as_core_type_id() {
+                                wasm_encoder::HeapType::Concrete(core.index() as u32)
+                            } else {
+                                panic!("Did not unpack concrete type!")
+                            }
                         }
-                    } else if ty.is_extern_ref() {
-                        wasm_encoder::HeapType::Abstract {
-                            shared: false,
-                            ty: AbstractHeapType::Extern,
-                        }
-                    } else {
-                        unreachable!()
                     })
                     .encode(&mut bytes)
                 }

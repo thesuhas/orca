@@ -208,6 +208,18 @@ pub(crate) fn add_local(
     LocalID(index as u32)
 }
 
+pub(crate) fn add_locals(
+    types: &Vec<DataType>,
+    num_params: usize,
+    num_locals: &mut u32,
+    locals: &mut Vec<(u32, DataType)>,
+) {
+    // TODO: Make this more efficient instead of just iterating
+    for ty in types.iter() {
+        add_local(*ty, num_params, num_locals, locals);
+    }
+}
+
 /// Intermediate representation of an Imported Function. The actual Import is stored in the Imports field of the module.
 #[derive(Clone, Debug)]
 pub struct ImportedFunction {
