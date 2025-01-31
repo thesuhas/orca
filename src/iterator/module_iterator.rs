@@ -129,6 +129,25 @@ impl<'a> InjectAt<'a> for ModuleIterator<'_, 'a> {
 impl<'a> Opcode<'a> for ModuleIterator<'_, 'a> {}
 impl<'a> MacroOpcode<'a> for ModuleIterator<'_, 'a> {}
 impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
+    ///Can be called after finishing some instrumentation to reset the mode.
+    fn finish_instr(&mut self) {
+        if let (
+            Location::Module {
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.mod_iterator.curr_loc()
+        {
+            match &mut self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
+                FuncKind::Local(l) => l.body.instructions[instr_idx].instr_flag.finish_instr(),
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+    }
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let (

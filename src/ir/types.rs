@@ -779,6 +779,11 @@ impl<'a> FuncInstrFlag<'a> {
             Some(FuncInstrMode::Exit) => self.exit.get(idx).unwrap(),
         }
     }
+
+    /// Can be called after finishing some instrumentation to reset the mode.
+    pub fn finish_instr(&mut self) {
+        self.current_mode = None
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -1040,6 +1045,11 @@ impl<'a> InstrumentationFlag<'a> {
                 Some(block_alt) => block_alt.get(idx).unwrap(),
             },
         }
+    }
+
+    /// Can be called after finishing some instrumentation to reset the mode.
+    pub fn finish_instr(&mut self) {
+        self.current_mode = None
     }
 }
 
