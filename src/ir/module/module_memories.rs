@@ -190,12 +190,12 @@ impl Memory {
         }
     }
 
-    /// Change the kind of the memory
-    pub(crate) fn set_kind(&mut self, kind: MemKind) {
-        self.kind = kind;
-        // Resets deletion
-        self.deleted = false;
-    }
+    // /// Change the kind of the memory
+    // pub(crate) fn set_kind(&mut self, kind: MemKind) {
+    //     self.kind = kind;
+    //     // Resets deletion
+    //     self.deleted = false;
+    // }
 
     /// Get the kind of the memory
     pub fn kind(&self) -> &MemKind {
