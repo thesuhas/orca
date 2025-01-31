@@ -598,6 +598,21 @@ impl<'a> Component<'a> {
                                         ),
                                     wasmparser::ComponentDefinedType::Own(u) => enc.own(*u),
                                     wasmparser::ComponentDefinedType::Borrow(u) => enc.borrow(*u),
+                                    wasmparser::ComponentDefinedType::Future(opt) => match opt {
+                                        Some(u) => {
+                                            enc.future(Some(reencode.component_val_type(*u)))
+                                        }
+                                        None => enc.future(None),
+                                    },
+                                    wasmparser::ComponentDefinedType::Stream(opt) => match opt {
+                                        Some(u) => {
+                                            enc.stream(Some(reencode.component_val_type(*u)))
+                                        }
+                                        None => enc.stream(None),
+                                    },
+                                    wasmparser::ComponentDefinedType::ErrorContext => {
+                                        enc.error_context()
+                                    }
                                 }
                             }
                             ComponentType::Func(func_ty) => {
@@ -817,6 +832,109 @@ impl<'a> Component<'a> {
                             }
                             CanonicalFunction::ThreadHwConcurrency => {
                                 canon_sec.thread_hw_concurrency();
+                            }
+                            CanonicalFunction::TaskBackpressure => {
+                                canon_sec.task_backpressure();
+                            }
+                            CanonicalFunction::TaskReturn { type_index } => {
+                                canon_sec.task_return(*type_index);
+                            }
+                            CanonicalFunction::TaskWait { async_, memory } => {
+                                canon_sec.task_wait(*async_, *memory);
+                            }
+                            CanonicalFunction::TaskPoll { async_, memory } => {
+                                canon_sec.task_poll(*async_, *memory);
+                            }
+                            CanonicalFunction::TaskYield { async_ } => {
+                                canon_sec.task_yield(*async_);
+                            }
+                            CanonicalFunction::SubtaskDrop => {
+                                canon_sec.subtask_drop();
+                            }
+                            CanonicalFunction::StreamNew { ty } => {
+                                canon_sec.stream_new(*ty);
+                            }
+                            CanonicalFunction::StreamRead { ty, options } => {
+                                canon_sec.stream_read(
+                                    *ty,
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::StreamWrite { ty, options } => {
+                                canon_sec.stream_write(
+                                    *ty,
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::StreamCancelRead { ty, async_ } => {
+                                canon_sec.stream_cancel_read(*ty, *async_);
+                            }
+                            CanonicalFunction::StreamCancelWrite { ty, async_ } => {
+                                canon_sec.stream_cancel_write(*ty, *async_);
+                            }
+                            CanonicalFunction::StreamCloseReadable { ty } => {
+                                canon_sec.stream_close_readable(*ty);
+                            }
+                            CanonicalFunction::StreamCloseWritable { ty } => {
+                                canon_sec.stream_close_writable(*ty);
+                            }
+                            CanonicalFunction::FutureNew { ty } => {
+                                canon_sec.future_new(*ty);
+                            }
+                            CanonicalFunction::FutureRead { ty, options } => {
+                                canon_sec.future_read(
+                                    *ty,
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::FutureWrite { ty, options } => {
+                                canon_sec.future_write(
+                                    *ty,
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::FutureCancelRead { ty, async_ } => {
+                                canon_sec.future_cancel_read(*ty, *async_);
+                            }
+                            CanonicalFunction::FutureCancelWrite { ty, async_ } => {
+                                canon_sec.future_cancel_write(*ty, *async_);
+                            }
+                            CanonicalFunction::FutureCloseReadable { ty } => {
+                                canon_sec.future_close_readable(*ty);
+                            }
+                            CanonicalFunction::FutureCloseWritable { ty } => {
+                                canon_sec.future_close_writable(*ty);
+                            }
+                            CanonicalFunction::ErrorContextNew { options } => {
+                                canon_sec.error_context_new(
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::ErrorContextDebugMessage { options } => {
+                                canon_sec.error_context_debug_message(
+                                    options
+                                        .into_iter()
+                                        .map(|t| reencode.canonical_option(*t))
+                                        .collect::<Vec<wasm_encoder::CanonicalOption>>(),
+                                );
+                            }
+                            CanonicalFunction::ErrorContextDrop => {
+                                canon_sec.error_context_drop();
                             }
                         }
                         last_processed_canon += 1;

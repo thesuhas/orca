@@ -7,8 +7,8 @@ use wasm_encoder::{
     CoreTypeEncoder, InstanceType,
 };
 use wasmparser::{
-    ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
-    InstanceTypeDeclaration, Operator, SubType,
+    ComponentAlias, ComponentFuncResult, ComponentType,
+    ComponentTypeDeclaration, CoreType, InstanceTypeDeclaration, Operator, SubType,
 };
 
 // Not added to wasm-tools
@@ -259,6 +259,15 @@ pub fn convert_component_type(
                 ),
                 wasmparser::ComponentDefinedType::Own(u) => def_enc.own(*u),
                 wasmparser::ComponentDefinedType::Borrow(u) => def_enc.borrow(*u),
+                wasmparser::ComponentDefinedType::Future(opt) => match opt {
+                    Some(u) => def_enc.future(Some(reencode.component_val_type(*u))),
+                    None => def_enc.future(None),
+                },
+                wasmparser::ComponentDefinedType::Stream(opt) => match opt {
+                    Some(u) => def_enc.stream(Some(reencode.component_val_type(*u))),
+                    None => def_enc.future(None),
+                },
+                wasmparser::ComponentDefinedType::ErrorContext => def_enc.error_context(),
             }
         }
         ComponentType::Func(func_ty) => {
