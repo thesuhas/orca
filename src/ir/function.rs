@@ -136,7 +136,7 @@ impl AddLocal for FunctionBuilder<'_> {
 /// FunctionBuilder since FunctionModifier does side effect to operators at encoding
 /// (it only modifies the Instrument type)
 pub struct FunctionModifier<'a, 'b> {
-    pub instr_flag: FuncInstrFlag<'a>,
+    pub instr_flag: &'a mut FuncInstrFlag<'b>,
     pub body: &'a mut Body<'b>,
     pub args: &'a mut Vec<LocalID>,
     pub(crate) instr_idx: Option<usize>,
@@ -145,10 +145,14 @@ pub struct FunctionModifier<'a, 'b> {
 impl<'a, 'b> FunctionModifier<'a, 'b> {
     // by default, the instr_idx the last instruction (always Operator::End indicating end of the function)
     // and the Instrument type is set to before
-    pub fn init(body: &'a mut Body<'b>, args: &'a mut Vec<LocalID>) -> Self {
+    pub fn init(
+        instr_flag: &'a mut FuncInstrFlag<'b>,
+        body: &'a mut Body<'b>,
+        args: &'a mut Vec<LocalID>,
+    ) -> Self {
         let instr_idx = body.instructions.len() - 1;
         let mut func_modifier = FunctionModifier {
-            instr_flag: FuncInstrFlag::default(),
+            instr_flag,
             body,
             args,
             instr_idx: None,
@@ -204,6 +208,10 @@ impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {}
 impl<'a, 'b> MacroOpcode<'b> for FunctionModifier<'a, 'b> {}
 
 impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
+    ///Can be called after finishing some instrumentation to reset the mode.
+    fn finish_instr(&mut self) {
+        self.instr_flag.finish_instr();
+    }
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let Some(idx) = self.instr_idx {
             &self.body.instructions[idx].instr_flag.current_mode

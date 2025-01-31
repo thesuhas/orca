@@ -13,6 +13,8 @@ use wasmparser::Operator;
 
 /// Defines instrumentation behaviour
 pub trait Instrumenter<'a> {
+    /// Can be called after finishing some instrumentation to reset the mode.
+    fn finish_instr(&mut self);
     /// Get the InstrumentType of the current location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode>;
 

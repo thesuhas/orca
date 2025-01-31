@@ -405,6 +405,31 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
             panic!("Should have gotten Component Location and not Module Location!")
         }
     }
+
+    ///Can be called after finishing some instrumentation to reset the mode.
+    fn finish_instr(&mut self) {
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
+        {
+            match &mut self.comp.modules[*mod_idx as usize]
+                .functions
+                .get_mut(func_idx)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(l) => l.body.instructions[instr_idx].instr_flag.finish_instr(),
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
 }
 impl<'a, 'b> IteratingInstrumenter<'b> for ComponentIterator<'a, 'b> {
     /// Sets the type of Instrumentation Mode of the current location

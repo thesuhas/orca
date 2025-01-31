@@ -604,7 +604,9 @@ impl<'a> Module<'a> {
     /// translating them into the straightforward before/after/alt modes.
     fn resolve_special_instrumentation(&mut self) {
         if !self.num_local_functions > 0 {
-            for rel_func_idx in self.imports.num_funcs as usize..self.functions.len() {
+            for rel_func_idx in (self.imports.num_funcs - self.imports.num_funcs_added) as usize
+                ..self.functions.len()
+            {
                 let func_idx = FunctionID(rel_func_idx as u32);
                 if let FuncKind::Import(..) = &self.functions.get_kind(func_idx) {
                     // skip imports
@@ -1538,8 +1540,8 @@ impl<'a> Module<'a> {
             TypeRef::Memory(..) => {
                 // TODO -- this still doesn't work in the generic case...fix this!
                 let imported = self.imports.num_memories;
-                return (imported, self.imports.add(import))
-            },
+                return (imported, self.imports.add(import));
+            }
         };
 
         let id = if num_local > 0 {
@@ -1558,7 +1560,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
         let (mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
