@@ -394,7 +394,15 @@ impl<'a> Functions<'a> {
     ) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
         return match &mut self.functions.get_mut(*func_id as usize)?.kind {
-            FuncKind::Local(ref mut l) => Some(FunctionModifier::init(&mut l.body, &mut l.args)),
+            FuncKind::Local(ref mut l) => {
+                // the instrflag should be reset!
+                l.instr_flag.finish_instr();
+                Some(FunctionModifier::init(
+                    &mut l.instr_flag,
+                    &mut l.body,
+                    &mut l.args,
+                ))
+            }
             _ => None,
         };
     }

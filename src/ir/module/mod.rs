@@ -617,7 +617,9 @@ impl<'a> Module<'a> {
     /// translating them into the straightforward before/after/alt modes.
     fn resolve_special_instrumentation(&mut self) {
         if !self.num_local_functions > 0 {
-            for rel_func_idx in self.imports.num_funcs as usize..self.functions.len() {
+            for rel_func_idx in (self.imports.num_funcs - self.imports.num_funcs_added) as usize
+                ..self.functions.len()
+            {
                 let func_idx = FunctionID(rel_func_idx as u32);
                 if let FuncKind::Import(..) = &self.functions.get_kind(func_idx) {
                     // skip imports
@@ -1875,7 +1877,7 @@ fn resolve_function_entry<'a, 'b, 'c>(
 
 fn resolve_function_exit<'a, 'b, 'c>(
     builder: &mut FunctionModifier<'a, 'b>,
-    instr_func_on_entry: &mut InstrBody<'c>,
+    instr_func_on_exit: &mut InstrBody<'c>,
     idx: usize,
 ) where
     'c: 'b,
@@ -1886,10 +1888,10 @@ fn resolve_function_exit<'a, 'b, 'c>(
             func_idx: FunctionID(0), // not used
             instr_idx: idx,
         });
-        builder.inject_all(instr_func_on_entry);
+        builder.inject_all(instr_func_on_exit);
 
         // remove the contents of the body now that it's been resolved
-        instr_func_on_entry.clear();
+        instr_func_on_exit.clear();
     }
 }
 
