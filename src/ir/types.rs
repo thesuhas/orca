@@ -9,7 +9,8 @@ use std::mem::discriminant;
 use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{AbstractHeapType, Encode};
-use wasmparser::{ConstExpr, Operator, RefType, ValType};
+use wasmparser::types::TypeIdentifier;
+use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -1281,18 +1282,96 @@ impl InitExpr {
                     wasm_encoder::Instruction::GlobalGet(**g).encode(&mut bytes)
                 }
                 Instructions::RefNull(ty) => {
-                    wasm_encoder::Instruction::RefNull(if ty.is_func_ref() {
-                        wasm_encoder::HeapType::Abstract {
-                            shared: false,
-                            ty: AbstractHeapType::Func,
+                    wasm_encoder::Instruction::RefNull(match ty.heap_type() {
+                        HeapType::Abstract { shared, ty } => match ty {
+                            wasmparser::AbstractHeapType::Func => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Func,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Extern => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Extern,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Any => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Any,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::None => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::None,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoExtern => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoExtern,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoFunc => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoFunc,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Eq => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Eq,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::Struct => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Struct,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Array => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Array,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::I31 => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::I31,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::Exn => wasm_encoder::HeapType::Abstract {
+                                ty: AbstractHeapType::Exn,
+                                shared,
+                            },
+                            wasmparser::AbstractHeapType::NoExn => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoExn,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::Cont => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::Cont,
+                                    shared,
+                                }
+                            }
+                            wasmparser::AbstractHeapType::NoCont => {
+                                wasm_encoder::HeapType::Abstract {
+                                    ty: AbstractHeapType::NoCont,
+                                    shared,
+                                }
+                            }
+                        },
+                        HeapType::Concrete(id) => {
+                            if let Some(mod_id) = id.as_module_index() {
+                                wasm_encoder::HeapType::Concrete(mod_id)
+                            } else if let Some(rg_id) = id.as_rec_group_index() {
+                                wasm_encoder::HeapType::Concrete(rg_id)
+                            } else if let Some(core) = id.as_core_type_id() {
+                                wasm_encoder::HeapType::Concrete(core.index() as u32)
+                            } else {
+                                panic!("Did not unpack concrete type!")
+                            }
                         }
-                    } else if ty.is_extern_ref() {
-                        wasm_encoder::HeapType::Abstract {
-                            shared: false,
-                            ty: AbstractHeapType::Extern,
-                        }
-                    } else {
-                        unreachable!()
                     })
                     .encode(&mut bytes)
                 }

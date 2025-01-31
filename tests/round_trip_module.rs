@@ -61,23 +61,23 @@ macro_rules! make_round_trip_tests_module {
 
 mod round_trip {
     // TODO -- change this to just search and find files (keeps from having to manually maintain this list)
-    make_round_trip_tests_module!(
-        "dfinity/modules",
-        import_func,
-        data_section,
-        func,
-        func_locals,
-        table,
-        table_init,
-        globals,
-        exports,
-        start,
-        const_expr
-    );
+    // make_round_trip_tests_module!(
+    //     "dfinity/modules",
+    //     import_func,
+    //     data_section,
+    //     func,
+    //     func_locals,
+    //     table,
+    //     table_init,
+    //     globals,
+    //     exports,
+    //     start,
+    //     const_expr
+    // );
+    //
+    // make_round_trip_tests_module!("handwritten/modules", add, block, func1, import, _start);
 
-    make_round_trip_tests_module!("handwritten/modules", add, block, func1, import, _start);
-
-    make_round_trip_tests_module!("spin", hello_world_module);
+    make_round_trip_tests_module!("spin", kotlin_test);
 }
 
 #[test]

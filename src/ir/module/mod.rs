@@ -30,8 +30,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
+use wasm_encoder::TagSection;
 use wasmparser::{
-    CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef,
+    CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TagType,
+    TypeRef,
 };
 
 pub mod module_exports;
@@ -72,6 +74,8 @@ pub struct Module<'a> {
     pub start: Option<FunctionID>,
     /// Elements
     pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
+    /// Tags
+    pub tags: Vec<TagType>,
     /// Custom Sections
     pub custom_sections: CustomSections<'a>,
     /// Number of local functions (not counting imported functions)
@@ -134,6 +138,7 @@ impl<'a> Module<'a> {
         let mut start = None;
         let mut data_section_count = None;
         let mut custom_sections = vec![];
+        let mut tags: Vec<TagType> = vec![];
 
         let mut module_name: Option<String> = None;
         // for the other names, we directly encode it without passing them into the IR
@@ -357,6 +362,14 @@ impl<'a> Module<'a> {
                         name: None,
                     });
                 }
+                Payload::TagSection(tag_section_reader) => {
+                    for tag in tag_section_reader.into_iter() {
+                        match tag {
+                            Ok(t) => tags.push(t),
+                            Err(e) => panic!("Error encored in tag section!: {}", e),
+                        }
+                    }
+                }
                 Payload::CustomSection(custom_section_reader) => {
                     match custom_section_reader.as_known() {
                         wasmparser::KnownCustom::Name(name_section_reader) => {
@@ -459,8 +472,7 @@ impl<'a> Module<'a> {
                     contents: _,
                     range: _,
                 } => return Err(Error::UnknownSection { section_id: id }),
-                Payload::TagSection(_)
-                | Payload::ModuleSection {
+                Payload::ModuleSection {
                     parser: _,
                     unchecked_range: _,
                 }
@@ -543,6 +555,7 @@ impl<'a> Module<'a> {
             data_count_section_exists: data_section_count.is_some(),
             // code_sections: code_sections.clone(),
             data,
+            tags,
             custom_sections: CustomSections::new(custom_sections),
             num_local_functions: code_sections.len() as u32,
             num_local_globals: num_globals,
@@ -1284,6 +1297,17 @@ impl<'a> Module<'a> {
                 count: self.data.len() as u32,
             };
             module.section(&data_count);
+        }
+
+        if !self.tags.is_empty() {
+            let mut tags = TagSection::new();
+            for tag in self.tags.iter() {
+                tags.tag(wasm_encoder::TagType {
+                    kind: wasm_encoder::TagKind::from(tag.kind),
+                    func_type_idx: tag.func_type_idx,
+                });
+            }
+            module.section(&tags);
         }
 
         if !self.num_local_functions > 0 {
