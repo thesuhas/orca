@@ -209,7 +209,7 @@ pub(crate) fn add_local(
 }
 
 pub(crate) fn add_locals(
-    types: &Vec<DataType>,
+    types: &[DataType],
     num_params: usize,
     num_locals: &mut u32,
     locals: &mut Vec<(u32, DataType)>,

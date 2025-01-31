@@ -32,8 +32,11 @@ use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasm_encoder::TagSection;
-use wasmparser::{CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TagType, TypeRef};
 use wasmparser::Operator::Block;
+use wasmparser::{
+    CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TagType,
+    TypeRef,
+};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -1670,7 +1673,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1973,8 +1976,10 @@ fn resolve_function_entry<'a, 'b, 'c>(
 
 fn resolve_function_exit_with_block_wrapper<'a, 'b, 'c>(
     instr_func_on_entry: &mut InstrBody<'c>,
-    block_ty: TypeID
-) where 'c: 'b {
+    block_ty: TypeID,
+) where
+    'c: 'b,
+{
     // To handle `br*` AND fallthrough:
     // Since the relative depth of a branch target
     // cannot exceed its current depth, we can just
@@ -1983,7 +1988,7 @@ fn resolve_function_exit_with_block_wrapper<'a, 'b, 'c>(
 
     // to be handled on resolving func_entry
     instr_func_on_entry.push(Block {
-        blockty: wasmparser::BlockType::from(BlockType::FuncType(block_ty))
+        blockty: wasmparser::BlockType::from(BlockType::FuncType(block_ty)),
     });
 }
 fn resolve_function_exit<'a, 'b, 'c>(
