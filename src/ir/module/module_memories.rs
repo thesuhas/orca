@@ -1,7 +1,7 @@
-use std::vec::IntoIter;
-use wasmparser::MemoryType;
 use crate::ir::id::{ImportsID, MemoryID};
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
+use std::vec::IntoIter;
+use wasmparser::MemoryType;
 
 /// Intermediate representation of all the memories in a module.
 #[allow(dead_code)]
@@ -109,11 +109,7 @@ impl Memories {
         MemoryID(self.memories.len() as u32)
     }
 
-    pub(crate) fn add_local_mem(
-        &mut self,
-        mut local_mem: LocalMemory,
-        ty: MemoryType
-    ) -> MemoryID {
+    pub(crate) fn add_local_mem(&mut self, mut local_mem: LocalMemory, ty: MemoryType) -> MemoryID {
         self.recalculate_ids = true;
         // fix the ID of the memory
         let id = self.next_id();
@@ -122,7 +118,7 @@ impl Memories {
         self.push(Memory {
             ty,
             kind: MemKind::Local(local_mem),
-            deleted: false
+            deleted: false,
         });
         id
     }
@@ -142,7 +138,7 @@ impl Memories {
                 import_id: imp_id,
                 import_mem_id: MemoryID(imp_mem_id),
             }),
-            deleted: false
+            deleted: false,
         });
     }
 }
@@ -250,6 +246,6 @@ pub struct LocalMemory {
 /// Intermediate representation of an Imported Memory. The actual Import is stored in the Imports field of the module.
 #[derive(Clone, Debug)]
 pub struct ImportedMemory {
-    pub import_id: ImportsID,            // Maps to location in a module's imports
-    pub(crate) import_mem_id: MemoryID,  // Maps to location in a module's imported memories
+    pub import_id: ImportsID,           // Maps to location in a module's imports
+    pub(crate) import_mem_id: MemoryID, // Maps to location in a module's imported memories
 }

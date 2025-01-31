@@ -12,6 +12,7 @@ use crate::ir::module::module_globals::{
     Global, GlobalKind, ImportedGlobal, LocalGlobal, ModuleGlobals,
 };
 use crate::ir::module::module_imports::{Import, ModuleImports};
+use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 use crate::ir::module::module_tables::ModuleTables;
 use crate::ir::module::module_types::{ModuleTypes, Types};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
@@ -19,7 +20,10 @@ use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
     InstrumentationFlag,
 };
-use crate::ir::wrappers::{indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, refers_to_global, refers_to_memory, update_fn_instr, update_global_instr, update_memory_instr};
+use crate::ir::wrappers::{
+    indirect_namemap_parser2encoder, namemap_parser2encoder, refers_to_func, refers_to_global,
+    refers_to_memory, update_fn_instr, update_global_instr, update_memory_instr,
+};
 use crate::opcode::{Inject, Instrumenter};
 use crate::{Location, Opcode};
 use log::{error, warn};
@@ -30,7 +34,6 @@ use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasmparser::{
     CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TypeRef,
 };
-use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 
 pub mod module_exports;
 pub mod module_functions;
@@ -535,7 +538,7 @@ impl<'a> Module<'a> {
                     MemKind::Import(ImportedMemory {
                         import_id: ImportsID(index as u32),
                         import_mem_id: MemoryID(imp_mem_id),
-                    })
+                    }),
                 ));
                 imp_mem_id += 1;
             }
@@ -546,7 +549,7 @@ impl<'a> Module<'a> {
                 ty.to_owned(),
                 MemKind::Local(LocalMemory {
                     mem_id: MemoryID(imports.num_memories + index as u32),
-                })
+                }),
             ));
         }
 
@@ -1510,17 +1513,14 @@ impl<'a> Module<'a> {
                         offset_expr,
                     } => {
                         let new_idx = match memory_mapping.get(memory_index) {
-                            Some(new_index) => {
-                                *new_index
-                            }
-                            None => panic!("Attempting to reference a deleted memory, ID: {}", memory_index),
+                            Some(new_index) => *new_index,
+                            None => panic!(
+                                "Attempting to reference a deleted memory, ID: {}",
+                                memory_index
+                            ),
                         };
-                        data.active(
-                            new_idx,
-                            &offset_expr.to_wasmencoder_type(),
-                            segment_data,
-                        )
-                    },
+                        data.active(new_idx, &offset_expr.to_wasmencoder_type(), segment_data)
+                    }
                 };
             }
             module.section(&data);
@@ -1615,10 +1615,7 @@ impl<'a> Module<'a> {
     // ==== Memory Management ====
     // ===========================
 
-    pub fn add_local_memory(
-        &mut self,
-        ty: MemoryType
-    ) -> MemoryID {
+    pub fn add_local_memory(&mut self, ty: MemoryType) -> MemoryID {
         let local_mem = LocalMemory {
             mem_id: MemoryID(0), // will be fixed
         };
@@ -1631,7 +1628,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1642,17 +1639,14 @@ impl<'a> Module<'a> {
         });
 
         // Add to memories as well as it has imported memories
-        self.memories
-            .add_import_mem(imp_id, ty, imp_mem_id);
+        self.memories.add_import_mem(imp_id, ty, imp_mem_id);
         (MemoryID(imp_mem_id), imp_id)
     }
 
     /// Delete a memory from the module.
     pub fn delete_memory(&mut self, mem_id: MemoryID) {
         self.memories.delete(mem_id);
-        if let MemKind::Import(ImportedMemory { import_id, .. }) =
-            self.memories.get_kind(mem_id)
-        {
+        if let MemKind::Import(ImportedMemory { import_id, .. }) = self.memories.get_kind(mem_id) {
             self.imports.delete(*import_id);
         }
     }
