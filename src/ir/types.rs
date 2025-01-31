@@ -75,19 +75,19 @@ impl fmt::Display for DataType {
             DataType::Exn => write!(f, "DataType: Exn"),
             DataType::NoExn => write!(f, "DataType: NoExn"),
             DataType::Module { ty_id, nullable } => {
-                write!(f, "DataType: Module {:?} Nullable: {:?}", ty_id, nullable)
+                write!(f, "module: {ty_id}, nullable: {nullable}",)
             }
-            DataType::RecGroup(idx) => write!(f, "DataType: RecGroup {:?}", idx),
-            DataType::CoreTypeId(idx) => write!(f, "DataType: CoreTypeId {:?}", idx),
-            DataType::Cont => write!(f, "DataType: Cont"),
-            DataType::NoCont => write!(f, "DataType: NoCont"),
-            DataType::FuncRefNull => write!(f, "DataType: FuncRef Null"),
-            DataType::ExternRefNull => write!(f, "DataType: ExternRef Null"),
-            DataType::AnyNull => write!(f, "DataType: Any Null"),
-            DataType::EqNull => write!(f, "DataType: Eq Null"),
-            DataType::StructNull => write!(f, "DataType: Struct Null"),
-            DataType::ArrayNull => write!(f, "DataType: Array Null"),
-            DataType::I31Null => write!(f, "DataType: I31 Null"),
+            DataType::RecGroup(idx) => write!(f, "recgroup: {idx}"),
+            DataType::CoreTypeId(idx) => write!(f, "coretypeid: {idx}"),
+            DataType::Cont => write!(f, "cont"),
+            DataType::NoCont => write!(f, "nocont"),
+            DataType::FuncRefNull => write!(f, "funcref: null"),
+            DataType::ExternRefNull => write!(f, "externref: null"),
+            DataType::AnyNull => write!(f, "any: null"),
+            DataType::EqNull => write!(f, "eq: null"),
+            DataType::StructNull => write!(f, "struct: null"),
+            DataType::ArrayNull => write!(f, "array: null"),
+            DataType::I31Null => write!(f, "i31: null"),
         }
     }
 }

@@ -1,5 +1,5 @@
 use log::{error, trace};
-use orca_wasm::ir::id::FunctionID;
+use orca_wasm::ir::id::{FunctionID, TypeID};
 use orca_wasm::ir::types::InstrumentationMode;
 use orca_wasm::iterator::component_iterator::ComponentIterator;
 use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
@@ -1884,6 +1884,25 @@ fn test_semantic_after_simple_2br_table() {
         (InstrumentationMode::SemanticAfter, br_table_body),
     )];
     run_block_injection(&mut mod_it, &ops_of_interest);
+
+    let result = module.encode();
+    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+    if let Err(e) = check_instrumentation_encoding(&out, file) {
+        error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+    }
+}
+
+#[test]
+fn add_imports_when_has_start_func() {
+    let file = "tests/test_inputs/instr_testing/modules/add-imports-when-has-start-func.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse");
+
+    module.add_import_func("ima".to_string(), "new_import".to_string(), TypeID(0));
+    module.add_import_func("ya_dont".to_string(), "say".to_string(), TypeID(0));
 
     let result = module.encode();
     let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");

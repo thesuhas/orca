@@ -1074,6 +1074,20 @@ impl<'a> Module<'a> {
         let mut module = wasm_encoder::Module::new();
         let mut reencode = RoundtripReencoder;
 
+        let new_start = if let Some(start_fn) = self.start {
+            // fix the start function mapping
+            match func_mapping.get(&*start_fn) {
+                Some(new_index) => Some(FunctionID(*new_index)),
+                None => {
+                    warn!("Deleted the start function!");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        self.start = new_start;
+
         if !self.types.is_empty() {
             let mut types = wasm_encoder::TypeSection::new();
             let mut last_rg = None;
@@ -1084,7 +1098,7 @@ impl<'a> Module<'a> {
                 // If it is a new one
                 if curr_rg != last_rg {
                     // If the previous one was an explicit rec group
-                    if let Some(_) = last_rg {
+                    if last_rg.is_some() {
                         // Encode the last one as a recgroup
                         types.ty().rec(rg_types.clone());
                         // Reset the vector
@@ -1103,7 +1117,7 @@ impl<'a> Module<'a> {
                 last_rg = curr_rg;
             }
             // If the last rg was a none, it was encoded in the binary, if it was an explicit rec group, was not encoded
-            if let Some(_) = last_rg {
+            if last_rg.is_some() {
                 types.ty().rec(rg_types.clone());
             }
             module.section(&types);
@@ -1545,7 +1559,11 @@ impl<'a> Module<'a> {
             ),
             TypeRef::Table(..) => todo!(),
             TypeRef::Tag(..) => todo!(),
-            TypeRef::Memory(..) => todo!(),
+            TypeRef::Memory(..) => {
+                // TODO -- this still doesn't work in the generic case...fix this!
+                let imported = self.imports.num_memories;
+                return (imported, self.imports.add(import));
+            }
         };
 
         let id = if num_local > 0 {
@@ -1554,6 +1572,27 @@ impl<'a> Module<'a> {
             num_imported
         };
         (id, self.imports.add(import))
+    }
+
+    // ===========================
+    // ==== Memory Management ====
+    // ===========================
+
+    pub fn add_import_memory(
+        &mut self,
+        module: String,
+        name: String,
+        ty: MemoryType,
+    ) -> (MemoryID, ImportsID) {
+        let (mem_id, imp_id) = self.add_import(Import {
+            module: module.leak(),
+            name: name.clone().leak(),
+            ty: TypeRef::Memory(ty),
+            custom_name: None,
+            deleted: false,
+        });
+
+        (MemoryID(mem_id), imp_id)
     }
 
     // =============================
@@ -1761,6 +1800,11 @@ impl<'a> Module<'a> {
         {
             self.imports.delete(*import_id);
         }
+    }
+
+    /// Change a locally-defined global's init expression.
+    pub fn mod_global_init_expr(&mut self, global_id: GlobalID, new_expr: InitExpr) {
+        self.globals.mod_global_init_expr(*global_id, new_expr);
     }
 }
 
