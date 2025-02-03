@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasm_encoder::TagSection;
+use wasmparser::Operator::Block;
 use wasmparser::{
     CompositeInnerType, ExternalKind, GlobalType, MemoryType, Operator, Parser, Payload, TagType,
     TypeRef,
@@ -684,6 +685,26 @@ impl<'a> Module<'a> {
                     BlockID,
                     HashMap<InstrumentationMode, InstrToInject>,
                 > = HashMap::new();
+                if let Some(on_exit) = &mut instr_func_on_exit {
+                    if !on_exit.is_empty() {
+                        let on_entry = if let Some(on_entry) = &mut instr_func_on_entry {
+                            on_entry
+                        } else {
+                            let on_entry = vec![];
+                            instr_func_on_entry = Some(on_entry);
+                            if let Some(ref mut on_entry) = instr_func_on_entry {
+                                on_entry
+                            } else {
+                                panic!()
+                            }
+                        };
+
+                        let func_ty = self.functions.get_type_id(func_idx);
+                        let func_results = self.types.get(func_ty).unwrap().results();
+                        let block_ty = self.types.add_func_type(&[], &func_results);
+                        resolve_function_exit_with_block_wrapper(on_entry, block_ty);
+                    }
+                }
                 let mut builder = self.functions.get_fn_modifier(func_idx).unwrap();
 
                 // Must make copy to be able to iterate over body while calling builder.* methods that mutate the instrumentation flag!
@@ -704,7 +725,7 @@ impl<'a> Module<'a> {
                     }
                     if let Some(on_exit) = &mut instr_func_on_exit {
                         if !on_exit.is_empty() {
-                            resolve_function_exit(&mut builder, on_exit, idx);
+                            resolve_function_exit(on_exit, &mut builder, op, idx);
                         }
                     }
 
@@ -1953,19 +1974,80 @@ fn resolve_function_entry<'a, 'b, 'c>(
     }
 }
 
+fn resolve_function_exit_with_block_wrapper<'a, 'b, 'c>(
+    instr_func_on_entry: &mut InstrBody<'c>,
+    block_ty: TypeID,
+) where
+    'c: 'b,
+{
+    // To handle `br*` AND fallthrough:
+    // Since the relative depth of a branch target
+    // cannot exceed its current depth, we can just
+    // wrap the function body in a block and put the
+    // `exit` instrumentation AFTER the block's `end`.
+
+    // to be handled on resolving func_entry
+    instr_func_on_entry.push(Block {
+        blockty: wasmparser::BlockType::from(BlockType::FuncType(block_ty)),
+    });
+}
 fn resolve_function_exit<'a, 'b, 'c>(
-    builder: &mut FunctionModifier<'a, 'b>,
     instr_func_on_exit: &mut InstrBody<'c>,
+    builder: &mut FunctionModifier<'a, 'b>,
+    op: &Operator,
     idx: usize,
 ) where
     'c: 'b,
 {
+    // To handle `return`:
+    // Place a copy of `exit` BEFORE the `return`
+    // Place a copy of `exit` BEFORE the `return_call`
+    // Place a copy of `exit` BEFORE the `return_call_indirect`
+    // Place a copy of `exit` BEFORE the `return_call_ref`
+
+    // To handle `traps`:
+    // Place a copy of `exit` BEFORE the `unreachable`
+    // Place a copy of `exit` BEFORE the `throw`
+    // Place a copy of `exit` BEFORE the `rethrow`
+    // Place a copy of `exit` BEFORE the `throw_ref`
+    // Place a copy of `exit` BEFORE the `resume_throw`
+
+    // convert instr to simple before/after/alt
+    match op {
+        // handle returns
+        Operator::Return { .. } |
+            Operator::ReturnCall {..} |
+            Operator::ReturnCallIndirect {..} |
+            Operator::ReturnCallRef {..} |
+
+        // handle traps
+        Operator::Unreachable |
+            Operator::Throw {..} |
+            Operator::Rethrow {..} |
+            Operator::ThrowRef |
+            Operator::ResumeThrow {..} => {
+            // just inject immediately before the instruction
+            builder.before_at(Location::Module {
+                func_idx: FunctionID(0), // not used
+                instr_idx: idx,
+            });
+            builder.inject_all(instr_func_on_exit);
+
+            // no need to do next part if we've injected!
+            return
+        }
+        _ => {}
+    }
+
+    // Handles the actual injection of the added block's `end`
+    // and places instr block afterward!
     if idx == builder.body.instructions.len() - 1 {
         // we're at the end of the function!
         builder.before_at(Location::Module {
             func_idx: FunctionID(0), // not used
             instr_idx: idx,
         });
+        builder.end(); // end the added wrapper block!
         builder.inject_all(instr_func_on_exit);
 
         // remove the contents of the body now that it's been resolved

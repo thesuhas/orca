@@ -164,7 +164,7 @@ impl<'a, 'b> FunctionModifier<'a, 'b> {
         func_modifier
     }
 
-    pub fn add_locals(&mut self, types: &Vec<DataType>) {
+    pub fn add_locals(&mut self, types: &[DataType]) {
         add_locals(
             types,
             self.args.len(),
