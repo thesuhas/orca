@@ -1,28 +1,9 @@
-mod common;
-
-use crate::common::{try_path, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};
-use log::{debug, error, trace};
+use log::debug;
 use orca_wasm::ir::id::FunctionID;
 use orca_wasm::ir::module::Module;
-use std::fs::File;
-use std::io::Write;
 
-fn write_to_file(bytes: &[u8], path: String) {
-    try_path(&path);
-    let mut file = match File::create(path) {
-        Ok(file) => file,
-        Err(e) => {
-            error!("Failed to create the file: {}", e);
-            return;
-        }
-    };
-
-    // Write the string to the file
-    match file.write_all(bytes) {
-        Ok(_) => trace!("Data successfully written to the file."),
-        Err(e) => error!("Failed to write to the file: {}", e),
-    }
-}
+mod common;
+use common::{write_to_file, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};
 
 fn round_trip_module(testname: &str, folder: &str) {
     let filename = format!(

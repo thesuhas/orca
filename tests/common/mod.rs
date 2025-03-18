@@ -1,16 +1,37 @@
 #![allow(dead_code)]
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use log::{debug, error, trace};
 
 pub const WASM_OUTPUT_DIR: &str = "output/wasm";
 pub const WAT_OUTPUT_DIR: &str = "output/wat";
 
 /// create output path if it doesn't exist
-pub fn try_path(path: &String) {
-    if !PathBuf::from(path).exists() {
-        fs::create_dir_all(PathBuf::from(path).parent().unwrap()).unwrap();
+pub fn ensure_containing_dir(path: impl AsRef<Path>) {
+    if !path.as_ref().exists() {
+        fs::create_dir_all(path.as_ref().to_path_buf().parent().unwrap()).unwrap();
+    }
+}
+
+/// Write bytes to a given path on disk
+pub fn write_to_file(bytes: &[u8], path: impl AsRef<Path>) {
+    ensure_containing_dir(&path);
+    let mut file = match File::create(path) {
+        Ok(file) => file,
+        Err(e) => {
+            error!("Failed to create the file: {}", e);
+            return;
+        }
+    };
+
+    // Write the string to the file
+    match file.write_all(bytes) {
+        Ok(_) => trace!("Data successfully written to the file."),
+        Err(e) => error!("Failed to write to the file: {}", e),
     }
 }
 
