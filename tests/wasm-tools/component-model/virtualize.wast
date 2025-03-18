@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (core module $libc
     (memory (export "mem") 0)

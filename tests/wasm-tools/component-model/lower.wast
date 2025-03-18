@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (assert_invalid
   (component
     (import "f" (func $f (param "x" (list u8))))

@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (core module $m
     (memory (export "m") 1)

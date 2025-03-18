@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (import "log" (func $log (param "msg" string)))
   (core module $libc

@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots % -f cm-values
+
 ;; For example, the following component:
 
 ;; a.wasm

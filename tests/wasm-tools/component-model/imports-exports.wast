@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 ;; With what's defined so far, we can define a component that imports, links and exports other components:
 
 (component

@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots % -f cm-values
+
 (component
   (import "i" (instance $i
     (export "f1" (func))

@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots % -f cm-values
+
 ;; With this, we can define a component that imports a string and computes a new exported string, all at instantiation time:
 
 (component

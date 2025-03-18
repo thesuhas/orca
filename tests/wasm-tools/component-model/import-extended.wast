@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots % -f cm-nested-names
+
 ;; These are the extended import name forms that are currently supported
 ;; via WasmFeatures::component_model_nested_names.
 

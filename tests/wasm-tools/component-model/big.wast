@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (import "wasi-logging" (instance $logging
     (export "log" (func (param "msg" string)))

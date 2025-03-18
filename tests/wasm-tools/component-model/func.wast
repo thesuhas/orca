@@ -1,8 +1,9 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (import "a" (func (param "foo" string)))
   (import "b" (func (param "foo" string) (param "bar" s32) (param "baz" u32)))
-  (import "c" (func (result "foo" (tuple u8))))
-  (import "d" (func (result "foo" string) (result "bar" s32) (result "baz" u32)))
+  (import "c" (func (result (tuple u8))))
 )
 
 (component
@@ -12,25 +13,12 @@
   (import "d" (func (param "p1" bool) (result string)))
 )
 
-(assert_invalid
-  (component
-    (import "a" (func (result "foo" string) (result s32) (result "bar" u32)))
-  )
-  "function result name cannot be empty"
-)
 
 (assert_invalid
   (component
     (type (func (param "foo" string) (param "FOO" u32)))
   )
   "function parameter name `FOO` conflicts with previous parameter name `foo`"
-)
-
-(assert_invalid
-  (component
-    (type (func (result "FOO" string) (result "foo" u32)))
-  )
-  "function result name `foo` conflicts with previous result name `FOO`"
 )
 
 (assert_invalid
@@ -134,3 +122,25 @@
   )
   "canonical option `realloc` is required"
 )
+
+(assert_invalid
+  (component binary
+    "\00asm" "\0d\00\01\00"   ;; component header
+    "\07\05"          ;; component type section, 5 bytes
+    "\01"             ;; 1 count
+    "\40"             ;; component function type
+    "\00"             ;; 0 parameters
+    "\01\01"          ;; invalid result encoding
+  )
+  "invalid leading byte (0x1) for number of results")
+
+(assert_invalid
+  (component binary
+    "\00asm" "\0d\00\01\00"   ;; component header
+    "\07\05"          ;; component type section, 5 bytes
+    "\01"             ;; 1 count
+    "\40"             ;; component function type
+    "\00"             ;; 0 parameters
+    "\02\00"          ;; invalid result encoding
+  )
+  "invalid leading byte (0x2) for component function results")

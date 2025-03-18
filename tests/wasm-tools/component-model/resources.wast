@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (type $x (resource (rep i32)))
 )
@@ -179,10 +181,10 @@
   (type (component
     (import "x" (instance $i
       (export $t "t" (type (sub resource)))
-      (export "f" (func (result "x" (own $t))))
+      (export "f" (func (result (own $t))))
     ))
     (alias export $i "t" (type $t))
-    (export "f" (func (result "x" (own $t))))
+    (export "f" (func (result (own $t))))
   ))
 )
 
@@ -1151,3 +1153,14 @@
     (type (func (result (option (list $t)))))
   )
   "function result cannot contain a `borrow` type")
+
+;; forms of canon builtins
+(component
+  (type $r (resource (rep i32)))
+  (core func (canon resource.new $r))
+  (canon resource.new $r (core func))
+  (core func (canon resource.drop $r))
+  (canon resource.drop $r (core func))
+  (core func (canon resource.rep $r))
+  (canon resource.rep $r (core func))
+)
