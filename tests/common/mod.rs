@@ -3,9 +3,9 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use log::{debug, error, trace};
+use log::{error, trace};
 
 pub const WASM_OUTPUT_DIR: &str = "output/wasm";
 pub const WAT_OUTPUT_DIR: &str = "output/wat";

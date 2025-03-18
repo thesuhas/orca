@@ -1021,9 +1021,7 @@ fn test_fn_entry_one_func() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut fn_entry_body = vec![];
-    fn_entry_body.push(Operator::I32Const { value: 1 });
-    fn_entry_body.push(Operator::Drop);
+    let fn_entry_body = vec![Operator::I32Const { value: 1 }, Operator::Drop];
 
     inject_function_entry(&mut mod_it, fn_entry_body);
 
@@ -1044,9 +1042,7 @@ fn test_fn_entry_two_funcs() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut fn_entry_body = vec![];
-    fn_entry_body.push(Operator::I32Const { value: 1 });
-    fn_entry_body.push(Operator::Drop);
+    let fn_entry_body = vec![Operator::I32Const { value: 1 }, Operator::Drop];
 
     inject_function_entry(&mut mod_it, fn_entry_body);
 
@@ -1069,9 +1065,7 @@ fn test_fn_exit_one_func() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut fn_entry_body = vec![];
-    fn_entry_body.push(Operator::I32Const { value: 1 });
-    fn_entry_body.push(Operator::Drop);
+    let fn_entry_body = vec![Operator::I32Const { value: 1 }, Operator::Drop];
 
     inject_function_exit(&mut mod_it, fn_entry_body);
 
@@ -1092,9 +1086,7 @@ fn test_fn_exit_two_funcs() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut fn_entry_body = vec![];
-    fn_entry_body.push(Operator::I32Const { value: 1 });
-    fn_entry_body.push(Operator::Drop);
+    let fn_entry_body = vec![Operator::I32Const { value: 1 }, Operator::Drop];
 
     inject_function_exit(&mut mod_it, fn_entry_body);
 
@@ -1116,33 +1108,13 @@ fn test_semantic_after_complex_mult_nested_diff_opcodes() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 23 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 34 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 45 });
-    else_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 56 });
-    br_body.push(Operator::Drop);
-
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 67 });
-    br_if_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 78 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 45 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
+    let br_if_body = vec![Operator::I32Const { value: 67 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 78 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1193,13 +1165,8 @@ fn test_semantic_after_medium_1br() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 23 });
-    br_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1230,13 +1197,8 @@ fn test_semantic_after_medium_1br_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 23 });
-    br_if_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_if_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1267,13 +1229,8 @@ fn test_semantic_after_medium_1br_table() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 23 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1304,13 +1261,8 @@ fn test_semantic_after_medium_2br() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 23 });
-    br_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1341,13 +1293,8 @@ fn test_semantic_after_medium_2br_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 23 });
-    br_if_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_if_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1378,13 +1325,8 @@ fn test_semantic_after_medium_2br_table() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 23 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1415,13 +1357,8 @@ fn test_semantic_after_medium_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 34 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1452,25 +1389,11 @@ fn test_semantic_after_medium_ifelse() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 23 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 34 });
-    else_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 45 });
-    br_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 56 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 45 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1513,21 +1436,10 @@ fn test_semantic_after_medium_ifs() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 23 });
-    if_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 34 });
-    br_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 45 });
-    br_table_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 23 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 45 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1566,13 +1478,8 @@ fn test_semantic_after_medium_multiple() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 1234 });
-    br_if_body.push(Operator::Drop);
-
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 5678 });
-    br_table_body.push(Operator::Drop);
+    let br_if_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
+    let br_table_body = vec![Operator::I32Const { value: 5678 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1600,7 +1507,6 @@ fn test_semantic_after_medium_multiple() {
 fn test_semantic_after_medium_other_operators() {
     let _file = "tests/test_inputs/instr_testing/modules/semantic_after/medium_other_operators.wat";
     // todo -- test the other operators (when I know how to write wat using them)
-    assert!(true);
 }
 
 #[test]
@@ -1610,9 +1516,7 @@ fn test_semantic_after_simple_1br() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 1234 });
-    br_body.push(Operator::Drop);
+    let br_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Br,
@@ -1637,9 +1541,7 @@ fn test_semantic_after_simple_1br_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 1234 });
-    br_if_body.push(Operator::Drop);
+    let br_if_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::BrIf,
@@ -1664,9 +1566,7 @@ fn test_semantic_after_simple_1br_table() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 1234 });
-    br_table_body.push(Operator::Drop);
+    let br_table_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::BrTable,
@@ -1691,13 +1591,8 @@ fn test_semantic_after_simple_1if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 12 });
-    if_body.push(Operator::Drop);
-
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 34 });
-    br_body.push(Operator::Drop);
+    let if_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let br_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1728,9 +1623,7 @@ fn test_semantic_after_simple_2br() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_body = vec![];
-    br_body.push(Operator::I32Const { value: 1234 });
-    br_body.push(Operator::Drop);
+    let br_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Br,
@@ -1755,9 +1648,7 @@ fn test_semantic_after_simple_2br_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_if_body = vec![];
-    br_if_body.push(Operator::I32Const { value: 1234 });
-    br_if_body.push(Operator::Drop);
+    let br_if_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::BrIf,
@@ -1782,9 +1673,7 @@ fn test_semantic_after_simple_2br_table() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut br_table_body = vec![];
-    br_table_body.push(Operator::I32Const { value: 1234 });
-    br_table_body.push(Operator::Drop);
+    let br_table_body = vec![Operator::I32Const { value: 1234 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::BrTable,

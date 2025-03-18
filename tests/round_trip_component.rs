@@ -24,10 +24,10 @@ fn round_trip_component(testname: &str, folder: &str) {
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
         write_to_file(
-            &original.as_bytes().to_vec(),
+            original.as_bytes(),
             format!("{}_test_original.wat", testname),
         );
-        write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
+        write_to_file(out.as_bytes(), format!("{}_test.wat", testname));
     }
     assert_eq!(out, original);
 }
