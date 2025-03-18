@@ -99,8 +99,8 @@ fn test_import_delete() {
     let fid = module
         .imports
         .get_func("bogus".to_string(), "hi".to_string());
-    assert!(!id.is_none());
-    assert!(!fid.is_none());
+    assert!(id.is_some());
+    assert!(fid.is_some());
 
     let id = id.unwrap();
     let fid = fid.unwrap();
@@ -188,7 +188,7 @@ fn test_middle_import_to_local() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     builder.i32_const(1);
     builder.drop();
 
@@ -215,7 +215,7 @@ fn test_first_import_to_local() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     builder.i32_const(1);
     builder.drop();
 
@@ -242,7 +242,7 @@ fn test_last_import_to_local() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     builder.i32_const(1);
     builder.drop();
 
@@ -270,17 +270,17 @@ fn test_all_import_to_local() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // Convert all to local
-    let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
     first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
-    let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
     second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    let mut third_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(3);
     third_builder.drop();
     third_builder.replace_import_in_module(&mut module, ImportsID(2));
@@ -307,12 +307,12 @@ fn test_some_import_to_local() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // Convert all to local
-    let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
     first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
-    let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
     second_builder.replace_import_in_module(&mut module, ImportsID(1));
@@ -338,7 +338,7 @@ fn test_middle_import_to_local_import_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     builder.i32_const(1);
     builder.drop();
 
@@ -368,7 +368,7 @@ fn test_middle_import_to_local_local_delete() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     builder.i32_const(1);
     builder.drop();
 
@@ -579,17 +579,17 @@ fn test_all_local_to_import_all_import_to_local() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // Convert all to local
-    let mut first_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(4);
     first_builder.drop();
     first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
-    let mut second_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(5);
     second_builder.drop();
     second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    let mut third_builder = FunctionBuilder::new(&*vec![DataType::I32, DataType::I32], &*vec![]);
+    let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(6);
     third_builder.drop();
     third_builder.replace_import_in_module(&mut module, ImportsID(2));
@@ -637,14 +637,14 @@ fn test_add_imports_and_local_fns() {
     let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2));
 
     // add first local func
-    let mut first_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut first_builder = FunctionBuilder::new(&[], &[]);
     first_builder.i32_const(1);
     first_builder.i32_const(1);
     first_builder.call(fid);
     let fid0 = first_builder.finish_module(&mut module);
 
     // add second local func
-    let mut sec_builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut sec_builder = FunctionBuilder::new(&[], &[]);
     sec_builder.i32_const(2);
     sec_builder.drop();
     sec_builder.call(fid0);
@@ -708,7 +708,7 @@ pub(crate) fn try_path(path: &str) {
 pub(crate) fn validate(wasm: &Vec<u8>, output_wasm_path: &str) -> Result<(), std::io::Error> {
     try_path(output_wasm_path);
     std::fs::write(output_wasm_path, wasm)?;
-    validate_wasm(&output_wasm_path);
+    validate_wasm(output_wasm_path);
     Ok(())
 }
 

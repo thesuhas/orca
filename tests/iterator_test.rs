@@ -63,7 +63,7 @@ fn test_it_instr_at() {
         func_idx: FunctionID(1),
         instr_idx: 1,
     };
-    mod_it.before_at(loc.clone());
+    mod_it.before_at(loc);
     mod_it.add_instr_at(loc, Operator::Unreachable);
     loop {
         let op = mod_it.curr_op();

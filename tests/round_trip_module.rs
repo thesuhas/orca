@@ -7,7 +7,7 @@ use orca_wasm::ir::module::Module;
 use std::fs::File;
 use std::io::Write;
 
-fn write_to_file(bytes: &Vec<u8>, path: String) {
+fn write_to_file(bytes: &[u8], path: String) {
     try_path(&path);
     let mut file = match File::create(path) {
         Ok(file) => file,
@@ -41,7 +41,7 @@ fn round_trip_module(testname: &str, folder: &str) {
     if out != original {
         debug!("Test: {:?} failed! Writing to file to check", testname);
         write_to_file(
-            &out.as_bytes().to_vec(),
+            out.as_bytes(),
             format!("{WAT_OUTPUT_DIR}/module_{}.wat", testname),
         );
     }

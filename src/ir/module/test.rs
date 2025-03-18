@@ -19,7 +19,7 @@ fn test_add_local_func() {
     state_assertions(&module, &init_state, false);
 
     // add local func
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
     assert_eq!(
@@ -65,7 +65,7 @@ fn test_add_local_then_imported_func() {
     state_assertions(&module, &init_state, false);
 
     // add local function
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
     assert_eq!(init_state.next_fid(), *builder.finish_module(&mut module));
@@ -99,7 +99,7 @@ fn test_add_imported_then_local_func() {
     init_state.add_imported_func();
 
     // add local function using the imported function
-    let mut builder = FunctionBuilder::new(&vec![], &vec![DataType::I32]);
+    let mut builder = FunctionBuilder::new(&[], &[DataType::I32]);
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(fid);
@@ -122,7 +122,7 @@ fn test_add_then_delete_local_func() {
     state_assertions(&module, &init_state, false);
 
     // add local function
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
     let fid = builder.finish_module(&mut module);
@@ -239,13 +239,13 @@ fn test_convert_import_fn_to_local() {
     state_assertions(&module, &init_state, false);
 
     // convert the import to a function
-    let mut builder = FunctionBuilder::new(&*vec![DataType::I32], &*vec![DataType::I32]);
+    let mut builder = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
     builder.i32_const(1);
     builder.drop();
     builder.replace_import_in_module(&mut module, ImportsID(0));
 
     // add local function using the translated function
-    let mut builder = FunctionBuilder::new(&vec![], &vec![DataType::I32]);
+    let mut builder = FunctionBuilder::new(&[], &[DataType::I32]);
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(FunctionID(0));
@@ -332,9 +332,7 @@ fn test_set_fn_name_local_through_functions() {
 
     let fid = FunctionID(10);
     let mut new_func_names = HashMap::new();
-    module
-        .functions
-        .set_local_fn_name(fid.clone(), "test".to_string());
+    module.functions.set_local_fn_name(fid, "test".to_string());
     new_func_names.insert(fid, "test".to_string());
 
     is_valid(
@@ -354,7 +352,7 @@ fn test_set_fn_name_local_through_module() {
 
     let fid = FunctionID(10);
     let mut new_func_names = HashMap::new();
-    module.set_fn_name(fid.clone(), "test".to_string());
+    module.set_fn_name(fid, "test".to_string());
     new_func_names.insert(fid, "test".to_string());
 
     is_valid(
@@ -376,7 +374,7 @@ fn test_set_fn_name_local_through_func_builder() {
 
     // add local function
     let name = "test0";
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
     builder.set_name(name.to_string());
@@ -388,7 +386,7 @@ fn test_set_fn_name_local_through_func_builder() {
 
     // add local function
     let name = "other";
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
     builder.set_name("test1".to_string());
@@ -427,7 +425,7 @@ fn test_create_and_add_global() {
     init_state.add_local_global();
 
     // add a function using the new global
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.global_get(gid);
     builder.drop();
     let fid = builder.finish_module(&mut module);
@@ -463,7 +461,7 @@ fn test_add_imported_global() {
     init_state.add_imported_global();
 
     // add a function using the new global
-    let mut builder = FunctionBuilder::new(&*vec![], &*vec![]);
+    let mut builder = FunctionBuilder::new(&[], &[]);
     builder.global_get(gid);
     builder.drop();
     let fid = builder.finish_module(&mut module);
@@ -658,7 +656,7 @@ fn is_valid(
     new_fn_names: &HashMap<FunctionID, String>,
     test_name: &str,
 ) {
-    state_assertions(&module, state, true);
+    state_assertions(module, state, true);
 
     // encode and write to file
     let output_wasm_path = format!("{TEST_DEBUG_DIR}/{test_name}.wasm");
@@ -716,13 +714,13 @@ fn state_assertions(module: &Module, state: &State, only_temporal: bool) {
 
 pub(crate) fn encode_and_validate_wasm(module: &mut Module, output_wasm_path: &str) {
     try_path(output_wasm_path);
-    if let Err(e) = module.emit_wasm(&output_wasm_path) {
+    if let Err(e) = module.emit_wasm(output_wasm_path) {
         panic!(
             "Failed to dump wasm to {output_wasm_path} due to error: {}",
             e
         );
     }
-    validate_wasm(&output_wasm_path);
+    validate_wasm(output_wasm_path);
 }
 
 pub(crate) fn validate_wasm(wasm_path: &str) -> bool {

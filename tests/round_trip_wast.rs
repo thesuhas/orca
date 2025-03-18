@@ -44,7 +44,7 @@ fn test_wast(path: String, component: bool) {
         let mut cmd = wasm_tools();
         let td = tempfile::TempDir::new().unwrap();
         cmd.arg("json-from-wast")
-            .arg(&file.path())
+            .arg(file.path())
             .arg("--pretty")
             .arg("--wasm-dir")
             .arg(td.path())
@@ -84,22 +84,20 @@ fn test_wast(path: String, component: bool) {
                         if let Value::Object(testcase) = value {
                             // If assert is not in the string, that means it is a valid test case
                             if let Value::String(ty) = testcase.get_key_value("type").unwrap().1 {
-                                if !ty.contains("assert") {
-                                    if testcase.contains_key("filename") {
-                                        if let Value::String(test_file) =
-                                            testcase.get_key_value("filename").unwrap().1
-                                        {
-                                            // Do round-trip
-                                            roundtrip(
-                                                Path::new(td.path())
-                                                    .join(test_file)
-                                                    .to_str()
-                                                    .unwrap()
-                                                    .parse()
-                                                    .unwrap(),
-                                                component,
-                                            );
-                                        }
+                                if !ty.contains("assert") && testcase.contains_key("filename") {
+                                    if let Value::String(test_file) =
+                                        testcase.get_key_value("filename").unwrap().1
+                                    {
+                                        // Do round-trip
+                                        roundtrip(
+                                            Path::new(td.path())
+                                                .join(test_file)
+                                                .to_str()
+                                                .unwrap()
+                                                .parse()
+                                                .unwrap(),
+                                            component,
+                                        );
                                     }
                                 }
                             }

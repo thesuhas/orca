@@ -5,7 +5,7 @@ use orca_wasm::ir::component::Component;
 use std::fs::File;
 use std::io::Write;
 
-fn write_to_file(bytes: &Vec<u8>, path: String) {
+fn write_to_file(bytes: &[u8], path: String) {
     let mut file = match File::create(path) {
         Ok(file) => file,
         Err(e) => {

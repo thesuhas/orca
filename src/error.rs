@@ -1,10 +1,10 @@
 use std::ops::Range;
+
 use wasmparser::BinaryReaderError;
 
+/// Error for parsing
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
-
-/// Error for parsing
 pub enum Error {
     BinaryReaderError(BinaryReaderError),
     UnknownVersion(u32),

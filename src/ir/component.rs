@@ -619,7 +619,7 @@ impl<'a> Component<'a> {
                                         (p.0, reencode.component_val_type(p.1))
                                     },
                                 ));
-                                convert_results(func_ty.result.clone(), enc, &mut reencode);
+                                convert_results(func_ty.result, enc, &mut reencode);
                             }
                             ComponentType::Component(comp) => {
                                 let mut new_comp = wasm_encoder::ComponentType::new();
@@ -1079,13 +1079,10 @@ impl<'a> Component<'a> {
             .enumerate()
         {
             if let FuncKind::Local(l) = &func.kind {
-                match &l.body.name {
-                    Some(n) => {
-                        if n == name {
-                            return Some(FunctionID(idx as u32));
-                        }
+                if let Some(n) = &l.body.name {
+                    if n == name {
+                        return Some(FunctionID(idx as u32));
                     }
-                    None => {}
                 }
             }
         }

@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+use std::mem::discriminant;
+
 use log::{error, trace};
+use wasmparser::Operator;
+
 use orca_wasm::ir::id::{FunctionID, TypeID};
 use orca_wasm::ir::types::InstrumentationMode;
 use orca_wasm::iterator::component_iterator::ComponentIterator;
@@ -7,9 +12,6 @@ use orca_wasm::iterator::module_iterator::ModuleIterator;
 use orca_wasm::module_builder::AddLocal;
 use orca_wasm::opcode::{Inject, Instrumenter};
 use orca_wasm::{Component, Location, Module, Opcode};
-use std::collections::HashMap;
-use std::mem::discriminant;
-use wasmparser::Operator;
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -244,9 +246,7 @@ fn test_block_alt_one_func_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 12 });
-    loop_body.push(Operator::Drop);
+    let loop_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Loop,
@@ -296,9 +296,7 @@ fn test_block_alt_one_func_replace_else() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 12 });
-    else_body.push(Operator::Drop);
+    let else_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Else,
@@ -323,9 +321,7 @@ fn test_block_alt_one_func_two_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Block,
@@ -376,9 +372,7 @@ fn test_block_alt_remove_else_with_instrumented_after_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 12 });
-    if_body.push(Operator::Drop);
+    let if_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let else_body = vec![];
 
@@ -412,9 +406,7 @@ fn test_block_alt_remove_else_with_instrumented_exit_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 12 });
-    if_body.push(Operator::Drop);
+    let if_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let else_body = vec![];
 
@@ -522,9 +514,7 @@ fn test_block_alt_replace_else_nested_if() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 12 });
-    else_body.push(Operator::Drop);
+    let else_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Else,
@@ -549,10 +539,11 @@ fn test_block_alt_replace_if_with_else() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut if_body = vec![];
-    if_body.push(Operator::Drop);
-    if_body.push(Operator::I32Const { value: 12 });
-    if_body.push(Operator::Drop);
+    let if_body = vec![
+        Operator::Drop,
+        Operator::I32Const { value: 12 },
+        Operator::Drop,
+    ];
 
     let ops_of_interest = vec![(
         SupportedOperators::If,
@@ -577,9 +568,7 @@ fn test_block_alt_replace_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Block,
@@ -606,13 +595,9 @@ fn test_block_entry_one_func_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -643,13 +628,9 @@ fn test_block_entry_one_func_one_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -680,17 +661,9 @@ fn test_block_entry_one_func_two_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -725,21 +698,10 @@ fn test_block_entry_two_funcs_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 78 });
-    else_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 78 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -778,21 +740,10 @@ fn test_block_entry_two_funcs_one_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 78 });
-    else_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 78 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -831,9 +782,7 @@ fn test_block_entry_two_funcs_two_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Block,
@@ -860,13 +809,8 @@ fn test_block_exit_one_func_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -897,13 +841,8 @@ fn test_block_exit_one_func_one_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -934,17 +873,9 @@ fn test_block_exit_one_func_two_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -979,21 +910,10 @@ fn test_block_exit_two_funcs_nested_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 78 });
-    else_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 78 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1032,21 +952,10 @@ fn test_block_exit_two_funcs_one_block() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
-
-    let mut loop_body = vec![];
-    loop_body.push(Operator::I32Const { value: 34 });
-    loop_body.push(Operator::Drop);
-
-    let mut if_body = vec![];
-    if_body.push(Operator::I32Const { value: 56 });
-    if_body.push(Operator::Drop);
-
-    let mut else_body = vec![];
-    else_body.push(Operator::I32Const { value: 78 });
-    else_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
+    let loop_body = vec![Operator::I32Const { value: 34 }, Operator::Drop];
+    let if_body = vec![Operator::I32Const { value: 56 }, Operator::Drop];
+    let else_body = vec![Operator::I32Const { value: 78 }, Operator::Drop];
 
     let ops_of_interest = vec![
         (
@@ -1085,9 +994,7 @@ fn test_block_exit_two_funcs_two_blocks() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse");
     let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
 
-    let mut block_body = vec![];
-    block_body.push(Operator::I32Const { value: 12 });
-    block_body.push(Operator::Drop);
+    let block_body = vec![Operator::I32Const { value: 12 }, Operator::Drop];
 
     let ops_of_interest = vec![(
         SupportedOperators::Block,
@@ -1978,7 +1885,7 @@ fn run_block_injection<'a, 'b, 'c>(
                     }
                 };
                 if matches {
-                    if body.len() > 0 {
+                    if !body.is_empty() {
                         // has body
                         mod_it.set_instrument_mode(*mode);
                         mod_it.inject_all(body);
