@@ -15,11 +15,12 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - run: rustup component add rustfmt
-    - run: cargo fmt --all -- --check
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: rustup install stable
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-features --all-targets
 
   build_and_test:
     name: Build project and run all unit AND integration tests
