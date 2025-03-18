@@ -1,16 +1,19 @@
 //! Intermediate representation of sections in a wasm module.
 
-use crate::error::Error;
-use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 use std::cmp::PartialEq;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
 use std::slice::Iter;
+
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{AbstractHeapType, Encode};
+
 use wasmparser::types::TypeIdentifier;
 use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
+
+use crate::error::Error;
+use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -1162,7 +1165,7 @@ where
         self.instr_flag.add_instr(&self.op, val)
     }
 
-    pub fn extract_op(&'a self) -> Operator {
+    pub fn extract_op(&'a self) -> Operator<'a> {
         self.op.clone()
     }
 }

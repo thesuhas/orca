@@ -87,7 +87,6 @@ pub fn print_component_defined_type(ty: &ComponentDefinedType) {
         ComponentDefinedType::Borrow(_) => eprintln!("Borrow"),
         ComponentDefinedType::Future(_) => eprintln!("Future"),
         ComponentDefinedType::Stream(_) => eprintln!("Stream"),
-        ComponentDefinedType::ErrorContext => eprintln!("Error Context"),
     }
 }
 
