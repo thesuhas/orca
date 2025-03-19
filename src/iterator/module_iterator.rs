@@ -51,7 +51,7 @@ impl<'a, 'b> ModuleIterator<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Inject<'b> for ModuleIterator<'a, 'b> {
+impl<'b> Inject<'b> for ModuleIterator<'_, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example

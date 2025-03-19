@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots % -f cm-values
+
 (assert_invalid
   (component (export "" (instance 0)))
   "index out of bounds")

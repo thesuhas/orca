@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component
   (func (import "a"))
   (component)
@@ -54,13 +56,6 @@
     (type (func (param "yOu" string)))
   )
   "function parameter name `yOu` is not in kebab case"
-)
-
-(assert_invalid
-  (component
-    (type (func (result "uP" string)))
-  )
-  "name `uP` is not in kebab case"
 )
 
 (assert_invalid

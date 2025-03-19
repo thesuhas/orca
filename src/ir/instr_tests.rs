@@ -106,7 +106,7 @@ pub fn assert_panics_with_message(func: impl FnOnce() + UnwindSafe, msg: &str) {
     };
 
     err.downcast::<String>()
-        .map(|s| chk(&**s))
+        .map(|s| chk(&s))
         .or_else(|err| err.downcast::<&str>().map(|s| chk(*s)))
         .expect("Unexpected panic type!");
 }

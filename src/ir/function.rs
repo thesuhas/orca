@@ -185,7 +185,7 @@ impl AddLocal for FunctionModifier<'_, '_> {
     }
 }
 
-impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
+impl<'b> Inject<'b> for FunctionModifier<'_, 'b> {
     // TODO: refactor the inject the function to return a Result rather than panicking?
     fn inject(&mut self, instr: Operator<'b>) {
         if self.instr_flag.current_mode.is_some() {
@@ -203,7 +203,7 @@ impl<'a, 'b> Inject<'b> for FunctionModifier<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
+impl<'b> InjectAt<'b> for FunctionModifier<'_, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         let loc = Location::Module {
             func_idx: FunctionID(0), // not used
@@ -213,10 +213,10 @@ impl<'a, 'b> InjectAt<'b> for FunctionModifier<'a, 'b> {
         self.add_instr_at(loc, instr);
     }
 }
-impl<'a, 'b> Opcode<'b> for FunctionModifier<'a, 'b> {}
-impl<'a, 'b> MacroOpcode<'b> for FunctionModifier<'a, 'b> {}
+impl<'b> Opcode<'b> for FunctionModifier<'_, 'b> {}
+impl<'b> MacroOpcode<'b> for FunctionModifier<'_, 'b> {}
 
-impl<'a, 'b> Instrumenter<'b> for FunctionModifier<'a, 'b> {
+impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
     ///Can be called after finishing some instrumentation to reset the mode.
     fn finish_instr(&mut self) {
         self.instr_flag.finish_instr();

@@ -1,13 +1,14 @@
 //! Wrapper functions
 
 use std::collections::HashMap;
+
 use wasm_encoder::reencode::{Reencode, ReencodeComponent};
 use wasm_encoder::{
     Alias, ComponentCoreTypeEncoder, ComponentFuncTypeEncoder, ComponentTypeEncoder,
     CoreTypeEncoder, InstanceType,
 };
 use wasmparser::{
-    ComponentAlias, ComponentFuncResult, ComponentType, ComponentTypeDeclaration, CoreType,
+    ComponentAlias, ComponentType, ComponentTypeDeclaration, ComponentValType, CoreType,
     InstanceTypeDeclaration, Operator, SubType,
 };
 
@@ -116,23 +117,11 @@ pub fn convert_instance_type(
 // Not added to wasm-tools
 /// Convert Func Results
 pub fn convert_results(
-    result: ComponentFuncResult,
+    result: Option<ComponentValType>,
     mut enc: ComponentFuncTypeEncoder,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
-    match result {
-        // Modified to pass encoder into this function, need to use result for unnamed - https://github.com/bytecodealliance/wasm-tools/discussions/1639#discussioncomment-9887694
-        ComponentFuncResult::Unnamed(ty) => {
-            enc.result(reencode.component_val_type(ty));
-        }
-        ComponentFuncResult::Named(b) => {
-            let mut results = vec![];
-            for named in b.into_vec() {
-                results.push((named.0, reencode.component_val_type(named.1)));
-            }
-            enc.results(results);
-        }
-    }
+    enc.result(result.map(|v| reencode.component_val_type(v)));
 }
 
 // Not added to wasm-tools
@@ -267,7 +256,6 @@ pub fn convert_component_type(
                     Some(u) => def_enc.stream(Some(reencode.component_val_type(*u))),
                     None => def_enc.future(None),
                 },
-                wasmparser::ComponentDefinedType::ErrorContext => def_enc.error_context(),
             }
         }
         ComponentType::Func(func_ty) => {
@@ -280,7 +268,7 @@ pub fn convert_component_type(
                     .into_iter()
                     .map(|p| (p.0, reencode.component_val_type(p.1))),
             );
-            convert_results(func_ty.clone().results, new_enc, reencode);
+            convert_results(func_ty.clone().result, new_enc, reencode);
         }
         ComponentType::Component(comp) => {
             let mut new_comp = wasm_encoder::ComponentType::new();

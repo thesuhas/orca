@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 ;; With what's defined so far, we can define the following component:
 
 (component

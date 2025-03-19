@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 (component $C
   (type $A1 bool)
   (type $A2 u8)

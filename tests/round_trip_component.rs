@@ -1,25 +1,7 @@
-mod common;
-
-use crate::common::WASM_OUTPUT_DIR;
 use orca_wasm::ir::component::Component;
-use std::fs::File;
-use std::io::Write;
 
-fn write_to_file(bytes: &Vec<u8>, path: String) {
-    let mut file = match File::create(path) {
-        Ok(file) => file,
-        Err(e) => {
-            eprintln!("Failed to create the file: {}", e);
-            return;
-        }
-    };
-
-    // Write the string to the file
-    match file.write_all(bytes) {
-        Ok(_) => println!("Data successfully written to the file."),
-        Err(e) => eprintln!("Failed to write to the file: {}", e),
-    }
-}
+mod common;
+use common::{write_to_file, WASM_OUTPUT_DIR};
 
 fn round_trip_component(testname: &str, folder: &str) {
     let filename = format!(
@@ -42,10 +24,10 @@ fn round_trip_component(testname: &str, folder: &str) {
     if out != original {
         println!("Test: {:?} failed! Writing to file to check", testname);
         write_to_file(
-            &original.as_bytes().to_vec(),
+            original.as_bytes(),
             format!("{}_test_original.wat", testname),
         );
-        write_to_file(&out.as_bytes().to_vec(), format!("{}_test.wat", testname));
+        write_to_file(out.as_bytes(), format!("{}_test.wat", testname));
     }
     assert_eq!(out, original);
 }

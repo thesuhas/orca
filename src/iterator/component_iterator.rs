@@ -100,7 +100,7 @@ impl<'a, 'b> ComponentIterator<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
+impl<'b> Inject<'b> for ComponentIterator<'_, 'b> {
     /// Injects an Operator at the current location
     ///
     /// # Example
@@ -168,7 +168,7 @@ impl<'a, 'b> Inject<'b> for ComponentIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> InjectAt<'b> for ComponentIterator<'a, 'b> {
+impl<'b> InjectAt<'b> for ComponentIterator<'_, 'b> {
     fn inject_at(&mut self, idx: usize, mode: InstrumentationMode, instr: Operator<'b>) {
         if let (
             Location::Component {
@@ -189,9 +189,9 @@ impl<'a, 'b> InjectAt<'b> for ComponentIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> Opcode<'b> for ComponentIterator<'a, 'b> {}
-impl<'a, 'b> MacroOpcode<'b> for ComponentIterator<'a, 'b> {}
-impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
+impl<'b> Opcode<'b> for ComponentIterator<'_, 'b> {}
+impl<'b> MacroOpcode<'b> for ComponentIterator<'_, 'b> {}
+impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let (
@@ -431,7 +431,7 @@ impl<'a, 'b> Instrumenter<'b> for ComponentIterator<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> IteratingInstrumenter<'b> for ComponentIterator<'a, 'b> {
+impl<'b> IteratingInstrumenter<'b> for ComponentIterator<'_, 'b> {
     /// Sets the type of Instrumentation Mode of the current location
     fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
         if let (
@@ -457,7 +457,7 @@ impl<'a, 'b> IteratingInstrumenter<'b> for ComponentIterator<'a, 'b> {
 }
 
 // Note: Marked Trait as the same lifetime as component
-impl<'a, 'b> Iterator for ComponentIterator<'a, 'b> {
+impl Iterator for ComponentIterator<'_, '_> {
     /// Resets the Component Iterator
     fn reset(&mut self) {
         self.comp_iterator.reset();

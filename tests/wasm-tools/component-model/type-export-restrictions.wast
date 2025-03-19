@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 ;; Test that unnamed types in various types are all detected
 
 (assert_invalid

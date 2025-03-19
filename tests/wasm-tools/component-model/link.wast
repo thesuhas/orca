@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 ;; Based on this, we can link two modules $A and $B together with the following component:
 
 (component

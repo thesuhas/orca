@@ -369,13 +369,10 @@ impl<'a> Functions<'a> {
     pub fn get_local_fid_by_name(&self, name: &str) -> Option<FunctionID> {
         for (idx, func) in self.functions.iter().enumerate() {
             if let FuncKind::Local(l) = &func.kind {
-                match &l.body.name {
-                    Some(n) => {
-                        if n == name {
-                            return Some(FunctionID(idx as u32));
-                        }
+                if let Some(n) = &l.body.name {
+                    if n == name {
+                        return Some(FunctionID(idx as u32));
                     }
-                    None => {}
                 }
             }
         }
@@ -392,7 +389,7 @@ impl<'a> Functions<'a> {
         func_id: FunctionID,
     ) -> Option<FunctionModifier<'b, 'a>> {
         // grab type and section and code section
-        return match &mut self.functions.get_mut(*func_id as usize)?.kind {
+        match &mut self.functions.get_mut(*func_id as usize)?.kind {
             FuncKind::Local(ref mut l) => {
                 // the instrflag should be reset!
                 l.instr_flag.finish_instr();
@@ -403,7 +400,7 @@ impl<'a> Functions<'a> {
                 ))
             }
             _ => None,
-        };
+        }
     }
 
     /// Delete a function

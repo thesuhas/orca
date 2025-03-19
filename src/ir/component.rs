@@ -1,28 +1,28 @@
 #![allow(clippy::mut_range_bound)] // see https://github.com/rust-lang/rust-clippy/issues/6072
 //! Intermediate Representation of a wasm component.
 
-use crate::error::Error;
-use crate::ir::helpers::{
-    print_alias, print_component_export, print_component_import, print_component_type,
-    print_core_type,
-};
-use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID};
-use crate::ir::module::Module;
-use crate::ir::section::ComponentSection;
-use crate::ir::wrappers::{
-    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
-    convert_results, encode_core_type_subtype, process_alias,
-};
-
-use crate::ir::module::module_functions::FuncKind;
-use crate::ir::module::module_globals::Global;
-use crate::ir::types::CustomSections;
 use wasm_encoder::reencode::{Reencode, ReencodeComponent};
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
 use wasmparser::{
     CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
     ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance,
     Parser, Payload,
+};
+
+use crate::error::Error;
+use crate::ir::helpers::{
+    print_alias, print_component_export, print_component_import, print_component_type,
+    print_core_type,
+};
+use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID};
+use crate::ir::module::module_functions::FuncKind;
+use crate::ir::module::module_globals::Global;
+use crate::ir::module::Module;
+use crate::ir::section::ComponentSection;
+use crate::ir::types::CustomSections;
+use crate::ir::wrappers::{
+    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
+    convert_results, encode_core_type_subtype, process_alias,
 };
 
 #[derive(Debug)]
@@ -610,9 +610,6 @@ impl<'a> Component<'a> {
                                         }
                                         None => enc.stream(None),
                                     },
-                                    wasmparser::ComponentDefinedType::ErrorContext => {
-                                        enc.error_context()
-                                    }
                                 }
                             }
                             ComponentType::Func(func_ty) => {
@@ -622,7 +619,7 @@ impl<'a> Component<'a> {
                                         (p.0, reencode.component_val_type(p.1))
                                     },
                                 ));
-                                convert_results(func_ty.results.clone(), enc, &mut reencode);
+                                convert_results(func_ty.result, enc, &mut reencode);
                             }
                             ComponentType::Component(comp) => {
                                 let mut new_comp = wasm_encoder::ComponentType::new();
@@ -830,23 +827,41 @@ impl<'a> Component<'a> {
                             CanonicalFunction::ThreadSpawn { func_ty_index } => {
                                 canon_sec.thread_spawn(*func_ty_index);
                             }
-                            CanonicalFunction::ThreadHwConcurrency => {
-                                canon_sec.thread_hw_concurrency();
+                            CanonicalFunction::ResourceDropAsync { resource } => {
+                                canon_sec.resource_drop_async(*resource);
                             }
-                            CanonicalFunction::TaskBackpressure => {
-                                canon_sec.task_backpressure();
+                            CanonicalFunction::ThreadAvailableParallelism => {
+                                canon_sec.thread_available_parallelism();
                             }
-                            CanonicalFunction::TaskReturn { type_index } => {
-                                canon_sec.task_return(*type_index);
+                            CanonicalFunction::BackpressureSet => {
+                                canon_sec.backpressure_set();
                             }
-                            CanonicalFunction::TaskWait { async_, memory } => {
-                                canon_sec.task_wait(*async_, *memory);
+                            CanonicalFunction::TaskReturn { result, options } => {
+                                let options = options
+                                    .iter()
+                                    .cloned()
+                                    .map(|v| v.into())
+                                    .collect::<Vec<_>>();
+                                let result = result.map(|v| v.into());
+                                canon_sec.task_return(result, options);
                             }
-                            CanonicalFunction::TaskPoll { async_, memory } => {
-                                canon_sec.task_poll(*async_, *memory);
+                            CanonicalFunction::Yield { async_ } => {
+                                canon_sec.yield_(*async_);
                             }
-                            CanonicalFunction::TaskYield { async_ } => {
-                                canon_sec.task_yield(*async_);
+                            CanonicalFunction::WaitableSetNew => {
+                                canon_sec.waitable_set_new();
+                            }
+                            CanonicalFunction::WaitableSetWait { async_, memory } => {
+                                canon_sec.waitable_set_wait(*async_, *memory);
+                            }
+                            CanonicalFunction::WaitableSetPoll { async_, memory } => {
+                                canon_sec.waitable_set_poll(*async_, *memory);
+                            }
+                            CanonicalFunction::WaitableSetDrop => {
+                                canon_sec.waitable_set_drop();
+                            }
+                            CanonicalFunction::WaitableJoin => {
+                                canon_sec.waitable_join();
                             }
                             CanonicalFunction::SubtaskDrop => {
                                 canon_sec.subtask_drop();
@@ -1064,13 +1079,10 @@ impl<'a> Component<'a> {
             .enumerate()
         {
             if let FuncKind::Local(l) = &func.kind {
-                match &l.body.name {
-                    Some(n) => {
-                        if n == name {
-                            return Some(FunctionID(idx as u32));
-                        }
+                if let Some(n) = &l.body.name {
+                    if n == name {
+                        return Some(FunctionID(idx as u32));
                     }
-                    None => {}
                 }
             }
         }
