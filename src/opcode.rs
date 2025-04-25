@@ -153,6 +153,12 @@ pub trait Opcode<'a>: Inject<'a> {
         self
     }
 
+    /// Inject a select statement
+    fn select(&mut self) -> &mut Self {
+        self.inject(Operator::Select);
+        self
+    }
+
     /// Inject an if statement
     fn if_stmt(&mut self, block_type: BlockType) -> &mut Self {
         self.inject(Operator::If {

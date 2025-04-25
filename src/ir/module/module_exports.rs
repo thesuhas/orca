@@ -59,6 +59,17 @@ impl ModuleExports {
         self.exports.push(export);
     }
 
+    /// Add an exported memory
+    pub fn add_export_mem(&mut self, name: String, exp_id: u32) {
+        let export = Export {
+            name,
+            kind: ExternalKind::Memory,
+            index: exp_id,
+            deleted: false,
+        };
+        self.exports.push(export)
+    }
+
     /// Get export by name and return if present
     pub fn get_by_name(&self, name: String) -> Option<Export> {
         for exp in self.exports.iter() {
