@@ -1595,7 +1595,7 @@ impl<'a> Module<'a> {
         for section in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
                 name: std::borrow::Cow::Borrowed(section.name),
-                data: std::borrow::Cow::Borrowed(section.data),
+                data: section.data.clone(),
             });
         }
 

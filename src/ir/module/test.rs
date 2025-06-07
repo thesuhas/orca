@@ -3,8 +3,8 @@
 // ==================================
 
 use crate::ir::function::FunctionBuilder;
-use crate::ir::id::{ExportsID, FunctionID, GlobalID, ImportsID, TypeID};
-use crate::ir::types::InitExpr;
+use crate::ir::id::{ExportsID, FunctionID, GlobalID, ImportsID, TypeID, CustomSectionID};
+use crate::ir::types::{InitExpr, CustomSection, CustomSections};
 use crate::{DataType, Instructions, Module, Opcode};
 use log::debug;
 use std::collections::HashMap;
@@ -735,4 +735,215 @@ pub(crate) fn validate_wasm(wasm_path: &str) -> bool {
     }
 
     res.status.success()
+}
+
+// ====================================
+// ==== Custom Sections API Testing ====
+// ====================================
+
+#[test]
+fn test_custom_sections_get_section_data_mut() {
+    // Test basic copy-on-write functionality
+    let original_data = b"hello world";
+    let mut sections = CustomSections::new(vec![("test", original_data)]);
+    
+    let id = sections.get_id("test".to_string()).unwrap();
+    assert_eq!(id, CustomSectionID(0));
+    
+    // Get mutable reference - this should trigger copy-on-write
+    let data_mut = sections.get_section_data_mut(id).unwrap();
+    assert_eq!(data_mut, original_data);
+    
+    // Modify the data
+    data_mut.push(b'!');
+    assert_eq!(data_mut, b"hello world!");
+    
+    // Verify the change persisted
+    let data_mut2 = sections.get_section_data_mut(id).unwrap();
+    assert_eq!(data_mut2, b"hello world!");
+}
+
+#[test]
+fn test_custom_sections_get_section_data_mut_invalid_id() {
+    let mut sections = CustomSections::new(vec![]);
+    let result = sections.get_section_data_mut(CustomSectionID(0));
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_custom_sections_add_new_section() {
+    let mut sections = CustomSections::new(vec![]);
+    
+    // Create a new section with owned data
+    let section = CustomSection::new("new_section", vec![1, 2, 3, 4]);
+    let id = sections.add(section);
+    
+    assert_eq!(id, CustomSectionID(0));
+    assert_eq!(sections.len(), 1);
+    
+    // Get the data and modify it
+    let data_mut = sections.get_section_data_mut(id).unwrap();
+    assert_eq!(data_mut, &[1, 2, 3, 4]);
+    
+    data_mut.extend_from_slice(&[5, 6]);
+    assert_eq!(data_mut, &[1, 2, 3, 4, 5, 6]);
+}
+
+#[test]
+fn test_custom_sections_multiple_sections() {
+    let mut sections = CustomSections::new(vec![
+        ("section1", b"data1"),
+        ("section2", b"data2"),
+    ]);
+    
+    let id1 = sections.get_id("section1".to_string()).unwrap();
+    let id2 = sections.get_id("section2".to_string()).unwrap();
+    
+    assert_eq!(id1, CustomSectionID(0));
+    assert_eq!(id2, CustomSectionID(1));
+    
+    // Modify first section
+    let data1_mut = sections.get_section_data_mut(id1).unwrap();
+    data1_mut.clear();
+    data1_mut.extend_from_slice(b"modified1");
+    
+    // Modify second section
+    let data2_mut = sections.get_section_data_mut(id2).unwrap();
+    data2_mut.clear();
+    data2_mut.extend_from_slice(b"modified2");
+    
+    // Verify both modifications
+    assert_eq!(sections.get_section_data_mut(id1).unwrap(), b"modified1");
+    assert_eq!(sections.get_section_data_mut(id2).unwrap(), b"modified2");
+}
+
+#[test]
+fn test_custom_sections_cow_behavior() {
+    let original_data = b"original";
+    let mut sections = CustomSections::new(vec![("test", original_data)]);
+    
+    let id = sections.get_id("test".to_string()).unwrap();
+    
+    // First, verify the section starts as borrowed
+    let section = sections.get_by_id(id);
+    assert_eq!(section.data.as_ref(), original_data);
+    
+    // Now trigger copy-on-write
+    let data_mut = sections.get_section_data_mut(id).unwrap();
+    data_mut.push(b'!');
+    
+    // The data should now be owned
+    let section = sections.get_by_id(id);
+    assert_eq!(section.data.as_ref(), b"original!");
+}
+
+#[test]
+fn test_custom_sections_add_and_modify_workflow() {
+    let mut sections = CustomSections::new(vec![]);
+    
+    // Add a new section
+    let section = CustomSection::new("config", b"key=value".to_vec());
+    let id = sections.add(section);
+    
+    // Modify the section data
+    {
+        let data = sections.get_section_data_mut(id).unwrap();
+        data.clear();
+        data.extend_from_slice(b"key1=value1\nkey2=value2");
+    }
+    
+    // Add another section
+    let section2 = CustomSection::new("metadata", b"version=1.0".to_vec());
+    let id2 = sections.add(section2);
+    
+    // Verify both sections exist and have correct data
+    assert_eq!(sections.len(), 2);
+    assert_eq!(
+        sections.get_section_data_mut(id).unwrap(),
+        b"key1=value1\nkey2=value2"
+    );
+    assert_eq!(sections.get_section_data_mut(id2).unwrap(), b"version=1.0");
+}
+
+#[test]
+fn test_custom_sections_edge_cases() {
+    // Test with empty data
+    let mut sections = CustomSections::new(vec![("empty", b"")]);
+    let id = sections.get_id("empty".to_string()).unwrap();
+    
+    let data_mut = sections.get_section_data_mut(id).unwrap();
+    assert!(data_mut.is_empty());
+    
+    data_mut.extend_from_slice(b"now has content");
+    assert_eq!(data_mut, b"now has content");
+    
+    // Test with large data
+    let large_data = vec![42u8; 10000];
+    let section = CustomSection::new("large", large_data.clone());
+    let large_id = sections.add(section);
+    
+    let large_data_mut = sections.get_section_data_mut(large_id).unwrap();
+    assert_eq!(large_data_mut.len(), 10000);
+    assert!(large_data_mut.iter().all(|&b| b == 42));
+    
+    // Modify large data
+    large_data_mut[0] = 1;
+    large_data_mut[9999] = 2;
+    assert_eq!(large_data_mut[0], 1);
+    assert_eq!(large_data_mut[9999], 2);
+}
+
+#[test]
+fn test_custom_sections_integration_with_existing_api() {
+    let mut sections = CustomSections::new(vec![
+        ("original1", b"data1"),
+        ("original2", b"data2"),
+    ]);
+    
+    // Test existing API still works
+    assert_eq!(sections.len(), 2);
+    assert!(!sections.is_empty());
+    
+    let id1 = sections.get_id("original1".to_string()).unwrap();
+    let section1 = sections.get_by_id(id1);
+    assert_eq!(section1.name, "original1");
+    assert_eq!(section1.data.as_ref(), b"data1");
+    
+    // Modify using new API
+    let data_mut = sections.get_section_data_mut(id1).unwrap();
+    data_mut.clear();
+    data_mut.extend_from_slice(b"modified_data1");
+    
+    // Verify change via existing API
+    let section1_after = sections.get_by_id(id1);
+    assert_eq!(section1_after.data.as_ref(), b"modified_data1");
+    
+    // Test iteration
+    let mut count = 0;
+    for section in sections.iter() {
+        count += 1;
+        assert!(section.name.starts_with("original"));
+    }
+    assert_eq!(count, 2);
+    
+    // Test deletion still works
+    // Note: after deletion, IDs may shift since we use Vec::remove
+    let original_len = sections.len();
+    sections.delete(id1);
+    assert_eq!(sections.len(), original_len - 1);
+}
+
+#[test] 
+fn test_custom_section_constructors() {
+    // Test new() constructor (owned data)
+    let owned_data1 = b"data1".to_vec();
+    let section1 = CustomSection::new("test1", owned_data1.clone());
+    assert_eq!(section1.name, "test1");
+    assert_eq!(section1.data.as_ref(), &owned_data1);
+    
+    // Test new() constructor with different owned data  
+    let owned_data2 = b"data2".to_vec();
+    let section2 = CustomSection::new("test2", owned_data2.clone());
+    assert_eq!(section2.name, "test2");
+    assert_eq!(section2.data.as_ref(), &owned_data2);
 }

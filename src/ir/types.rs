@@ -1,5 +1,6 @@
 //! Intermediate representation of sections in a wasm module.
 
+use std::borrow::Cow;
 use std::cmp::PartialEq;
 use std::fmt::Formatter;
 use std::fmt::{self};
@@ -1222,6 +1223,10 @@ impl InitExpr {
         }
     }
 
+    pub fn instructions(&self) -> &[Instructions] {
+        &self.exprs
+    }
+
     pub(crate) fn eval(init: &ConstExpr) -> InitExpr {
         use wasmparser::Operator::*;
         let mut reader = init.get_operators_reader();
@@ -1511,7 +1516,7 @@ impl<'a> CustomSections<'a> {
         CustomSections {
             custom_sections: custom_sections
                 .iter()
-                .map(|cs| CustomSection::new(cs.0, cs.1))
+                .map(|cs| CustomSection::new_borrowed(cs.0, cs.1))
                 .collect(),
         }
     }
@@ -1555,19 +1560,46 @@ impl<'a> CustomSections<'a> {
     pub fn iter(&self) -> Iter<'_, CustomSection<'a>> {
         self.custom_sections.iter()
     }
+
+    /// Get mutable reference to section data
+    pub fn get_section_data_mut(&mut self, section_id: CustomSectionID) -> Option<&mut Vec<u8>> {
+        if *section_id < self.custom_sections.len() as u32 {
+            Some(self.custom_sections[*section_id as usize].data.to_mut())
+        } else {
+            None
+        }
+    }
+
+    /// Add a new custom section and return its ID
+    pub fn add(&mut self, section: CustomSection<'a>) -> CustomSectionID {
+        let id = CustomSectionID(self.custom_sections.len() as u32);
+        self.custom_sections.push(section);
+        id
+    }
 }
 
 /// Intermediate Representation of a single Custom Section
 #[derive(Clone, Debug)]
 pub struct CustomSection<'a> {
     pub name: &'a str,
-    pub data: &'a [u8],
+    pub data: std::borrow::Cow<'a, [u8]>,
 }
 
 impl<'a> CustomSection<'a> {
     /// Create a new custom section
-    pub fn new(name: &'a str, data: &'a [u8]) -> Self {
-        CustomSection { name, data }
+    pub fn new(name: &'a str, data: Vec<u8>) -> Self {
+        CustomSection {
+            name,
+            data: Cow::Owned(data),
+        }
+    }
+
+    /// Create a new custom section with borrowed data (private)
+    fn new_borrowed(name: &'a str, data: &'a [u8]) -> Self {
+        CustomSection {
+            name,
+            data: Cow::Borrowed(data),
+        }
     }
 }
 
