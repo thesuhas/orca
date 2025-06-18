@@ -24,7 +24,7 @@ fn test_add_local_func() {
     builder.drop();
     assert_eq!(
         FunctionID(init_state.func_count + 1),
-        builder.finish_module(&mut module)
+        builder.finish_module(&mut module, None)
     );
     init_state.add_local_func();
 
@@ -44,7 +44,8 @@ fn test_add_import_func() {
     state_assertions(&module, &init_state, false);
 
     // add imported func
-    let (fid, imp0) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0));
+    let (fid, imp0) =
+        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0), None);
     assert_eq!(init_state.next_fid(), *fid); // zero-based, no '+ 1'
     assert_eq!(init_state.next_imp_id(), *imp0); // zero-based, no '+ 1'
     init_state.add_imported_func();
@@ -68,11 +69,15 @@ fn test_add_local_then_imported_func() {
     let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
-    assert_eq!(init_state.next_fid(), *builder.finish_module(&mut module));
+    assert_eq!(
+        init_state.next_fid(),
+        *builder.finish_module(&mut module, None)
+    );
     init_state.add_local_func();
 
     // add imported func
-    let (fid, imp0) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0));
+    let (fid, imp0) =
+        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0), None);
     assert_eq!(init_state.next_fid(), *fid); // zero-based, no '+ 1'
     assert_eq!(init_state.next_imp_id(), *imp0); // zero-based, no '+ 1'
     init_state.add_imported_func();
@@ -93,7 +98,8 @@ fn test_add_imported_then_local_func() {
     state_assertions(&module, &init_state, false);
 
     // add imported func
-    let (fid, imp0) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0));
+    let (fid, imp0) =
+        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0), None);
     assert_eq!(init_state.next_fid(), *fid); // zero-based, no '+ 1'
     assert_eq!(init_state.next_imp_id(), *imp0); // zero-based, no '+ 1'
     init_state.add_imported_func();
@@ -103,7 +109,10 @@ fn test_add_imported_then_local_func() {
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(fid);
-    assert_eq!(init_state.next_fid(), *builder.finish_module(&mut module));
+    assert_eq!(
+        init_state.next_fid(),
+        *builder.finish_module(&mut module, None)
+    );
     init_state.add_local_func();
 
     is_valid(
@@ -125,7 +134,7 @@ fn test_add_then_delete_local_func() {
     let mut builder = FunctionBuilder::new(&[], &[]);
     builder.i32_const(1);
     builder.drop();
-    let fid = builder.finish_module(&mut module);
+    let fid = builder.finish_module(&mut module, None);
     assert_eq!(init_state.next_fid(), *fid);
     init_state.add_local_func();
 
@@ -170,7 +179,8 @@ fn test_add_then_delete_imported_func() {
     state_assertions(&module, &init_state, false);
 
     // add imported func
-    let (fid, imp0) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0));
+    let (fid, imp0) =
+        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(0), None);
     assert_eq!(init_state.next_fid(), *fid); // zero-based, no '+ 1'
     assert_eq!(init_state.next_imp_id(), *imp0); // zero-based, no '+ 1'
     init_state.add_imported_func();
@@ -242,14 +252,17 @@ fn test_convert_import_fn_to_local() {
     let mut builder = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
     builder.i32_const(1);
     builder.drop();
-    builder.replace_import_in_module(&mut module, ImportsID(0));
+    builder.replace_import_in_module(&mut module, ImportsID(0), None);
 
     // add local function using the translated function
     let mut builder = FunctionBuilder::new(&[], &[DataType::I32]);
     builder.i32_const(1);
     builder.i32_const(1);
     builder.call(FunctionID(0));
-    assert_eq!(init_state.next_fid(), *builder.finish_module(&mut module));
+    assert_eq!(
+        init_state.next_fid(),
+        *builder.finish_module(&mut module, None)
+    );
     init_state.add_local_func();
     init_state.import_func_to_local();
 
@@ -274,6 +287,7 @@ fn test_convert_local_fn_to_import() {
         "please".to_string(),
         "work".to_string(),
         TypeID(1),
+        None,
     ); // unused in wat file!
     init_state.local_func_to_import();
 
@@ -378,7 +392,7 @@ fn test_set_fn_name_local_through_func_builder() {
     builder.i32_const(1);
     builder.drop();
     builder.set_name(name.to_string());
-    let fid = builder.finish_module(&mut module);
+    let fid = builder.finish_module(&mut module, None);
 
     assert_eq!(init_state.next_fid(), *fid);
     init_state.add_local_func();
@@ -390,7 +404,7 @@ fn test_set_fn_name_local_through_func_builder() {
     builder.i32_const(1);
     builder.drop();
     builder.set_name("test1".to_string());
-    let fid = builder.finish_module(&mut module);
+    let fid = builder.finish_module(&mut module, None);
 
     assert_eq!(init_state.next_fid(), *fid);
     init_state.add_local_func();
@@ -420,6 +434,7 @@ fn test_create_and_add_global() {
         DataType::I32,
         true,
         false,
+        None,
     );
     assert_eq!(init_state.next_gid(), *gid);
     init_state.add_local_global();
@@ -428,7 +443,7 @@ fn test_create_and_add_global() {
     let mut builder = FunctionBuilder::new(&[], &[]);
     builder.global_get(gid);
     builder.drop();
-    let fid = builder.finish_module(&mut module);
+    let fid = builder.finish_module(&mut module, None);
 
     assert_eq!(init_state.next_fid(), *fid);
     init_state.add_local_func();
@@ -455,6 +470,7 @@ fn test_add_imported_global() {
         DataType::I32,
         true,
         false,
+        None,
     );
     assert_eq!(init_state.next_gid(), *gid);
     assert_eq!(init_state.next_imp_id(), *imp_id);
@@ -464,7 +480,7 @@ fn test_add_imported_global() {
     let mut builder = FunctionBuilder::new(&[], &[]);
     builder.global_get(gid);
     builder.drop();
-    let fid = builder.finish_module(&mut module);
+    let fid = builder.finish_module(&mut module, None);
 
     assert_eq!(init_state.next_fid(), *fid);
     init_state.add_local_func();
