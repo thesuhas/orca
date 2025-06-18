@@ -1,6 +1,8 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::{DataType, InitExpr, Instruction, InstrumentationMode};
+use super::types::{
+    DataType, InitExpr, InjectTag, InjectedInstrs, Instruction, InstrumentationMode,
+};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
@@ -13,7 +15,7 @@ use crate::ir::module::module_globals::{
 };
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
-use crate::ir::module::module_tables::ModuleTables;
+use crate::ir::module::module_tables::{Element, ModuleTables, Table};
 use crate::ir::module::module_types::{ModuleTypes, Types};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
@@ -76,7 +78,7 @@ pub struct Module<'a> {
     /// Index of the start function.
     pub start: Option<FunctionID>,
     /// Elements
-    pub elements: Vec<(ElementKind<'a>, ElementItems<'a>)>,
+    pub elements: Vec<Element<'a>>,
     /// Tags
     pub tags: Vec<TagType>,
     /// Custom Sections
@@ -195,6 +197,7 @@ impl<'a> Module<'a> {
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
+                                        tag: None,
                                     };
                                     types.push(final_ty.clone());
 
@@ -209,6 +212,7 @@ impl<'a> Module<'a> {
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
+                                        tag: None,
                                     };
                                     types.push(array_ty.clone());
 
@@ -231,6 +235,7 @@ impl<'a> Module<'a> {
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
+                                        tag: None,
                                     };
                                     types.push(struct_ty.clone());
                                     if rec_group {
@@ -243,6 +248,7 @@ impl<'a> Module<'a> {
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
+                                        tag: None,
                                     };
                                     types.push(cont_ty.clone());
                                     if rec_group {
@@ -268,8 +274,8 @@ impl<'a> Module<'a> {
                         .into_iter()
                         .map(|t| {
                             t.map_err(Error::from).map(|t| match t.init {
-                                wasmparser::TableInit::RefNull => (t.ty, None),
-                                wasmparser::TableInit::Expr(e) => (t.ty, Some(e)),
+                                wasmparser::TableInit::RefNull => Table::new(t.ty, None, None),
+                                wasmparser::TableInit::Expr(e) => Table::new(t.ty, Some(e), None),
                             })
                         })
                         .collect::<Result<_, _>>()?;
@@ -306,7 +312,11 @@ impl<'a> Module<'a> {
                     for element in element_section_reader.into_iter() {
                         let element = element?;
                         let items = ElementItems::from_wasmparser(element.items.clone())?;
-                        elements.push((ElementKind::from_wasmparser(element.kind)?, items));
+                        elements.push(Element::new(
+                            ElementKind::from_wasmparser(element.kind)?,
+                            items,
+                            None,
+                        ));
                     }
                 }
                 Payload::DataCountSection { count, range: _ } => {
@@ -531,12 +541,13 @@ impl<'a> Module<'a> {
         // Local Functions
         for (index, code_sec) in code_sections.iter().enumerate() {
             final_funcs.push(Function::new(
-                FuncKind::Local(LocalFunction::new(
+                FuncKind::Local(Box::new(LocalFunction::new(
                     functions[index],
                     FunctionID(imports.num_funcs + index as u32),
                     (*code_sec).clone(),
                     types[*functions[index] as usize].params().len(),
-                )),
+                    None,
+                ))),
                 (*code_sec).clone().name,
             ));
         }
@@ -552,6 +563,7 @@ impl<'a> Module<'a> {
                         import_id: ImportsID(index as u32),
                         import_mem_id: MemoryID(imp_mem_id),
                     }),
+                    None,
                 ));
                 imp_mem_id += 1;
             }
@@ -563,6 +575,7 @@ impl<'a> Module<'a> {
                 MemKind::Local(LocalMemory {
                     mem_id: MemoryID(imports.num_memories + index as u32),
                 }),
+                None,
             ));
         }
 
@@ -609,8 +622,8 @@ impl<'a> Module<'a> {
         for func in self.functions.iter() {
             match &func.kind {
                 FuncKind::Import(_) => {}
-                FuncKind::Local(LocalFunction { func_id, body, .. }) => {
-                    metadata.push((*func_id, body.num_instructions));
+                FuncKind::Local(func, ..) => {
+                    metadata.push((func.func_id, func.body.num_instructions));
                 }
             }
         }
@@ -656,22 +669,21 @@ impl<'a> Module<'a> {
 
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
-                if let FuncKind::Local(LocalFunction { instr_flag, .. }) =
-                    self.functions.get_kind_mut(func_idx)
-                {
+                if let FuncKind::Local(func) = self.functions.get_kind_mut(func_idx) {
+                    let instr_flag = &mut func.instr_flag;
                     if !instr_flag.has_special_instr {
                         // skip functions without special instrumentation!
                         continue;
                     }
 
                     // save off the function entry/exit special mode bodies
-                    if !instr_flag.entry.is_empty() {
+                    if !instr_flag.entry.instrs.is_empty() {
                         instr_func_on_entry = Some(instr_flag.entry.to_owned());
-                        instr_flag.entry = vec![];
+                        instr_flag.entry.instrs.clear();
                     }
-                    if !instr_flag.exit.is_empty() {
+                    if !instr_flag.exit.instrs.is_empty() {
                         instr_func_on_exit = Some(instr_flag.exit.to_owned());
-                        instr_flag.exit = vec![];
+                        instr_flag.exit.instrs.clear();
                     }
                 }
 
@@ -686,12 +698,14 @@ impl<'a> Module<'a> {
                     HashMap<InstrumentationMode, InstrToInject>,
                 > = HashMap::new();
                 if let Some(on_exit) = &mut instr_func_on_exit {
-                    if !on_exit.is_empty() {
+                    if !on_exit.instrs.is_empty() {
                         let on_entry = if let Some(on_entry) = &mut instr_func_on_entry {
                             on_entry
                         } else {
-                            let on_entry = vec![];
-                            instr_func_on_entry = Some(on_entry);
+                            instr_func_on_entry = Some(InjectedInstrs {
+                                tag: on_exit.tag.clone(),
+                                ..Default::default()
+                            });
                             if let Some(ref mut on_entry) = instr_func_on_entry {
                                 on_entry
                             } else {
@@ -701,8 +715,10 @@ impl<'a> Module<'a> {
 
                         let func_ty = self.functions.get_type_id(func_idx);
                         let func_results = self.types.get(func_ty).unwrap().results();
-                        let block_ty = self.types.add_func_type(&[], &func_results);
-                        resolve_function_exit_with_block_wrapper(on_entry, block_ty);
+                        let block_ty =
+                            self.types
+                                .add_func_type(&[], &func_results, on_exit.tag.clone());
+                        resolve_function_exit_with_block_wrapper(&mut on_entry.instrs, block_ty);
                     }
                 }
                 let mut builder = self.functions.get_fn_modifier(func_idx).unwrap();
@@ -719,13 +735,13 @@ impl<'a> Module<'a> {
                 {
                     // resolve function-level instrumentation
                     if let Some(on_entry) = &mut instr_func_on_entry {
-                        if !on_entry.is_empty() {
-                            resolve_function_entry(&mut builder, on_entry, idx);
+                        if !on_entry.instrs.is_empty() {
+                            resolve_function_entry(&mut builder, &mut on_entry.instrs, idx);
                         }
                     }
                     if let Some(on_exit) = &mut instr_func_on_exit {
-                        if !on_exit.is_empty() {
-                            resolve_function_exit(on_exit, &mut builder, op, idx);
+                        if !on_exit.instrs.is_empty() {
+                            resolve_function_exit(&mut on_exit.instrs, &mut builder, op, idx);
                         }
                     }
 
@@ -740,7 +756,7 @@ impl<'a> Module<'a> {
                                 // only plan to handle if we're not already removing the block this instr is in
                                 if delete_block.is_none()
                                     && plan_resolution_block_alt(
-                                        block_alt,
+                                        &block_alt.instrs,
                                         &mut builder,
                                         &mut retain_end,
                                         op,
@@ -782,7 +798,7 @@ impl<'a> Module<'a> {
                                 // only plan to handle if we're not already removing the block this instr is in
                                 if delete_block.is_none()
                                     && plan_resolution_block_alt(
-                                        block_alt,
+                                        &block_alt.instrs,
                                         &mut builder,
                                         &mut retain_end,
                                         op,
@@ -889,8 +905,8 @@ impl<'a> Module<'a> {
                         } = instrumentation;
 
                         // Handle block entry
-                        if !block_entry.is_empty() {
-                            resolve_block_entry(block_entry, &mut builder, op, idx);
+                        if !block_entry.instrs.is_empty() {
+                            resolve_block_entry(&block_entry.instrs, &mut builder, op, idx);
                             builder.clear_instr_at(
                                 Location::Module {
                                     func_idx: FunctionID(0), // not used
@@ -901,9 +917,9 @@ impl<'a> Module<'a> {
                         }
 
                         // Handle block exit
-                        if !block_exit.is_empty() {
+                        if !block_exit.instrs.is_empty() {
                             plan_resolution_block_exit(
-                                block_exit,
+                                &block_exit.instrs,
                                 &block_stack,
                                 &mut resolve_on_else_or_end,
                                 &mut resolve_on_end,
@@ -919,9 +935,9 @@ impl<'a> Module<'a> {
                         }
 
                         // Handle semantic_after!
-                        if !semantic_after.is_empty() {
+                        if !semantic_after.instrs.is_empty() {
                             plan_resolution_semantic_after(
-                                semantic_after,
+                                &semantic_after.instrs,
                                 &mut builder,
                                 &block_stack,
                                 &mut resolve_on_end,
@@ -1020,6 +1036,7 @@ impl<'a> Module<'a> {
                 super_type,
                 is_final,
                 shared,
+                ..
             } => {
                 let params = params
                     .iter()
@@ -1048,6 +1065,7 @@ impl<'a> Module<'a> {
                 super_type,
                 is_final,
                 shared,
+                ..
             } => wasm_encoder::SubType {
                 is_final: *is_final,
                 supertype_idx: match super_type {
@@ -1070,6 +1088,7 @@ impl<'a> Module<'a> {
                 super_type,
                 is_final,
                 shared,
+                ..
             } => {
                 let mut encoded_fields: Vec<wasm_encoder::FieldType> = vec![];
                 for (idx, sty) in fields.iter().enumerate() {
@@ -1218,20 +1237,18 @@ impl<'a> Module<'a> {
 
         if !self.tables.is_empty() {
             let mut tables = wasm_encoder::TableSection::new();
-            for (table_ty, init) in self.tables.iter() {
+            for Table { ty, init_expr, .. } in self.tables.iter() {
                 let table_ty = wasm_encoder::TableType {
                     element_type: wasm_encoder::RefType {
-                        nullable: table_ty.element_type.is_nullable(),
-                        heap_type: reencode
-                            .heap_type(table_ty.element_type.heap_type())
-                            .unwrap(),
+                        nullable: ty.element_type.is_nullable(),
+                        heap_type: reencode.heap_type(ty.element_type.heap_type()).unwrap(),
                     },
-                    table64: table_ty.table64,
-                    minimum: table_ty.initial, // TODO - Check if this maps
-                    maximum: table_ty.maximum,
-                    shared: table_ty.shared,
+                    table64: ty.table64,
+                    minimum: ty.initial, // TODO - Check if this maps
+                    maximum: ty.maximum,
+                    shared: ty.shared,
                 };
-                match init {
+                match init_expr {
                     None => tables.table(table_ty),
                     Some(const_expr) => tables.table_with_init(
                         table_ty,
@@ -1332,7 +1349,7 @@ impl<'a> Module<'a> {
             let mut elements = wasm_encoder::ElementSection::new();
             let mut temp_const_exprs = vec![];
             let mut element_items = vec![];
-            for (kind, items) in self.elements.iter() {
+            for Element { kind, items, .. } in self.elements.iter() {
                 temp_const_exprs.clear();
                 element_items.clear();
                 let element_items = match &items {
@@ -1447,13 +1464,13 @@ impl<'a> Module<'a> {
                         } = instrument;
 
                         // Check if special instrumentation modes have been resolved!
-                        if !semantic_after.is_empty() {
+                        if !semantic_after.instrs.is_empty() {
                             error!("BUG: Semantic after instrumentation should be resolved already, please report.");
                         }
-                        if !block_entry.is_empty() {
+                        if !block_entry.instrs.is_empty() {
                             error!("BUG: Block entry instrumentation should be resolved already, please report.");
                         }
-                        if !block_exit.is_empty() {
+                        if !block_exit.instrs.is_empty() {
                             error!("BUG: Block exit instrumentation should be resolved already, please report.");
                         }
                         if !block_alt.is_none() {
@@ -1464,7 +1481,7 @@ impl<'a> Module<'a> {
 
                         // First encode before instructions
                         update_ids_and_encode(
-                            before,
+                            &mut before.instrs,
                             &func_mapping,
                             &global_mapping,
                             &memory_mapping,
@@ -1476,7 +1493,7 @@ impl<'a> Module<'a> {
                         if !at_end && !alternate.is_none() {
                             if let Some(alt) = alternate {
                                 update_ids_and_encode(
-                                    alt,
+                                    &mut alt.instrs,
                                     &func_mapping,
                                     &global_mapping,
                                     &memory_mapping,
@@ -1491,7 +1508,7 @@ impl<'a> Module<'a> {
                         // Now encode the after instructions
                         if !at_end {
                             update_ids_and_encode(
-                                after,
+                                &mut after.instrs,
                                 &func_mapping,
                                 &global_mapping,
                                 &memory_mapping,
@@ -1592,6 +1609,10 @@ impl<'a> Module<'a> {
         module
     }
 
+    // ==============================
+    // ==== Module Manipulations ====
+    // ==============================
+
     /// Add a new Data Segment to the module.
     /// Returns the index of the new Data Segment in the Data Section.
     pub fn add_data(&mut self, data: DataSegment) -> DataSegmentID {
@@ -1612,10 +1633,6 @@ impl<'a> Module<'a> {
         // module does not export a memory
         None
     }
-
-    // ==============================
-    // ==== Module Manipulations ====
-    // ==============================
 
     pub(crate) fn add_import(&mut self, import: Import<'a>) -> (u32, ImportsID) {
         let (num_local, num_imported, num_total) = match import.ty {
@@ -1650,20 +1667,21 @@ impl<'a> Module<'a> {
     // ==== Memory Management ====
     // ===========================
 
-    pub fn add_local_memory(&mut self, ty: MemoryType) -> MemoryID {
+    pub fn add_local_memory(&mut self, ty: MemoryType, tag: InjectTag) -> MemoryID {
         let local_mem = LocalMemory {
             mem_id: MemoryID(0), // will be fixed
         };
 
         self.num_local_memories += 1;
-        self.memories.add_local_mem(local_mem, ty)
+        self.memories.add_local_mem(local_mem, ty, tag)
     }
 
     pub fn add_import_memory(
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
+        tag: InjectTag,
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1671,10 +1689,11 @@ impl<'a> Module<'a> {
             ty: TypeRef::Memory(ty),
             custom_name: None,
             deleted: false,
+            tag: tag.clone(),
         });
 
         // Add to memories as well as it has imported memories
-        self.memories.add_import_mem(imp_id, ty, imp_mem_id);
+        self.memories.add_import_mem(imp_id, ty, imp_mem_id, tag);
         (MemoryID(imp_mem_id), imp_id)
     }
 
@@ -1696,13 +1715,15 @@ impl<'a> Module<'a> {
         params: &[DataType],
         results: &[DataType],
         body: Body<'a>,
+        tag: InjectTag,
     ) -> FunctionID {
-        let ty = self.types.add_func_type(params, results);
+        let ty = self.types.add_func_type(params, results, tag.clone());
         let local_func = LocalFunction::new(
             ty,
             FunctionID(0), // will be fixed
             body,
             params.len(),
+            tag,
         );
 
         self.num_local_functions += 1;
@@ -1718,6 +1739,7 @@ impl<'a> Module<'a> {
         module: String,
         name: String,
         ty_id: TypeID,
+        tag: InjectTag,
     ) -> (FunctionID, ImportsID) {
         let (imp_fn_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1725,6 +1747,7 @@ impl<'a> Module<'a> {
             ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
+            tag,
         });
 
         // Add to functions as well as it has imported functions
@@ -1764,7 +1787,7 @@ impl<'a> Module<'a> {
         self.delete_func(FunctionID(*import_id));
         self.functions
             .get_mut(FunctionID(*import_id))
-            .set_kind(FuncKind::Local(local_function));
+            .set_kind(FuncKind::Local(Box::new(local_function)));
         true
     }
 
@@ -1777,6 +1800,7 @@ impl<'a> Module<'a> {
         module: String,
         name: String,
         ty_id: TypeID,
+        tag: InjectTag,
     ) -> bool {
         if self.functions.is_import(function_id) {
             warn!("This is an imported function!");
@@ -1791,6 +1815,7 @@ impl<'a> Module<'a> {
             ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
+            tag,
         });
         self.functions
             .get_mut(function_id)
@@ -1832,6 +1857,7 @@ impl<'a> Module<'a> {
         content_ty: DataType,
         mutable: bool,
         shared: bool,
+        tag: InjectTag,
     ) -> GlobalID {
         self.add_global_internal(Global {
             kind: GlobalKind::Local(LocalGlobal {
@@ -1844,6 +1870,7 @@ impl<'a> Module<'a> {
                 init_expr,
             }),
             deleted: false,
+            tag,
         })
     }
 
@@ -1858,6 +1885,7 @@ impl<'a> Module<'a> {
         content_ty: DataType,
         mutable: bool,
         shared: bool,
+        tag: InjectTag,
     ) -> (GlobalID, ImportsID) {
         let global_ty = GlobalType {
             mutable,
@@ -1870,14 +1898,18 @@ impl<'a> Module<'a> {
             ty: TypeRef::Global(global_ty),
             custom_name: None,
             deleted: false,
+            tag: tag.clone(),
         });
 
         // Add to globals as well since it has imported globals
-        self.add_global_internal(Global::new(GlobalKind::Import(ImportedGlobal::new(
-            imp_id,
-            GlobalID(imp_global_id),
-            global_ty,
-        ))));
+        self.add_global_internal(Global::new(
+            GlobalKind::Import(ImportedGlobal::new(
+                imp_id,
+                GlobalID(imp_global_id),
+                global_ty,
+            )),
+            tag,
+        ));
         self.globals.recalculate_ids = true;
         (GlobalID(imp_global_id), imp_id)
     }

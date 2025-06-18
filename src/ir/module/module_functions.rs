@@ -3,7 +3,7 @@
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::ir::types::{Body, FuncInstrFlag, InstrumentationMode};
+use crate::ir::types::{Body, FuncInstrFlag, InjectTag, InstrumentationMode, Tag, TagUtils};
 use crate::DataType;
 use log::warn;
 use std::vec::IntoIter;
@@ -89,7 +89,7 @@ impl<'a> Function<'a> {
 /// Represents whether a function is a Local Function or an Imported Function
 #[derive(Clone, Debug)]
 pub enum FuncKind<'a> {
-    Local(LocalFunction<'a>),
+    Local(Box<LocalFunction<'a>>),
     Import(ImportedFunction),
 }
 
@@ -138,11 +138,22 @@ pub struct LocalFunction<'a> {
     pub instr_flag: FuncInstrFlag<'a>,
     pub body: Body<'a>,
     pub args: Vec<LocalID>,
+    tag: InjectTag,
 }
-
+impl TagUtils for LocalFunction<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+}
 impl<'a> LocalFunction<'a> {
     /// Creates a new local function
-    pub fn new(type_id: TypeID, function_id: FunctionID, body: Body<'a>, num_args: usize) -> Self {
+    pub fn new(
+        type_id: TypeID,
+        function_id: FunctionID,
+        body: Body<'a>,
+        num_args: usize,
+        tag: InjectTag,
+    ) -> Self {
         let mut args = vec![];
         for arg in 0..num_args {
             args.push(LocalID(arg as u32));
@@ -153,6 +164,7 @@ impl<'a> LocalFunction<'a> {
             instr_flag: FuncInstrFlag::default(),
             body,
             args,
+            tag,
         }
     }
     pub fn add_local(&mut self, ty: DataType) -> LocalID {
@@ -425,7 +437,10 @@ impl<'a> Functions<'a> {
         let id = self.next_id();
         local_function.func_id = id;
 
-        self.push(Function::new(FuncKind::Local(local_function), name.clone()));
+        self.push(Function::new(
+            FuncKind::Local(Box::new(local_function)),
+            name.clone(),
+        ));
         if let Some(name) = name {
             self.set_local_fn_name(id, name);
         }

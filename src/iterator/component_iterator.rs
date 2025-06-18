@@ -4,7 +4,7 @@ use crate::ir::component::Component;
 use crate::ir::id::{FunctionID, GlobalID, LocalID, ModuleID};
 use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
-use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
+use crate::ir::types::{DataType, FuncInstrMode, InjectedInstrs, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
@@ -345,7 +345,8 @@ impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].instr_flag.alternate = Some(vec![]);
+                    l.body.instructions[instr_idx].instr_flag.alternate =
+                        Some(InjectedInstrs::default());
                 }
             }
         } else {
@@ -370,7 +371,8 @@ impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
             {
                 FuncKind::Import(_) => panic!("Can't instrument into an imported function!"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].instr_flag.block_alt = Some(vec![]);
+                    l.body.instructions[instr_idx].instr_flag.block_alt =
+                        Some(InjectedInstrs::default());
                     l.instr_flag.has_special_instr |= true;
                 }
             }
