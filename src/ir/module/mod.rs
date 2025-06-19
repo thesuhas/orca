@@ -1254,11 +1254,25 @@ impl<'a> Module<'a> {
             module.section(&memories);
         }
 
+        if !self.tags.is_empty() {
+            let mut tags = TagSection::new();
+            for tag in self.tags.iter() {
+                tags.tag(wasm_encoder::TagType {
+                    kind: wasm_encoder::TagKind::from(tag.kind),
+                    func_type_idx: tag.func_type_idx,
+                });
+            }
+            module.section(&tags);
+        }
+
         if !self.globals.is_empty() {
             let mut globals = wasm_encoder::GlobalSection::new();
-            for global in self.globals.iter() {
+            for global in self.globals.iter_mut() {
                 if !global.deleted {
-                    if let GlobalKind::Local(LocalGlobal { ty, init_expr, .. }) = &global.kind {
+                    if let GlobalKind::Local(LocalGlobal { ty, init_expr, .. }) = &mut global.kind {
+                        for expr in init_expr.exprs.iter_mut() {
+                            expr.fix_id_mapping(&func_mapping, &global_mapping);
+                        }
                         globals.global(
                             wasm_encoder::GlobalType {
                                 val_type: reencode.val_type(ty.content_type).unwrap(),
@@ -1380,17 +1394,6 @@ impl<'a> Module<'a> {
             module.section(&data_count);
         }
 
-        if !self.tags.is_empty() {
-            let mut tags = TagSection::new();
-            for tag in self.tags.iter() {
-                tags.tag(wasm_encoder::TagType {
-                    kind: wasm_encoder::TagKind::from(tag.kind),
-                    func_type_idx: tag.func_type_idx,
-                });
-            }
-            module.section(&tags);
-        }
-
         if !self.num_local_functions > 0 {
             let mut code = wasm_encoder::CodeSection::new();
             for rel_func_idx in 0..self.functions.len() {
@@ -1427,15 +1430,7 @@ impl<'a> Module<'a> {
                     },
                 ) in instructions.iter_mut().enumerate()
                 {
-                    if refers_to_func(op) {
-                        update_fn_instr(op, &func_mapping);
-                    }
-                    if refers_to_global(op) {
-                        update_global_instr(op, &global_mapping);
-                    }
-                    if refers_to_memory(op) {
-                        update_memory_instr(op, &memory_mapping);
-                    }
+                    fix_op_id_mapping(op, &func_mapping, &global_mapping, &memory_mapping);
                     if !instrument.has_instr() {
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
@@ -1515,15 +1510,7 @@ impl<'a> Module<'a> {
                         reencode: &mut RoundtripReencoder,
                     ) {
                         for instr in instrs {
-                            if refers_to_func(instr) {
-                                update_fn_instr(instr, func_mapping);
-                            }
-                            if refers_to_global(instr) {
-                                update_global_instr(instr, global_mapping);
-                            }
-                            if refers_to_memory(instr) {
-                                update_memory_instr(instr, memory_mapping);
-                            }
+                            fix_op_id_mapping(instr, func_mapping, global_mapping, memory_mapping);
                             encode(instr, function, reencode);
                         }
                     }
@@ -1557,6 +1544,9 @@ impl<'a> Module<'a> {
                         memory_index,
                         offset_expr,
                     } => {
+                        for expr in offset_expr.exprs.iter_mut() {
+                            expr.fix_id_mapping(&func_mapping, &global_mapping);
+                        }
                         let new_idx = match memory_mapping.get(memory_index) {
                             Some(new_index) => *new_index,
                             None => panic!(
@@ -1594,8 +1584,8 @@ impl<'a> Module<'a> {
         // encode the rest of custom sections
         for section in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
-                name: std::borrow::Cow::Borrowed(section.name),
-                data: std::borrow::Cow::Borrowed(section.data),
+                name: Cow::Borrowed(section.name),
+                data: Cow::Borrowed(section.data),
             });
         }
 
@@ -1952,6 +1942,23 @@ struct InstrBodyFlagged<'a> {
 struct InstrToInject<'a> {
     flagged: Vec<InstrBodyFlagged<'a>>,
     not_flagged: Vec<InstrBody<'a>>,
+}
+
+fn fix_op_id_mapping(
+    op: &mut Operator,
+    func_mapping: &HashMap<u32, u32>,
+    global_mapping: &HashMap<u32, u32>,
+    memory_mapping: &HashMap<u32, u32>,
+) {
+    if refers_to_func(op) {
+        update_fn_instr(op, func_mapping);
+    }
+    if refers_to_global(op) {
+        update_global_instr(op, global_mapping);
+    }
+    if refers_to_memory(op) {
+        update_memory_instr(op, memory_mapping);
+    }
 }
 
 fn resolve_function_entry<'a, 'b, 'c>(
