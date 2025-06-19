@@ -341,7 +341,10 @@ pub fn add_to_namemap(namemap: &mut wasm_encoder::NameMap, names: wasmparser::Na
 }
 
 pub(crate) fn refers_to_func(op: &Operator) -> bool {
-    matches!(op, Operator::Call { .. } | Operator::RefFunc { .. })
+    matches!(
+        op,
+        Operator::Call { .. } | Operator::RefFunc { .. } | Operator::ReturnCall { .. }
+    )
 }
 
 pub(crate) fn refers_to_global(op: &Operator) -> bool {
@@ -440,14 +443,14 @@ pub(crate) fn refers_to_memory(op: &Operator) -> bool {
 
 pub(crate) fn update_fn_instr(op: &mut Operator, mapping: &HashMap<u32, u32>) {
     match op {
-        Operator::Call { function_index } | Operator::RefFunc { function_index } => {
-            match mapping.get(&(*function_index)) {
-                Some(new_index) => {
-                    *function_index = *new_index;
-                }
-                None => panic!("Deleted function!"),
+        Operator::Call { function_index }
+        | Operator::RefFunc { function_index }
+        | Operator::ReturnCall { function_index } => match mapping.get(&(*function_index)) {
+            Some(new_index) => {
+                *function_index = *new_index;
             }
-        }
+            None => panic!("Deleted function!"),
+        },
         _ => panic!("Operation doesn't need to be checked for function IDs!"),
     }
 }

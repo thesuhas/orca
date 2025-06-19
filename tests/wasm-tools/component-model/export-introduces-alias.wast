@@ -40,7 +40,7 @@
 (component
   (type (instance
     (type $t u8)
-    (export $t2 "t" (type (eq $t)))
-    (export $t3 "t2" (type (eq $t2)))
+    (export "t" (type $t2 (eq $t)))
+    (export "t2" (type $t3 (eq $t2)))
   ))
 )

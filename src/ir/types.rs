@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::cmp::PartialEq;
+use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
@@ -1175,12 +1176,12 @@ where
 /// initializers or element/data offsets.
 #[derive(Debug, Clone)]
 pub struct InitExpr {
-    exprs: Vec<Instructions>,
+    pub exprs: Vec<InitInstr>,
 }
 
-/// Set of instructions that can be used in Initialisatin Expressions
+/// Set of instructions that can be used in Initialization Expressions
 #[derive(Debug, Copy, Clone)]
-pub enum Instructions {
+pub enum InitInstr {
     /// An immediate constant value
     Value(Value),
     /// A constant value referenced by the global specified
@@ -1214,10 +1215,33 @@ pub enum Instructions {
     },
     RefI31,
 }
+impl InitInstr {
+    pub fn fix_id_mapping(
+        &mut self,
+        func_mapping: &HashMap<u32, u32>,
+        global_mapping: &HashMap<u32, u32>,
+    ) {
+        match self {
+            InitInstr::Global(id) => match global_mapping.get(&(*id)) {
+                Some(new_index) => {
+                    **id = *new_index;
+                }
+                None => panic!("Deleted global!"),
+            },
+            InitInstr::RefFunc(id) => match func_mapping.get(&(*id)) {
+                Some(new_index) => {
+                    **id = *new_index;
+                }
+                None => panic!("Deleted function!"),
+            },
+            _ => {}
+        }
+    }
+}
 
 impl InitExpr {
     /// Create a new initialisation expression given a vector of Instructions
-    pub fn new(instructions: Vec<Instructions>) -> Self {
+    pub fn new(instructions: Vec<InitInstr>) -> Self {
         InitExpr {
             exprs: instructions,
         }
@@ -1233,47 +1257,45 @@ impl InitExpr {
         let mut instrs = vec![];
         loop {
             let val = match reader.read().unwrap() {
-                I32Const { value } => Instructions::Value(Value::I32(value)),
-                I64Const { value } => Instructions::Value(Value::I64(value)),
-                F32Const { value } => Instructions::Value(Value::F32(f32::from_bits(value.bits()))),
-                F64Const { value } => Instructions::Value(Value::F64(f64::from_bits(value.bits()))),
-                V128Const { value } => Instructions::Value(Value::V128(v128_to_u128(&value))),
-                GlobalGet { global_index } => Instructions::Global(GlobalID(global_index)),
+                I32Const { value } => InitInstr::Value(Value::I32(value)),
+                I64Const { value } => InitInstr::Value(Value::I64(value)),
+                F32Const { value } => InitInstr::Value(Value::F32(f32::from_bits(value.bits()))),
+                F64Const { value } => InitInstr::Value(Value::F64(f64::from_bits(value.bits()))),
+                V128Const { value } => InitInstr::Value(Value::V128(v128_to_u128(&value))),
+                GlobalGet { global_index } => InitInstr::Global(GlobalID(global_index)),
                 // Marking nullable as true as it's a null reference
-                RefNull { hty } => Instructions::RefNull(RefType::new(true, hty).unwrap()),
-                RefFunc { function_index } => Instructions::RefFunc(FunctionID(function_index)),
-                StructNew { struct_type_index } => {
-                    Instructions::StructNew(TypeID(struct_type_index))
-                }
+                RefNull { hty } => InitInstr::RefNull(RefType::new(true, hty).unwrap()),
+                RefFunc { function_index } => InitInstr::RefFunc(FunctionID(function_index)),
+                StructNew { struct_type_index } => InitInstr::StructNew(TypeID(struct_type_index)),
                 StructNewDefault { struct_type_index } => {
-                    Instructions::StructNewDefault(TypeID(struct_type_index))
+                    InitInstr::StructNewDefault(TypeID(struct_type_index))
                 }
-                ArrayNew { array_type_index } => Instructions::ArrayNew(TypeID(array_type_index)),
+                ArrayNew { array_type_index } => InitInstr::ArrayNew(TypeID(array_type_index)),
                 ArrayNewDefault { array_type_index } => {
-                    Instructions::ArrayNewDefault(TypeID(array_type_index))
+                    InitInstr::ArrayNewDefault(TypeID(array_type_index))
                 }
                 ArrayNewFixed {
                     array_type_index,
                     array_size,
-                } => Instructions::RefArrayFixed {
+                } => InitInstr::RefArrayFixed {
                     array_type_index,
                     array_size,
                 },
                 ArrayNewData {
                     array_type_index,
                     array_data_index,
-                } => Instructions::RefArrayData {
+                } => InitInstr::RefArrayData {
                     array_data_index,
                     array_type_index,
                 },
                 ArrayNewElem {
                     array_type_index,
                     array_elem_index,
-                } => Instructions::RefArrayElem {
+                } => InitInstr::RefArrayElem {
                     array_type_index,
                     array_elem_index,
                 },
-                RefI31 => Instructions::RefI31,
+                RefI31 => InitInstr::RefI31,
                 End => break,
                 _ => panic!("Invalid constant expression"),
             };
@@ -1287,7 +1309,7 @@ impl InitExpr {
         let mut bytes = vec![];
         for instr in self.exprs.iter() {
             match instr {
-                Instructions::Value(v) => match v {
+                InitInstr::Value(v) => match v {
                     Value::I32(v) => wasm_encoder::Instruction::I32Const(*v).encode(&mut bytes),
                     Value::I64(v) => wasm_encoder::Instruction::I64Const(*v).encode(&mut bytes),
                     Value::F32(v) => wasm_encoder::Instruction::F32Const(*v).encode(&mut bytes),
@@ -1296,10 +1318,10 @@ impl InitExpr {
                         wasm_encoder::Instruction::V128Const(*v as i128).encode(&mut bytes)
                     }
                 },
-                Instructions::Global(g) => {
+                InitInstr::Global(g) => {
                     wasm_encoder::Instruction::GlobalGet(**g).encode(&mut bytes)
                 }
-                Instructions::RefNull(ty) => {
+                InitInstr::RefNull(ty) => {
                     wasm_encoder::Instruction::RefNull(match ty.heap_type() {
                         HeapType::Abstract { shared, ty } => match ty {
                             wasmparser::AbstractHeapType::Func => {
@@ -1393,23 +1415,21 @@ impl InitExpr {
                     })
                     .encode(&mut bytes)
                 }
-                Instructions::RefFunc(f) => {
-                    wasm_encoder::Instruction::RefFunc(**f).encode(&mut bytes)
-                }
-                Instructions::StructNew(id) => {
+                InitInstr::RefFunc(f) => wasm_encoder::Instruction::RefFunc(**f).encode(&mut bytes),
+                InitInstr::StructNew(id) => {
                     wasm_encoder::Instruction::StructNew(**id).encode(&mut bytes);
                 }
-                Instructions::ArrayNew(id) => {
+                InitInstr::ArrayNew(id) => {
                     wasm_encoder::Instruction::ArrayNew(**id).encode(&mut bytes);
                 }
 
-                Instructions::StructNewDefault(id) => {
+                InitInstr::StructNewDefault(id) => {
                     wasm_encoder::Instruction::StructNewDefault(**id).encode(&mut bytes);
                 }
-                Instructions::ArrayNewDefault(id) => {
+                InitInstr::ArrayNewDefault(id) => {
                     wasm_encoder::Instruction::ArrayNewDefault(**id).encode(&mut bytes);
                 }
-                Instructions::RefArrayFixed {
+                InitInstr::RefArrayFixed {
                     array_type_index,
                     array_size,
                 } => {
@@ -1419,7 +1439,7 @@ impl InitExpr {
                     }
                     .encode(&mut bytes);
                 }
-                Instructions::RefArrayData {
+                InitInstr::RefArrayData {
                     array_type_index,
                     array_data_index,
                 } => {
@@ -1429,7 +1449,7 @@ impl InitExpr {
                     }
                     .encode(&mut bytes);
                 }
-                Instructions::RefArrayElem {
+                InitInstr::RefArrayElem {
                     array_type_index,
                     array_elem_index,
                 } => {
@@ -1439,7 +1459,7 @@ impl InitExpr {
                     }
                     .encode(&mut bytes);
                 }
-                Instructions::RefI31 => wasm_encoder::Instruction::RefI31.encode(&mut bytes),
+                InitInstr::RefI31 => wasm_encoder::Instruction::RefI31.encode(&mut bytes),
             }
         }
         wasm_encoder::ConstExpr::raw(bytes)
