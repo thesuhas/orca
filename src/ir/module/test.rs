@@ -5,7 +5,7 @@
 use crate::ir::function::FunctionBuilder;
 use crate::ir::id::{CustomSectionID, ExportsID, FunctionID, GlobalID, ImportsID, TypeID};
 use crate::ir::types::{CustomSection, CustomSections, InitExpr};
-use crate::{DataType, InitInstr, Instructions, Module, Opcode};
+use crate::{DataType, InitInstr, Module, Opcode};
 use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
