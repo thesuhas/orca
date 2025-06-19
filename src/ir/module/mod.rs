@@ -1663,7 +1663,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1944,7 +1944,12 @@ struct InstrToInject<'a> {
     not_flagged: Vec<InstrBody<'a>>,
 }
 
-fn fix_op_id_mapping(op: &mut Operator, func_mapping: &HashMap<u32, u32>, global_mapping: &HashMap<u32, u32>, memory_mapping: &HashMap<u32, u32>) {
+fn fix_op_id_mapping(
+    op: &mut Operator,
+    func_mapping: &HashMap<u32, u32>,
+    global_mapping: &HashMap<u32, u32>,
+    memory_mapping: &HashMap<u32, u32>,
+) {
     if refers_to_func(op) {
         update_fn_instr(op, func_mapping);
     }

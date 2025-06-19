@@ -73,7 +73,12 @@ fn test_exports() {
         .unwrap();
     module.exports.delete(id);
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_exports.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_exports.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -94,7 +99,12 @@ fn test_import_delete() {
     assert_eq!(*id, *fid);
     module.delete_func(fid);
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_import_delete.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_import_delete.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -105,7 +115,12 @@ fn test_local_fn_delete() {
 
     module.delete_func(FunctionID(2));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_local_fn_delete.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_local_fn_delete.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -130,7 +145,12 @@ fn test_renumber_fn_id() {
 
     module.delete_func(FunctionID(1));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_renumber_fn_id.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_renumber_fn_id.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -146,7 +166,12 @@ fn test_middle_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -162,7 +187,12 @@ fn test_first_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(0));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_first_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_first_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -178,7 +208,12 @@ fn test_last_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_last_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_last_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -204,7 +239,12 @@ fn test_all_import_to_local() {
     third_builder.drop();
     third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_all_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -225,7 +265,12 @@ fn test_some_import_to_local() {
     second_builder.drop();
     second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_some_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_some_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -243,7 +288,12 @@ fn test_middle_import_to_local_import_delete() {
 
     module.delete_func(FunctionID(2));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_import_delete.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_import_delete.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -262,7 +312,12 @@ fn test_middle_import_to_local_local_delete() {
     module.delete_func(FunctionID(2));
     module.delete_func(FunctionID(3));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_local_delete.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_local_delete.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -273,7 +328,12 @@ fn test_add_import() {
 
     module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2));
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_add_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_add_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -290,7 +350,12 @@ fn test_middle_local_to_import() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -307,7 +372,12 @@ fn test_first_local_to_import() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -324,7 +394,12 @@ fn test_last_local_to_import() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -353,7 +428,12 @@ fn test_all_local_to_import() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -376,7 +456,12 @@ fn test_some_local_to_import() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -420,7 +505,12 @@ fn test_all_local_to_import_all_import_to_local() {
         TypeID(2),
     );
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_local_to_import_all_import_to_local.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_all_local_to_import_all_import_to_local.wasm"),
+        true,
+    );
 }
 
 #[test]
@@ -447,7 +537,12 @@ fn test_add_fns_init_exprs() {
     sec_builder.call(fid0);
     sec_builder.finish_module(&mut module);
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/init-exprs.wasm"), false)
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/init-exprs.wasm"),
+        false,
+    )
 }
 
 #[test]
@@ -475,7 +570,12 @@ fn test_add_imports_and_local_fns() {
 
     // add second import func
     module.add_import_func("test1".to_string(), "func1".to_string(), TypeID(2));
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_add_imports_and_local_fns.wasm"), true)
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/test_add_imports_and_local_fns.wasm"),
+        true,
+    )
 }
 
 #[test]
@@ -494,7 +594,12 @@ fn add_global_with_import() {
     );
     assert_eq!(1, *gid);
 
-    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/add_global_with_import.wasm"), true);
+    check_validity(
+        file,
+        &mut module,
+        &format!("{TEST_DEBUG_DIR}/add_global_with_import.wasm"),
+        true,
+    );
 }
 
 const TEST_DEBUG_DIR: &str = "output/tests/debug_me/test_module/";
@@ -538,9 +643,9 @@ fn check_validity(file: &str, module: &mut Module, output_wasm_path: &str, check
         let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
         if let Err(e) = check_instrumentation_encoding(&out, file) {
             error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
+                "Something went wrong when checking instrumentation encoding: {}",
+                e
+            )
         }
     }
 }

@@ -1215,20 +1215,24 @@ pub enum InitInstr {
     RefI31,
 }
 impl InitInstr {
-    pub fn fix_id_mapping(&mut self, func_mapping: &HashMap<u32, u32>, global_mapping: &HashMap<u32, u32>) {
+    pub fn fix_id_mapping(
+        &mut self,
+        func_mapping: &HashMap<u32, u32>,
+        global_mapping: &HashMap<u32, u32>,
+    ) {
         match self {
             InitInstr::Global(id) => match global_mapping.get(&(*id)) {
                 Some(new_index) => {
                     **id = *new_index;
                 }
                 None => panic!("Deleted global!"),
-            }
+            },
             InitInstr::RefFunc(id) => match func_mapping.get(&(*id)) {
                 Some(new_index) => {
                     **id = *new_index;
                 }
                 None => panic!("Deleted function!"),
-            }
+            },
             _ => {}
         }
     }
@@ -1257,9 +1261,7 @@ impl InitExpr {
                 // Marking nullable as true as it's a null reference
                 RefNull { hty } => InitInstr::RefNull(RefType::new(true, hty).unwrap()),
                 RefFunc { function_index } => InitInstr::RefFunc(FunctionID(function_index)),
-                StructNew { struct_type_index } => {
-                    InitInstr::StructNew(TypeID(struct_type_index))
-                }
+                StructNew { struct_type_index } => InitInstr::StructNew(TypeID(struct_type_index)),
                 StructNewDefault { struct_type_index } => {
                     InitInstr::StructNewDefault(TypeID(struct_type_index))
                 }
@@ -1408,9 +1410,7 @@ impl InitExpr {
                     })
                     .encode(&mut bytes)
                 }
-                InitInstr::RefFunc(f) => {
-                    wasm_encoder::Instruction::RefFunc(**f).encode(&mut bytes)
-                }
+                InitInstr::RefFunc(f) => wasm_encoder::Instruction::RefFunc(**f).encode(&mut bytes),
                 InitInstr::StructNew(id) => {
                     wasm_encoder::Instruction::StructNew(**id).encode(&mut bytes);
                 }
