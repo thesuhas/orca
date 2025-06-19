@@ -202,6 +202,11 @@ impl ModuleGlobals {
         self.globals.iter()
     }
 
+    /// Create an iterable over the global section
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Global> {
+        self.globals.iter_mut()
+    }
+
     /// Get the number of globals
     pub fn len(&self) -> usize {
         self.globals.len()

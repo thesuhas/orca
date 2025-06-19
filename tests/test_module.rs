@@ -4,7 +4,7 @@ use orca_wasm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
 use orca_wasm::ir::module::module_functions::FuncKind::{Import, Local};
 use orca_wasm::ir::module::module_functions::{ImportedFunction, LocalFunction};
 use orca_wasm::ir::types::{Body, InitExpr, Value};
-use orca_wasm::{DataType, Instructions, Module, Opcode};
+use orca_wasm::{DataType, InitInstr, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -14,9 +14,8 @@ use crate::common::check_instrumentation_encoding;
 #[test]
 fn test_fn_types() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let module = Module::parse(&buff, false).expect("Unable to parse module");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     assert_eq!(
         *module.functions.get_kind(FunctionID(0)),
@@ -49,7 +48,6 @@ fn test_fn_types() {
 #[test]
 fn test_exports() {
     let file = "tests/test_inputs/instr_testing/modules/function_modification/export_deletion.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -75,23 +73,12 @@ fn test_exports() {
         .unwrap();
     module.exports.delete(id);
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_exports.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_exports.wasm"), true);
 }
 
 #[test]
 fn test_import_delete() {
     let file = "tests/test_inputs/instr_testing/modules/function_modification/import_delete.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -107,46 +94,24 @@ fn test_import_delete() {
     assert_eq!(*id, *fid);
     module.delete_func(fid);
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_import_delete.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_import_delete.wasm"), true);
 }
 
 #[test]
 fn test_local_fn_delete() {
     let file = "tests/test_inputs/instr_testing/modules/function_modification/local_fn_delete.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     module.delete_func(FunctionID(2));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_local_fn_delete.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_local_fn_delete.wasm"), true);
 }
 
 #[test]
 #[should_panic]
 fn test_panic_call_delete() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -160,31 +125,18 @@ fn test_panic_call_delete() {
 fn test_renumber_fn_id() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/local_fn_renumber.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     module.delete_func(FunctionID(1));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_renumber_fn_id.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    // Should reencode and get original add.wat file
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_renumber_fn_id.wasm"), true);
 }
 
 #[test]
 fn test_middle_import_to_local() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/middle_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -194,24 +146,13 @@ fn test_middle_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_middle_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local.wasm"), true);
 }
 
 #[test]
 fn test_first_import_to_local() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/first_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -221,24 +162,13 @@ fn test_first_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(0));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_first_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_first_import_to_local.wasm"), true);
 }
 
 #[test]
 fn test_last_import_to_local() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/last_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -248,24 +178,13 @@ fn test_last_import_to_local() {
 
     builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_last_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_last_import_to_local.wasm"), true);
 }
 
 #[test]
 fn test_all_import_to_local() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/all_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -285,24 +204,13 @@ fn test_all_import_to_local() {
     third_builder.drop();
     third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_all_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_import_to_local.wasm"), true);
 }
 
 #[test]
 fn test_some_import_to_local() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/some_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -317,24 +225,13 @@ fn test_some_import_to_local() {
     second_builder.drop();
     second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_some_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_some_import_to_local.wasm"), true);
 }
 
 #[test]
 fn test_middle_import_to_local_import_delete() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/middle_import_to_local_import_delete.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -346,25 +243,13 @@ fn test_middle_import_to_local_import_delete() {
 
     module.delete_func(FunctionID(2));
 
-    let result = module.encode();
-    let output_wasm_path =
-        format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_import_delete.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_import_delete.wasm"), true);
 }
 
 #[test]
 fn test_middle_import_to_local_local_delete() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/middle_import_to_local_local_delete.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -377,47 +262,24 @@ fn test_middle_import_to_local_local_delete() {
     module.delete_func(FunctionID(2));
     module.delete_func(FunctionID(3));
 
-    let result = module.encode();
-    let output_wasm_path =
-        format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_local_delete.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_import_to_local_local_delete.wasm"), true);
 }
 
 #[test]
 fn test_add_import() {
     let file = "tests/test_inputs/instr_testing/modules/function_modification/add_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2));
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_add_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_add_import.wasm"), true);
 }
 
 #[test]
 fn test_middle_local_to_import() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/middle_local_to_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -428,24 +290,13 @@ fn test_middle_local_to_import() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_middle_local_to_import.wasm"), true);
 }
 
 #[test]
 fn test_first_local_to_import() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/first_local_to_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -456,24 +307,13 @@ fn test_first_local_to_import() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_first_local_to_import.wasm"), true);
 }
 
 #[test]
 fn test_last_local_to_import() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/last_local_to_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -484,24 +324,13 @@ fn test_last_local_to_import() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_last_local_to_import.wasm"), true);
 }
 
 #[test]
 fn test_all_local_to_import() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -524,24 +353,13 @@ fn test_all_local_to_import() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_local_to_import.wasm"), true);
 }
 
 #[test]
 fn test_some_local_to_import() {
     let file =
         "tests/test_inputs/instr_testing/modules/function_modification/some_local_to_import.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -558,23 +376,12 @@ fn test_some_local_to_import() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_some_local_to_import.wasm"), true);
 }
 
 #[test]
 fn test_all_local_to_import_all_import_to_local() {
     let file = "tests/test_inputs/instr_testing/modules/function_modification/all_local_to_import_all_import_to_local.wat";
-
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
@@ -613,18 +420,34 @@ fn test_all_local_to_import_all_import_to_local() {
         TypeID(2),
     );
 
-    let result = module.encode();
-    let output_wasm_path =
-        format!("{TEST_DEBUG_DIR}/test_all_local_to_import_all_import_to_local.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_all_local_to_import_all_import_to_local.wasm"), true);
+}
 
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+#[test]
+fn test_add_fns_init_exprs() {
+    let file = "tests/test_inputs/instr_testing/modules/init-exprs.wat";
+    let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
+    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+
+    // add first import func
+    let (..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(4));
+
+    // add first local func
+    let mut first_builder = FunctionBuilder::new(&[], &[]);
+    first_builder.i32_const(1);
+    first_builder.i32_const(1);
+    first_builder.i32_add();
+    first_builder.drop();
+    let fid0 = first_builder.finish_module(&mut module);
+
+    // add second local func
+    let mut sec_builder = FunctionBuilder::new(&[], &[]);
+    sec_builder.i32_const(2);
+    sec_builder.drop();
+    sec_builder.call(fid0);
+    sec_builder.finish_module(&mut module);
+
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/init-exprs.wasm"), false)
 }
 
 #[test]
@@ -652,18 +475,7 @@ fn test_add_imports_and_local_fns() {
 
     // add second import func
     module.add_import_func("test1".to_string(), "func1".to_string(), TypeID(2));
-
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/test_add_imports_and_local_fns.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/test_add_imports_and_local_fns.wasm"), true)
 }
 
 #[test]
@@ -675,25 +487,14 @@ fn add_global_with_import() {
 
     // add new global
     let gid = module.add_global(
-        InitExpr::new(vec![Instructions::Value(Value::I32(0))]),
+        InitExpr::new(vec![InitInstr::Value(Value::I32(0))]),
         DataType::I32,
         true,
         false,
     );
     assert_eq!(1, *gid);
 
-    let result = module.encode();
-    let output_wasm_path = format!("{TEST_DEBUG_DIR}/add_global_with_import.wasm");
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
-
-    let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
-
-    if let Err(e) = check_instrumentation_encoding(&out, file) {
-        error!(
-            "Something went wrong when checking instrumentation encoding: {}",
-            e
-        )
-    }
+    check_validity(file, &mut module, &format!("{TEST_DEBUG_DIR}/add_global_with_import.wasm"), true);
 }
 
 const TEST_DEBUG_DIR: &str = "output/tests/debug_me/test_module/";
@@ -716,12 +517,30 @@ pub(crate) fn validate_wasm(wasm_path: &str) -> bool {
     debug!("Running 'wasm-tools validate' on file: {wasm_path}");
     let res = Command::new("wasm-tools")
         .arg("validate")
+        .arg("-f")
+        .arg("legacy-exceptions")
         .arg(wasm_path)
         .output()
         .expect("failed to execute process");
     if !res.status.success() {
         println!("{:?}", std::str::from_utf8(&res.stderr).unwrap());
+        assert!(false)
     }
 
     res.status.success()
+}
+
+fn check_validity(file: &str, module: &mut Module, output_wasm_path: &str, check_encoding: bool) {
+    let result = module.encode();
+    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
+
+    if check_encoding {
+        let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
+        if let Err(e) = check_instrumentation_encoding(&out, file) {
+            error!(
+            "Something went wrong when checking instrumentation encoding: {}",
+            e
+        )
+        }
+    }
 }
