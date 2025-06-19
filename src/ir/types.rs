@@ -1247,8 +1247,8 @@ impl InitExpr {
         }
     }
 
-    pub fn instructions(&self) -> &[Instructions] {
-        &self.exprs
+    pub fn instructions(&self) -> &[InitInstr] {
+        self.exprs.as_slice()
     }
 
     pub(crate) fn eval(init: &ConstExpr) -> InitExpr {

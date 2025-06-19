@@ -15,7 +15,7 @@ use crate::common::check_instrumentation_encoding;
 fn test_fn_types() {
     let file = "tests/test_inputs/handwritten/modules/add.wat";
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
-    let mut module = Module::parse(&buff, false).expect("Unable to parse module");
+    let module = Module::parse(&buff, false).expect("Unable to parse module");
 
     assert_eq!(
         *module.functions.get_kind(FunctionID(0)),
@@ -637,7 +637,7 @@ pub(crate) fn validate_wasm(wasm_path: &str) -> bool {
 
 fn check_validity(file: &str, module: &mut Module, output_wasm_path: &str, check_encoding: bool) {
     let result = module.encode();
-    validate(&result, &output_wasm_path).expect("Failed to write out to wasm file.");
+    validate(&result, output_wasm_path).expect("Failed to write out to wasm file.");
 
     if check_encoding {
         let out = wasmprinter::print_bytes(result).expect("couldn't translate wasm to wat");
