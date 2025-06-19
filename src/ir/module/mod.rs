@@ -1584,8 +1584,8 @@ impl<'a> Module<'a> {
         // encode the rest of custom sections
         for section in self.custom_sections.iter() {
             module.section(&wasm_encoder::CustomSection {
-                name: Cow::Borrowed(section.name),
-                data: Cow::Borrowed(section.data),
+                name: std::borrow::Cow::Borrowed(section.name),
+                data: section.data.clone(),
             });
         }
 
