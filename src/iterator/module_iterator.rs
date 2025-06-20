@@ -208,6 +208,25 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
         }
     }
 
+    fn curr_instr_len(&self) -> usize {
+        if let (
+            Location::Module {
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.mod_iterator.curr_loc()
+        {
+            match &self.module.functions.get(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
+                FuncKind::Local(l) => l.instr_len_at(instr_idx),
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+    }
+
     fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
         if let Location::Module {
             func_idx,
@@ -287,6 +306,25 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
         self
     }
 
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
+                FuncKind::Local(ref mut l) => {
+                    l.append_instr_tag_at(data, instr_idx);
+                }
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+        self
+    }
+
     /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
         if let (
@@ -308,10 +346,6 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
     }
 }
 impl<'a> IteratingInstrumenter<'a> for ModuleIterator<'_, 'a> {
-    fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
-        self.set_instrument_mode_at(mode, self.curr_loc().0);
-    }
-
     fn add_global(&mut self, global: Global) -> GlobalID {
         self.module.globals.add(global)
     }

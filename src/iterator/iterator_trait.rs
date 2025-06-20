@@ -33,7 +33,14 @@ pub trait IteratingInstrumenter<'a>: Instrumenter<'a> + Iterator {
     // ==== MODES ====
 
     /// Sets the type of Instrumentation Type of the current location
-    fn set_instrument_mode(&mut self, mode: InstrumentationMode);
+    fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
+        self.set_instrument_mode_at(mode, self.curr_loc().0);
+    }
+
+    /// Appends the passed data to the tag of the current location.
+    fn append_to_tag(&mut self, data: Vec<u8>) {
+        self.append_tag_at(data, self.curr_loc().0);
+    }
 
     /// Mark the current location to InstrumentAlternate
     fn alternate(&mut self) -> &mut Self {

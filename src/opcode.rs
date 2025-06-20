@@ -27,6 +27,8 @@ pub trait Instrumenter<'a> {
     /// Sets the type of Instrumentation Type of the current function
     fn set_func_instrument_mode(&mut self, mode: FuncInstrMode);
 
+    fn curr_instr_len(&self) -> usize;
+
     // ==== FUNC INSTR INJECTION ====
 
     /// Mark the current function to InstrumentFuncEntry
@@ -95,6 +97,8 @@ pub trait Instrumenter<'a> {
 
     /// Injects an empty block alternate at a given location
     fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self;
+
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self;
 
     /// Get the instruction injected at index idx
     fn get_injected_val(&self, idx: usize) -> &Operator;
