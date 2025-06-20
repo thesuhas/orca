@@ -4,7 +4,7 @@ use crate::ir::id::{FunctionID, GlobalID, LocalID};
 use crate::ir::module::module_functions::FuncKind;
 use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
-use crate::ir::types::{DataType, FuncInstrMode, InstrumentationMode, Location};
+use crate::ir::types::{DataType, FuncInstrMode, InjectedInstrs, InstrumentationMode, Location};
 use crate::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
@@ -208,6 +208,25 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
         }
     }
 
+    fn curr_instr_len(&self) -> usize {
+        if let (
+            Location::Module {
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.mod_iterator.curr_loc()
+        {
+            match &self.module.functions.get(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot get an instruction to an imported function"),
+                FuncKind::Local(l) => l.instr_len_at(instr_idx),
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+    }
+
     fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
         if let Location::Module {
             func_idx,
@@ -256,7 +275,8 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
             match self.module.functions.get_mut(func_idx).kind {
                 FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].instr_flag.alternate = Some(vec![])
+                    l.body.instructions[instr_idx].instr_flag.alternate =
+                        Some(InjectedInstrs::default())
                 }
             }
         } else {
@@ -275,8 +295,28 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
             match self.module.functions.get_mut(func_idx as FunctionID).kind {
                 FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
                 FuncKind::Local(ref mut l) => {
-                    l.body.instructions[instr_idx].instr_flag.block_alt = Some(vec![]);
+                    l.body.instructions[instr_idx].instr_flag.block_alt =
+                        Some(InjectedInstrs::default());
                     l.instr_flag.has_special_instr |= true;
+                }
+            }
+        } else {
+            panic!("Should have gotten Module Location and not Module Location!")
+        }
+        self
+    }
+
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
+        if let Location::Module {
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match self.module.functions.get_mut(func_idx as FunctionID).kind {
+                FuncKind::Import(_) => panic!("Cannot instrument an imported function"),
+                FuncKind::Local(ref mut l) => {
+                    l.append_instr_tag_at(data, instr_idx);
                 }
             }
         } else {
@@ -306,10 +346,6 @@ impl<'a> Instrumenter<'a> for ModuleIterator<'_, 'a> {
     }
 }
 impl<'a> IteratingInstrumenter<'a> for ModuleIterator<'_, 'a> {
-    fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
-        self.set_instrument_mode_at(mode, self.curr_loc().0);
-    }
-
     fn add_global(&mut self, global: Global) -> GlobalID {
         self.module.globals.add(global)
     }

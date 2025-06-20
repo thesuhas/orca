@@ -19,6 +19,25 @@ use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// An optional tag that flags items that have been added to the module.
+/// It can also carry some bytes of information the explain why it was added.
+pub type InjectTag = Option<Tag>;
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct Tag {
+    data: Vec<u8>,
+}
+pub(crate) trait TagUtils {
+    fn get_tag(&mut self) -> &mut Tag;
+}
+// Override the default private_bounds warning since I don't want the TagUtils trait to be public
+#[allow(private_bounds)]
+pub trait HasInjectTag: TagUtils {
+    fn append_to_tag(&mut self, mut data: Vec<u8>) {
+        self.get_tag().data.append(&mut data);
+    }
+}
+
 /// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
@@ -126,7 +145,7 @@ impl From<ValType> for DataType {
             ValType::F64 => DataType::F64,
             ValType::V128 => DataType::V128,
             ValType::Ref(ref_type) => match ref_type.heap_type() {
-                wasmparser::HeapType::Abstract { shared: _, ty } => match ty {
+                HeapType::Abstract { shared: _, ty } => match ty {
                     wasmparser::AbstractHeapType::Func => {
                         if ref_type.is_nullable() {
                             DataType::FuncRefNull
@@ -184,7 +203,7 @@ impl From<ValType> for DataType {
                     wasmparser::AbstractHeapType::Cont => DataType::Cont,
                     wasmparser::AbstractHeapType::NoCont => DataType::NoCont,
                 },
-                wasmparser::HeapType::Concrete(u) => match u {
+                HeapType::Concrete(u) => match u {
                     wasmparser::UnpackedIndex::Module(idx) => DataType::Module {
                         ty_id: *ModuleID(idx),
                         nullable: ref_type.is_nullable(),
@@ -388,7 +407,7 @@ impl From<&DataType> for ValType {
             DataType::Any => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Any,
                     },
@@ -398,7 +417,7 @@ impl From<&DataType> for ValType {
             DataType::None => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::None,
                     },
@@ -408,7 +427,7 @@ impl From<&DataType> for ValType {
             DataType::NoExtern => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::NoExtern,
                     },
@@ -418,7 +437,7 @@ impl From<&DataType> for ValType {
             DataType::NoFunc => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::NoFunc,
                     },
@@ -428,7 +447,7 @@ impl From<&DataType> for ValType {
             DataType::Eq => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Eq,
                     },
@@ -438,7 +457,7 @@ impl From<&DataType> for ValType {
             DataType::Struct => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Struct,
                     },
@@ -448,7 +467,7 @@ impl From<&DataType> for ValType {
             DataType::Array => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Array,
                     },
@@ -458,7 +477,7 @@ impl From<&DataType> for ValType {
             DataType::I31 => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::I31,
                     },
@@ -468,7 +487,7 @@ impl From<&DataType> for ValType {
             DataType::Exn => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Exn,
                     },
@@ -478,7 +497,7 @@ impl From<&DataType> for ValType {
             DataType::NoExn => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::NoExn,
                     },
@@ -488,14 +507,14 @@ impl From<&DataType> for ValType {
             DataType::Module { ty_id, nullable } => ValType::Ref(
                 RefType::new(
                     *nullable,
-                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(*ty_id)),
+                    HeapType::Concrete(wasmparser::UnpackedIndex::Module(*ty_id)),
                 )
                 .unwrap(),
             ),
             DataType::RecGroup(idx) => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::RecGroup(*idx)),
+                    HeapType::Concrete(wasmparser::UnpackedIndex::RecGroup(*idx)),
                 )
                 .unwrap(),
             ),
@@ -503,7 +522,7 @@ impl From<&DataType> for ValType {
             DataType::Cont => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Cont,
                     },
@@ -513,7 +532,7 @@ impl From<&DataType> for ValType {
             DataType::NoCont => ValType::Ref(
                 RefType::new(
                     false,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::NoCont,
                     },
@@ -523,7 +542,7 @@ impl From<&DataType> for ValType {
             DataType::FuncRefNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Func,
                     },
@@ -533,7 +552,7 @@ impl From<&DataType> for ValType {
             DataType::ExternRefNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Extern,
                     },
@@ -543,7 +562,7 @@ impl From<&DataType> for ValType {
             DataType::AnyNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Any,
                     },
@@ -553,7 +572,7 @@ impl From<&DataType> for ValType {
             DataType::EqNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Eq,
                     },
@@ -563,7 +582,7 @@ impl From<&DataType> for ValType {
             DataType::StructNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Struct,
                     },
@@ -573,7 +592,7 @@ impl From<&DataType> for ValType {
             DataType::ArrayNull => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::Array,
                     },
@@ -583,7 +602,7 @@ impl From<&DataType> for ValType {
             DataType::I31Null => ValType::Ref(
                 RefType::new(
                     true,
-                    wasmparser::HeapType::Abstract {
+                    HeapType::Abstract {
                         shared: false,
                         ty: wasmparser::AbstractHeapType::I31,
                     },
@@ -610,6 +629,7 @@ pub struct DataSegment {
     pub kind: DataSegmentKind,
     /// The data of the data segment.
     pub data: Vec<u8>,
+    pub tag: InjectTag,
 }
 
 impl DataSegment {
@@ -617,7 +637,13 @@ impl DataSegment {
         Ok(DataSegment {
             kind: DataSegmentKind::from_wasmparser(data.kind)?,
             data: data.data.to_vec(),
+            tag: None,
         })
+    }
+}
+impl TagUtils for DataSegment {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
     }
 }
 
@@ -726,10 +752,23 @@ pub struct FuncInstrFlag<'a> {
     /// modes to resolve for this function (see InstrumentationMode variants)
     pub has_special_instr: bool,
     pub current_mode: Option<FuncInstrMode>,
-    pub entry: Vec<Operator<'a>>,
-    pub exit: Vec<Operator<'a>>,
+    pub entry: InjectedInstrs<'a>,
+    pub exit: InjectedInstrs<'a>,
 }
 
+impl TagUtils for FuncInstrFlag<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.has_special_instr = true;
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot append to the tag!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.get_tag(),
+            Some(FuncInstrMode::Exit) => self.exit.get_tag(),
+        }
+    }
+}
+impl HasInjectTag for FuncInstrFlag<'_> {}
 impl fmt::Display for FuncInstrFlag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let FuncInstrFlag {
@@ -747,8 +786,8 @@ impl fmt::Display for FuncInstrFlag<'_> {
              Func Entry: {:?} instructions\n \
              Func Exit: {:?} instructions",
             has_special_instr,
-            entry.len(),
-            exit.len()
+            entry.instrs.len(),
+            exit.instrs.len()
         )
     }
 }
@@ -782,7 +821,7 @@ impl<'a> FuncInstrFlag<'a> {
             has_special_instr: _,
             current_mode: _,
         } = self;
-        !entry.is_empty() || !exit.is_empty()
+        !entry.instrs.is_empty() || !exit.instrs.is_empty()
     }
 
     pub fn has_special_instr(&self) -> bool {
@@ -796,8 +835,8 @@ impl<'a> FuncInstrFlag<'a> {
             None => {
                 panic!("Current mode is not set...cannot inject instructions!")
             }
-            Some(FuncInstrMode::Entry) => self.entry.push(val),
-            Some(FuncInstrMode::Exit) => self.exit.push(val),
+            Some(FuncInstrMode::Entry) => self.entry.instrs.push(val),
+            Some(FuncInstrMode::Exit) => self.exit.instrs.push(val),
         }
     }
 
@@ -807,8 +846,18 @@ impl<'a> FuncInstrFlag<'a> {
             None => {
                 panic!("Current mode is not set...cannot grab instruction without context!")
             }
-            Some(FuncInstrMode::Entry) => self.entry.get(idx).unwrap(),
-            Some(FuncInstrMode::Exit) => self.exit.get(idx).unwrap(),
+            Some(FuncInstrMode::Entry) => self.entry.instrs.get(idx).unwrap(),
+            Some(FuncInstrMode::Exit) => self.exit.instrs.get(idx).unwrap(),
+        }
+    }
+
+    pub fn instr_len(&self) -> usize {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot grab instruction without context!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.instrs.len(),
+            Some(FuncInstrMode::Exit) => self.exit.instrs.len(),
         }
     }
 
@@ -836,22 +885,41 @@ pub enum InstrumentationMode {
 /// Instrumentation Data that is stored with every instruction
 pub struct InstrumentationFlag<'a> {
     pub current_mode: Option<InstrumentationMode>,
-    pub before: Vec<Operator<'a>>,
-    pub after: Vec<Operator<'a>>,
+    pub before: InjectedInstrs<'a>,
+    pub after: InjectedInstrs<'a>,
     /// None means to replace with no instructions (effectively removing the original)
     /// Some(vec) means to replace with the vec of instructions
     /// Some(empty vec) means there is no alt instrumentation
-    pub alternate: Option<Vec<Operator<'a>>>,
+    pub alternate: Option<InjectedInstrs<'a>>,
 
     // special modes
-    pub semantic_after: Vec<Operator<'a>>,
-    pub block_entry: Vec<Operator<'a>>,
-    pub block_exit: Vec<Operator<'a>>,
+    pub semantic_after: InjectedInstrs<'a>,
+    pub block_entry: InjectedInstrs<'a>,
+    pub block_exit: InjectedInstrs<'a>,
     /// None means to replace with no instructions (effectively removing the original)
     /// Some(vec) means to replace with the vec of instructions
     /// Some(empty vec) means there is no alt instrumentation
-    pub block_alt: Option<Vec<Operator<'a>>>,
+    pub block_alt: Option<InjectedInstrs<'a>>,
 }
+impl TagUtils for InstrumentationFlag<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot get the tag!")
+            }
+            Some(InstrumentationMode::Before) => self.before.get_tag(),
+            Some(InstrumentationMode::After) => self.after.get_tag(),
+            Some(InstrumentationMode::Alternate) => {
+                self.alternate.get_or_insert_default().get_tag()
+            }
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_tag(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.get_tag(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.get_tag(),
+            Some(InstrumentationMode::BlockAlt) => self.block_alt.get_or_insert_default().get_tag(),
+        }
+    }
+}
+impl HasInjectTag for InstrumentationFlag<'_> {}
 
 impl fmt::Display for InstrumentationFlag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -877,13 +945,13 @@ impl fmt::Display for InstrumentationFlag<'_> {
                    Block Entry: {:?} instructions\n \
                    Block Exit: {:?} instructions\n \
                    Block Alt: {:?} instructions",
-            before.len(),
-            after.len(),
-            alternate.as_ref().unwrap().len(),
-            semantic_after.len(),
-            block_entry.len(),
-            block_exit.len(),
-            block_alt.as_ref().unwrap().len()
+            before.instrs.len(),
+            after.instrs.len(),
+            alternate.as_ref().unwrap().instrs.len(),
+            semantic_after.instrs.len(),
+            block_entry.instrs.len(),
+            block_exit.instrs.len(),
+            block_alt.as_ref().unwrap().instrs.len()
         )
     }
 }
@@ -929,12 +997,12 @@ impl<'a> InstrumentationFlag<'a> {
             block_alt,
             current_mode: _,
         } = self;
-        !before.is_empty()
-            || !after.is_empty()
+        !before.instrs.is_empty()
+            || !after.instrs.is_empty()
             || !alternate.is_none() // Some(vec![]) means instruction removal!
-            || !semantic_after.is_empty()
-            || !block_entry.is_empty()
-            || !block_exit.is_empty()
+            || !semantic_after.instrs.is_empty()
+            || !block_entry.instrs.is_empty()
+            || !block_exit.instrs.is_empty()
             || !block_alt.is_none() // Some(vec![]) means block removal!
     }
 
@@ -946,17 +1014,22 @@ impl<'a> InstrumentationFlag<'a> {
                 panic!("Current mode is not set...cannot inject instructions!")
             }
             Some(InstrumentationMode::Before) => {
-                self.before.push(val);
+                self.before.instrs.push(val);
                 false
             }
             Some(InstrumentationMode::After) => {
-                self.after.push(val);
+                self.after.instrs.push(val);
                 false
             }
             Some(InstrumentationMode::Alternate) => {
                 match &mut self.alternate {
-                    None => self.alternate = Some(vec![val]),
-                    Some(alternate) => alternate.push(val),
+                    None => {
+                        self.alternate = Some(InjectedInstrs {
+                            instrs: vec![val],
+                            tag: None,
+                        })
+                    }
+                    Some(alternate) => alternate.instrs.push(val),
                 }
                 false
             }
@@ -964,7 +1037,7 @@ impl<'a> InstrumentationFlag<'a> {
                 // self.semantic_after.push(val);
                 // true
                 if Self::is_block_style_op(op) || Self::is_branching_op(op) {
-                    self.semantic_after.push(val);
+                    self.semantic_after.instrs.push(val);
                     true
                 } else {
                     // instrumentation type not applicable!
@@ -976,7 +1049,7 @@ impl<'a> InstrumentationFlag<'a> {
             }
             Some(InstrumentationMode::BlockEntry) => {
                 if Self::is_block_style_op(op) {
-                    self.block_entry.push(val);
+                    self.block_entry.instrs.push(val);
                     true
                 } else {
                     // instrumentation type not applicable!
@@ -988,7 +1061,7 @@ impl<'a> InstrumentationFlag<'a> {
             }
             Some(InstrumentationMode::BlockExit) => {
                 if Self::is_block_style_op(op) {
-                    self.block_exit.push(val);
+                    self.block_exit.instrs.push(val);
                     true
                 } else {
                     // instrumentation type not applicable!
@@ -1001,8 +1074,13 @@ impl<'a> InstrumentationFlag<'a> {
             Some(InstrumentationMode::BlockAlt) => {
                 if Self::is_block_style_op(op) {
                     match &mut self.block_alt {
-                        None => self.block_alt = Some(vec![val]),
-                        Some(block_alt) => block_alt.push(val),
+                        None => {
+                            self.block_alt = Some(InjectedInstrs {
+                                instrs: vec![val],
+                                tag: None,
+                            })
+                        }
+                        Some(block_alt) => block_alt.instrs.push(val),
                     }
                     true
                 } else {
@@ -1016,18 +1094,39 @@ impl<'a> InstrumentationFlag<'a> {
         }
     }
 
+    pub fn instr_len(&self) -> usize {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot inject instructions!")
+            }
+            Some(InstrumentationMode::Before) => self.before.instrs.len(),
+            Some(InstrumentationMode::After) => self.after.instrs.len(),
+            Some(InstrumentationMode::Alternate) => match &self.alternate {
+                None => 0,
+                Some(alternate) => alternate.instrs.len(),
+            },
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.instrs.len(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.instrs.len(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.instrs.len(),
+            Some(InstrumentationMode::BlockAlt) => match &self.block_alt {
+                None => 0,
+                Some(block_alt) => block_alt.instrs.len(),
+            },
+        }
+    }
+
     pub fn clear_instr(&mut self, mode: InstrumentationMode) {
         match mode {
             InstrumentationMode::Before => {
-                self.before.clear();
+                self.before.instrs.clear();
             }
-            InstrumentationMode::After => self.after.clear(),
+            InstrumentationMode::After => self.after.instrs.clear(),
             InstrumentationMode::Alternate => {
                 self.alternate = None;
             }
-            InstrumentationMode::SemanticAfter => self.semantic_after.clear(),
-            InstrumentationMode::BlockEntry => self.block_entry.clear(),
-            InstrumentationMode::BlockExit => self.block_exit.clear(),
+            InstrumentationMode::SemanticAfter => self.semantic_after.instrs.clear(),
+            InstrumentationMode::BlockEntry => self.block_entry.instrs.clear(),
+            InstrumentationMode::BlockExit => self.block_exit.instrs.clear(),
             InstrumentationMode::BlockAlt => {
                 self.block_alt = None;
             }
@@ -1063,18 +1162,20 @@ impl<'a> InstrumentationFlag<'a> {
             None => {
                 panic!("Current mode is not set...cannot grab instruction without context!")
             }
-            Some(InstrumentationMode::Before) => self.before.get(idx).unwrap(),
-            Some(InstrumentationMode::After) => self.after.get(idx).unwrap(),
+            Some(InstrumentationMode::Before) => self.before.instrs.get(idx).unwrap(),
+            Some(InstrumentationMode::After) => self.after.instrs.get(idx).unwrap(),
             Some(InstrumentationMode::Alternate) => match &self.alternate {
                 None => panic!("No alternate instructions to pull idx '{}' from", idx),
-                Some(alternate) => alternate.get(idx).unwrap(),
+                Some(alternate) => alternate.instrs.get(idx).unwrap(),
             },
-            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get(idx).unwrap(),
-            Some(InstrumentationMode::BlockEntry) => self.block_entry.get(idx).unwrap(),
-            Some(InstrumentationMode::BlockExit) => self.block_exit.get(idx).unwrap(),
+            Some(InstrumentationMode::SemanticAfter) => {
+                self.semantic_after.instrs.get(idx).unwrap()
+            }
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.instrs.get(idx).unwrap(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.instrs.get(idx).unwrap(),
             Some(InstrumentationMode::BlockAlt) => match &self.block_alt {
                 None => panic!("No block alt instructions to pull idx '{}' from", idx),
-                Some(block_alt) => block_alt.get(idx).unwrap(),
+                Some(block_alt) => block_alt.instrs.get(idx).unwrap(),
             },
         }
     }
@@ -1084,6 +1185,18 @@ impl<'a> InstrumentationFlag<'a> {
         self.current_mode = None
     }
 }
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct InjectedInstrs<'a> {
+    pub(crate) instrs: Vec<Operator<'a>>,
+    pub(crate) tag: InjectTag,
+}
+impl TagUtils for InjectedInstrs<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+}
+impl HasInjectTag for InjectedInstrs<'_> {}
 
 /// Used to represent a unique location in a wasm component or module.
 #[derive(Debug, Clone, Copy)]
@@ -1165,6 +1278,10 @@ where
 
     pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
         self.instr_flag.add_instr(&self.op, val)
+    }
+
+    pub fn instr_len(&self) -> usize {
+        self.instr_flag.instr_len()
     }
 
     pub fn extract_op(&'a self) -> Operator<'a> {

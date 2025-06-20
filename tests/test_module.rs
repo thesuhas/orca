@@ -27,21 +27,23 @@ fn test_fn_types() {
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(1)),
-        Local(LocalFunction::new(
+        Local(Box::new(LocalFunction::new(
             TypeID(5),
             FunctionID(0),
             Body::default(),
-            0
-        ))
+            0,
+            None
+        )))
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(2)),
-        Local(LocalFunction::new(
+        Local(Box::new(LocalFunction::new(
             TypeID(0),
             FunctionID(0),
             Body::default(),
-            0
-        ))
+            0,
+            None
+        )))
     );
 }
 
@@ -164,7 +166,7 @@ fn test_middle_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1));
+    builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     check_validity(
         file,
@@ -185,7 +187,7 @@ fn test_first_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(0));
+    builder.replace_import_in_module(&mut module, ImportsID(0), None);
 
     check_validity(
         file,
@@ -206,7 +208,7 @@ fn test_last_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(2));
+    builder.replace_import_in_module(&mut module, ImportsID(2), None);
 
     check_validity(
         file,
@@ -227,17 +229,17 @@ fn test_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0));
+    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1));
+    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(3);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, ImportsID(2));
+    third_builder.replace_import_in_module(&mut module, ImportsID(2), None);
 
     check_validity(
         file,
@@ -258,12 +260,12 @@ fn test_some_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0));
+    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1));
+    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     check_validity(
         file,
@@ -284,7 +286,7 @@ fn test_middle_import_to_local_import_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1));
+    builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     module.delete_func(FunctionID(2));
 
@@ -307,7 +309,7 @@ fn test_middle_import_to_local_local_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1));
+    builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     module.delete_func(FunctionID(2));
     module.delete_func(FunctionID(3));
@@ -326,7 +328,7 @@ fn test_add_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2));
+    module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2), None);
 
     check_validity(
         file,
@@ -348,6 +350,7 @@ fn test_middle_local_to_import() {
         "orca".to_string(),
         "better".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -370,6 +373,7 @@ fn test_first_local_to_import() {
         "orca".to_string(),
         "better".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -392,6 +396,7 @@ fn test_last_local_to_import() {
         "orca".to_string(),
         "better".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -414,18 +419,21 @@ fn test_all_local_to_import() {
         "all".to_string(),
         "local".to_string(),
         TypeID(2),
+        None,
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
         TypeID(2),
+        None,
     );
     module.convert_local_fn_to_import(
         FunctionID(5),
         "please".to_string(),
         "work".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -448,12 +456,14 @@ fn test_some_local_to_import() {
         "all".to_string(),
         "local".to_string(),
         TypeID(2),
+        None,
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -474,35 +484,38 @@ fn test_all_local_to_import_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(4);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0));
+    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(5);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1));
+    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
 
     let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(6);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, ImportsID(2));
+    third_builder.replace_import_in_module(&mut module, ImportsID(2), None);
 
     module.convert_local_fn_to_import(
         FunctionID(3),
         "all".to_string(),
         "local".to_string(),
         TypeID(2),
+        None,
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
         TypeID(2),
+        None,
     );
     module.convert_local_fn_to_import(
         FunctionID(5),
         "please".to_string(),
         "work".to_string(),
         TypeID(2),
+        None,
     );
 
     check_validity(
@@ -520,7 +533,7 @@ fn test_add_fns_init_exprs() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add first import func
-    let (..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(4));
+    let (..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(4), None);
 
     // add first local func
     let mut first_builder = FunctionBuilder::new(&[], &[]);
@@ -528,14 +541,14 @@ fn test_add_fns_init_exprs() {
     first_builder.i32_const(1);
     first_builder.i32_add();
     first_builder.drop();
-    let fid0 = first_builder.finish_module(&mut module);
+    let fid0 = first_builder.finish_module(&mut module, None);
 
     // add second local func
     let mut sec_builder = FunctionBuilder::new(&[], &[]);
     sec_builder.i32_const(2);
     sec_builder.drop();
     sec_builder.call(fid0);
-    sec_builder.finish_module(&mut module);
+    sec_builder.finish_module(&mut module, None);
 
     check_validity(
         file,
@@ -552,24 +565,25 @@ fn test_add_imports_and_local_fns() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add first import func
-    let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2));
+    let (fid, ..) =
+        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2), None);
 
     // add first local func
     let mut first_builder = FunctionBuilder::new(&[], &[]);
     first_builder.i32_const(1);
     first_builder.i32_const(1);
     first_builder.call(fid);
-    let fid0 = first_builder.finish_module(&mut module);
+    let fid0 = first_builder.finish_module(&mut module, None);
 
     // add second local func
     let mut sec_builder = FunctionBuilder::new(&[], &[]);
     sec_builder.i32_const(2);
     sec_builder.drop();
     sec_builder.call(fid0);
-    sec_builder.finish_module(&mut module);
+    sec_builder.finish_module(&mut module, None);
 
     // add second import func
-    module.add_import_func("test1".to_string(), "func1".to_string(), TypeID(2));
+    module.add_import_func("test1".to_string(), "func1".to_string(), TypeID(2), None);
     check_validity(
         file,
         &mut module,
@@ -591,6 +605,7 @@ fn add_global_with_import() {
         DataType::I32,
         true,
         false,
+        None,
     );
     assert_eq!(1, *gid);
 

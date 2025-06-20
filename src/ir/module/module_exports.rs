@@ -1,6 +1,7 @@
 //! Intermediate Representation of a Module's Exports
 
 use crate::ir::id::{ExportsID, FunctionID};
+use crate::ir::types::{InjectTag, Tag, TagUtils};
 use wasmparser::ExternalKind;
 
 #[derive(Debug, Clone)]
@@ -14,6 +15,12 @@ pub struct Export {
     pub index: u32,
     /// Marked for deletion
     pub(crate) deleted: bool,
+    pub tag: InjectTag,
+}
+impl TagUtils for Export {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
 }
 
 impl<'a> From<wasmparser::Export<'a>> for Export {
@@ -23,6 +30,7 @@ impl<'a> From<wasmparser::Export<'a>> for Export {
             kind: export.kind,
             index: export.index,
             deleted: false,
+            tag: None,
         }
     }
 }
@@ -49,23 +57,25 @@ impl ModuleExports {
     }
 
     /// Add an exported function
-    pub fn add_export_func(&mut self, name: String, exp_id: u32) {
+    pub fn add_export_func(&mut self, name: String, exp_id: u32, tag: InjectTag) {
         let export = Export {
             name,
             kind: ExternalKind::Func,
             index: exp_id,
             deleted: false,
+            tag,
         };
         self.exports.push(export);
     }
 
     /// Add an exported memory
-    pub fn add_export_mem(&mut self, name: String, exp_id: u32) {
+    pub fn add_export_mem(&mut self, name: String, exp_id: u32, tag: InjectTag) {
         let export = Export {
             name,
             kind: ExternalKind::Memory,
             index: exp_id,
             deleted: false,
+            tag,
         };
         self.exports.push(export)
     }

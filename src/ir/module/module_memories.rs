@@ -1,5 +1,6 @@
 use crate::ir::id::{ImportsID, MemoryID};
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
+use crate::ir::types::{InjectTag, Tag, TagUtils};
 use std::vec::IntoIter;
 use wasmparser::MemoryType;
 
@@ -109,7 +110,12 @@ impl Memories {
         MemoryID(self.memories.len() as u32)
     }
 
-    pub(crate) fn add_local_mem(&mut self, mut local_mem: LocalMemory, ty: MemoryType) -> MemoryID {
+    pub(crate) fn add_local_mem(
+        &mut self,
+        mut local_mem: LocalMemory,
+        ty: MemoryType,
+        tag: InjectTag,
+    ) -> MemoryID {
         self.recalculate_ids = true;
         // fix the ID of the memory
         let id = self.next_id();
@@ -119,6 +125,7 @@ impl Memories {
             ty,
             kind: MemKind::Local(local_mem),
             deleted: false,
+            tag,
         });
         id
     }
@@ -129,6 +136,7 @@ impl Memories {
         ty: MemoryType,
         // The id of the memory we're using (at least until re-indexing)
         imp_mem_id: u32,
+        tag: InjectTag,
     ) {
         self.recalculate_ids = true;
         assert_eq!(*self.next_id(), imp_mem_id);
@@ -139,6 +147,7 @@ impl Memories {
                 import_mem_id: MemoryID(imp_mem_id),
             }),
             deleted: false,
+            tag,
         });
     }
 }
@@ -149,6 +158,7 @@ pub struct Memory {
     pub ty: MemoryType,
     pub(crate) kind: MemKind,
     pub(crate) deleted: bool,
+    pub tag: InjectTag,
 }
 impl GetID for Memory {
     /// Get the ID of the function
@@ -175,14 +185,19 @@ impl LocalOrImport for Memory {
         self.deleted
     }
 }
-
+impl TagUtils for Memory {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+}
 impl Memory {
     /// Create a new memory
-    pub fn new(ty: MemoryType, kind: MemKind) -> Self {
+    pub fn new(ty: MemoryType, kind: MemKind, tag: InjectTag) -> Self {
         Self {
             ty,
             kind,
             deleted: false,
+            tag,
         }
     }
 

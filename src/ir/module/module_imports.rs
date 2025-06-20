@@ -1,6 +1,7 @@
 //! Intermediate Representation of a Module's Imports
 
 use crate::ir::id::{FunctionID, ImportsID};
+use crate::ir::types::{InjectTag, Tag, TagUtils};
 use wasmparser::TypeRef;
 
 // TODO: Need to handle the relationship between Functions and Imports
@@ -16,8 +17,13 @@ pub struct Import<'a> {
     /// The name (in the custom section) of the imported item.
     pub custom_name: Option<String>,
     pub(crate) deleted: bool,
+    pub tag: InjectTag,
 }
-
+impl TagUtils for Import<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+}
 impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
     fn from(import: wasmparser::Import<'a>) -> Self {
         Import {
@@ -26,6 +32,7 @@ impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
             ty: import.ty,
             custom_name: None,
             deleted: false,
+            tag: None,
         }
     }
 }

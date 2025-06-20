@@ -3,9 +3,9 @@
 use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::{add_local, add_locals, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
-use crate::ir::types::DataType;
-use crate::ir::types::InstrumentationMode;
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
+use crate::ir::types::{DataType, InjectTag, InjectedInstrs};
+use crate::ir::types::{HasInjectTag, InstrumentationMode};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::{Component, Location};
@@ -37,10 +37,16 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, module: &mut Module<'a>) -> FunctionID {
+    pub fn finish_module(mut self, module: &mut Module<'a>, tag: InjectTag) -> FunctionID {
         // add End as last instruction
         self.end();
-        let id = module.add_local_func(self.name, &self.params, &self.results, self.body.clone());
+        let id = module.add_local_func(
+            self.name,
+            &self.params,
+            &self.results,
+            self.body.clone(),
+            tag,
+        );
 
         assert_eq!(
             module.functions.len() as u32,
@@ -50,7 +56,12 @@ impl<'a> FunctionBuilder<'a> {
         id
     }
 
-    pub fn replace_import_in_module(mut self, module: &mut Module<'a>, import_id: ImportsID) {
+    pub fn replace_import_in_module(
+        mut self,
+        module: &mut Module<'a>,
+        import_id: ImportsID,
+        tag: InjectTag,
+    ) {
         // add End as last instruction
         self.end();
 
@@ -64,6 +75,7 @@ impl<'a> FunctionBuilder<'a> {
                         FunctionID(*import_id),
                         self.body.clone(),
                         self.params.len(),
+                        tag,
                     );
                     local_func.body.name = Some(imp.name.to_string());
                     module.convert_import_fn_to_local(import_id, local_func);
@@ -83,7 +95,12 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on component IR),
     /// return function index
-    pub fn finish_component(mut self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
+    pub fn finish_component(
+        mut self,
+        comp: &mut Component<'a>,
+        mod_idx: ModuleID,
+        tag: InjectTag,
+    ) -> FunctionID {
         // add End as last instruction
         self.end();
 
@@ -92,6 +109,7 @@ impl<'a> FunctionBuilder<'a> {
             &self.params,
             &self.results,
             self.body.clone(),
+            tag,
         );
 
         assert_eq!(
@@ -246,6 +264,20 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
         self.instr_flag.current_mode = Some(mode);
     }
 
+    fn curr_instr_len(&self) -> usize {
+        if self.instr_flag.current_mode.is_some() {
+            // inject at the function level
+            self.instr_flag.instr_len()
+        } else {
+            // inject at instruction level
+            if let Some(idx) = self.instr_idx {
+                self.body.instructions[idx].instr_len()
+            } else {
+                panic!("Instruction index not set");
+            }
+        }
+    }
+
     fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
         if let Location::Module { instr_idx, .. } = loc {
             self.body.clear_instr(instr_idx, mode);
@@ -264,7 +296,8 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
 
     fn empty_alternate_at(&mut self, loc: Location) -> &mut Self {
         if let Location::Module { instr_idx, .. } = loc {
-            self.body.instructions[instr_idx].instr_flag.alternate = Some(vec![]);
+            self.body.instructions[instr_idx].instr_flag.alternate =
+                Some(InjectedInstrs::default());
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
         }
@@ -274,10 +307,27 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
 
     fn empty_block_alt_at(&mut self, loc: Location) -> &mut Self {
         if let Location::Module { instr_idx, .. } = loc {
-            self.body.instructions[instr_idx].instr_flag.block_alt = Some(vec![]);
+            self.body.instructions[instr_idx].instr_flag.block_alt =
+                Some(InjectedInstrs::default());
             self.instr_flag.has_special_instr |= true;
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
+        }
+
+        self
+    }
+
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
+        let (Location::Component { instr_idx, .. } | Location::Module { instr_idx, .. }) = loc;
+
+        if self.instr_flag.current_mode.is_some() {
+            // append at function level
+            self.instr_flag.append_to_tag(data);
+        } else {
+            // append at instruction level
+            self.body.instructions[instr_idx]
+                .instr_flag
+                .append_to_tag(data);
         }
 
         self

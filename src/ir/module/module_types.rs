@@ -1,6 +1,7 @@
 //!  Intermediate representation of Module Types
 
 use crate::ir::id::TypeID;
+use crate::ir::types::{InjectTag, Tag, TagUtils};
 use crate::DataType;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -17,6 +18,7 @@ pub enum Types {
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     },
     ArrayType {
         fields: DataType,
@@ -24,6 +26,7 @@ pub enum Types {
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     },
     StructType {
         fields: Vec<DataType>,
@@ -31,15 +34,26 @@ pub enum Types {
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     },
     ContType {
         packed_index: PackedIndex,
         super_type: Option<PackedIndex>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     },
 }
-
+impl TagUtils for Types {
+    fn get_tag(&mut self) -> &mut Tag {
+        match self {
+            Types::FuncType { tag, .. }
+            | Types::ArrayType { tag, .. }
+            | Types::StructType { tag, .. }
+            | Types::ContType { tag, .. } => tag.get_or_insert_default(),
+        }
+    }
+}
 impl Types {
     /// Return the params of a Function Type
     pub fn params(&self) -> Vec<DataType> {
@@ -88,7 +102,12 @@ impl ModuleTypes {
     }
 
     /// Add a new function type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
-    pub fn add_func_type(&mut self, param: &[DataType], ret: &[DataType]) -> TypeID {
+    pub fn add_func_type(
+        &mut self,
+        param: &[DataType],
+        ret: &[DataType],
+        tag: InjectTag,
+    ) -> TypeID {
         let index = self.types.len();
         let ty = Types::FuncType {
             params: param.to_vec().into_boxed_slice(),
@@ -96,6 +115,7 @@ impl ModuleTypes {
             super_type: None,
             is_final: true,
             shared: false,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
@@ -115,6 +135,7 @@ impl ModuleTypes {
         super_type: Option<TypeID>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     ) -> TypeID {
         let index = self.types.len();
         let ty = Types::FuncType {
@@ -126,6 +147,7 @@ impl ModuleTypes {
             },
             is_final,
             shared,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
@@ -138,7 +160,12 @@ impl ModuleTypes {
     }
 
     /// Add a new array type to the module. Assumes no `super_type` and `is_final` is `true`
-    pub fn add_array_type(&mut self, field_type: DataType, mutable: bool) -> TypeID {
+    pub fn add_array_type(
+        &mut self,
+        field_type: DataType,
+        mutable: bool,
+        tag: InjectTag,
+    ) -> TypeID {
         let index = self.types.len();
         let ty = Types::ArrayType {
             fields: field_type,
@@ -146,6 +173,7 @@ impl ModuleTypes {
             super_type: None,
             is_final: true,
             shared: false,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
@@ -166,6 +194,7 @@ impl ModuleTypes {
         super_type: Option<TypeID>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     ) -> TypeID {
         let index = self.types.len();
         let ty = Types::ArrayType {
@@ -177,6 +206,7 @@ impl ModuleTypes {
             },
             is_final,
             shared,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
@@ -190,7 +220,12 @@ impl ModuleTypes {
     }
 
     /// Add a new struct type to the module. Assumes no `super_type` and `is_final` is `true`
-    pub fn add_struct_type(&mut self, field_type: Vec<DataType>, mutable: Vec<bool>) -> TypeID {
+    pub fn add_struct_type(
+        &mut self,
+        field_type: Vec<DataType>,
+        mutable: Vec<bool>,
+        tag: InjectTag,
+    ) -> TypeID {
         let index = self.types.len();
         let ty = Types::StructType {
             fields: field_type,
@@ -198,6 +233,7 @@ impl ModuleTypes {
             super_type: None,
             is_final: true,
             shared: false,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
@@ -218,6 +254,7 @@ impl ModuleTypes {
         super_type: Option<TypeID>,
         is_final: bool,
         shared: bool,
+        tag: InjectTag,
     ) -> TypeID {
         let index = self.types.len();
         let ty = Types::StructType {
@@ -229,6 +266,7 @@ impl ModuleTypes {
             },
             is_final,
             shared,
+            tag,
         };
 
         if !self.types_map.contains_key(&ty) {
