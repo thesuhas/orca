@@ -3,7 +3,9 @@
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::ir::types::{Body, FuncInstrFlag, InjectTag, InstrumentationMode, Tag, TagUtils};
+use crate::ir::types::{
+    Body, FuncInstrFlag, HasInjectTag, InjectTag, InstrumentationMode, Tag, TagUtils,
+};
 use crate::DataType;
 use log::warn;
 use std::vec::IntoIter;
@@ -145,6 +147,7 @@ impl TagUtils for LocalFunction<'_> {
         self.tag.get_or_insert_default()
     }
 }
+impl HasInjectTag for LocalFunction<'_> {}
 impl<'a> LocalFunction<'a> {
     /// Creates a new local function
     pub fn new(
@@ -185,6 +188,27 @@ impl<'a> LocalFunction<'a> {
             let is_special = self.body.instructions[instr_idx].add_instr(instr);
             // remember if we injected a special instrumentation (to be resolved before encoding)
             self.instr_flag.has_special_instr |= is_special;
+        }
+    }
+
+    pub fn instr_len_at(&self, instr_idx: usize) -> usize {
+        if self.instr_flag.current_mode.is_some() {
+            // inject at function level
+            self.instr_flag.instr_len()
+        } else {
+            self.body.instructions[instr_idx].instr_len()
+        }
+    }
+
+    pub fn append_instr_tag_at(&mut self, data: Vec<u8>, instr_idx: usize) {
+        if self.instr_flag.current_mode.is_some() {
+            // append at function level
+            self.instr_flag.append_to_tag(data);
+        } else {
+            // append at instruction level
+            self.body.instructions[instr_idx]
+                .instr_flag
+                .append_to_tag(data);
         }
     }
 

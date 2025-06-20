@@ -3,9 +3,9 @@
 use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::{add_local, add_locals, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
-use crate::ir::types::InstrumentationMode;
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
 use crate::ir::types::{DataType, InjectTag, InjectedInstrs};
+use crate::ir::types::{HasInjectTag, InstrumentationMode};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
 use crate::{Component, Location};
@@ -264,6 +264,20 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
         self.instr_flag.current_mode = Some(mode);
     }
 
+    fn curr_instr_len(&self) -> usize {
+        if self.instr_flag.current_mode.is_some() {
+            // inject at the function level
+            self.instr_flag.instr_len()
+        } else {
+            // inject at instruction level
+            if let Some(idx) = self.instr_idx {
+                self.body.instructions[idx].instr_len()
+            } else {
+                panic!("Instruction index not set");
+            }
+        }
+    }
+
     fn clear_instr_at(&mut self, loc: Location, mode: InstrumentationMode) {
         if let Location::Module { instr_idx, .. } = loc {
             self.body.clear_instr(instr_idx, mode);
@@ -298,6 +312,22 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
             self.instr_flag.has_special_instr |= true;
         } else {
             panic!("Should have gotten Component Location and not Module Location!")
+        }
+
+        self
+    }
+
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
+        let (Location::Component { instr_idx, .. } | Location::Module { instr_idx, .. }) = loc;
+
+        if self.instr_flag.current_mode.is_some() {
+            // append at function level
+            self.instr_flag.append_to_tag(data);
+        } else {
+            // append at instruction level
+            self.body.instructions[instr_idx]
+                .instr_flag
+                .append_to_tag(data);
         }
 
         self

@@ -756,6 +756,19 @@ pub struct FuncInstrFlag<'a> {
     pub exit: InjectedInstrs<'a>,
 }
 
+impl TagUtils for FuncInstrFlag<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        self.has_special_instr = true;
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot append to the tag!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.get_tag(),
+            Some(FuncInstrMode::Exit) => self.exit.get_tag(),
+        }
+    }
+}
+impl HasInjectTag for FuncInstrFlag<'_> {}
 impl fmt::Display for FuncInstrFlag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let FuncInstrFlag {
@@ -838,6 +851,16 @@ impl<'a> FuncInstrFlag<'a> {
         }
     }
 
+    pub fn instr_len(&self) -> usize {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot grab instruction without context!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.instrs.len(),
+            Some(FuncInstrMode::Exit) => self.exit.instrs.len(),
+        }
+    }
+
     /// Can be called after finishing some instrumentation to reset the mode.
     pub fn finish_instr(&mut self) {
         self.current_mode = None
@@ -878,6 +901,25 @@ pub struct InstrumentationFlag<'a> {
     /// Some(empty vec) means there is no alt instrumentation
     pub block_alt: Option<InjectedInstrs<'a>>,
 }
+impl TagUtils for InstrumentationFlag<'_> {
+    fn get_tag(&mut self) -> &mut Tag {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot get the tag!")
+            }
+            Some(InstrumentationMode::Before) => self.before.get_tag(),
+            Some(InstrumentationMode::After) => self.after.get_tag(),
+            Some(InstrumentationMode::Alternate) => {
+                self.alternate.get_or_insert_default().get_tag()
+            }
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_tag(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.get_tag(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.get_tag(),
+            Some(InstrumentationMode::BlockAlt) => self.block_alt.get_or_insert_default().get_tag(),
+        }
+    }
+}
+impl HasInjectTag for InstrumentationFlag<'_> {}
 
 impl fmt::Display for InstrumentationFlag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1052,6 +1094,27 @@ impl<'a> InstrumentationFlag<'a> {
         }
     }
 
+    pub fn instr_len(&self) -> usize {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot inject instructions!")
+            }
+            Some(InstrumentationMode::Before) => self.before.instrs.len(),
+            Some(InstrumentationMode::After) => self.after.instrs.len(),
+            Some(InstrumentationMode::Alternate) => match &self.alternate {
+                None => 0,
+                Some(alternate) => alternate.instrs.len(),
+            },
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.instrs.len(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.instrs.len(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.instrs.len(),
+            Some(InstrumentationMode::BlockAlt) => match &self.block_alt {
+                None => 0,
+                Some(block_alt) => block_alt.instrs.len(),
+            },
+        }
+    }
+
     pub fn clear_instr(&mut self, mode: InstrumentationMode) {
         match mode {
             InstrumentationMode::Before => {
@@ -1133,6 +1196,7 @@ impl TagUtils for InjectedInstrs<'_> {
         self.tag.get_or_insert_default()
     }
 }
+impl HasInjectTag for InjectedInstrs<'_> {}
 
 /// Used to represent a unique location in a wasm component or module.
 #[derive(Debug, Clone, Copy)]
@@ -1214,6 +1278,10 @@ where
 
     pub fn add_instr(&mut self, val: Operator<'a>) -> bool {
         self.instr_flag.add_instr(&self.op, val)
+    }
+
+    pub fn instr_len(&self) -> usize {
+        self.instr_flag.instr_len()
     }
 
     pub fn extract_op(&'a self) -> Operator<'a> {

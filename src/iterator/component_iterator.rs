@@ -192,6 +192,31 @@ impl<'b> InjectAt<'b> for ComponentIterator<'_, 'b> {
 impl<'b> Opcode<'b> for ComponentIterator<'_, 'b> {}
 impl<'b> MacroOpcode<'b> for ComponentIterator<'_, 'b> {}
 impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
+    ///Can be called after finishing some instrumentation to reset the mode.
+    fn finish_instr(&mut self) {
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
+        {
+            match &mut self.comp.modules[*mod_idx as usize]
+                .functions
+                .get_mut(func_idx)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(l) => l.body.instructions[instr_idx].instr_flag.finish_instr(),
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+    }
+
     /// Returns the Instrumentation at the current Location
     fn curr_instrument_mode(&self) -> &Option<InstrumentationMode> {
         if let (
@@ -283,6 +308,32 @@ impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
             }
         } else {
             panic!("Should have gotten component location!")
+        }
+    }
+
+    fn curr_instr_len(&self) -> usize {
+        if let (
+            Location::Component {
+                mod_idx,
+                func_idx,
+                instr_idx,
+                ..
+            },
+            ..,
+        ) = self.comp_iterator.curr_loc()
+        {
+            match &self.comp.modules[*mod_idx as usize]
+                .functions
+                .get(func_idx)
+                .kind
+            {
+                FuncKind::Import(_) => {
+                    panic!("Can't get instrumentation from an imported function!")
+                }
+                FuncKind::Local(l) => l.instr_len_at(instr_idx),
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
         }
     }
 
@@ -383,6 +434,28 @@ impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
         self
     }
 
+    fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
+        if let Location::Component {
+            mod_idx,
+            func_idx,
+            instr_idx,
+            ..
+        } = loc
+        {
+            match &mut self.comp.modules[*mod_idx as usize]
+                .functions
+                .get_mut(func_idx)
+                .kind
+            {
+                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
+                FuncKind::Local(l) => l.append_instr_tag_at(data, instr_idx),
+            }
+        } else {
+            panic!("Should have gotten Component Location and not Module Location!")
+        }
+        self
+    }
+
     /// Gets the injected instruction at the current location by index
     fn get_injected_val(&self, idx: usize) -> &Operator {
         if let (
@@ -407,51 +480,8 @@ impl<'b> Instrumenter<'b> for ComponentIterator<'_, 'b> {
             panic!("Should have gotten Component Location and not Module Location!")
         }
     }
-
-    ///Can be called after finishing some instrumentation to reset the mode.
-    fn finish_instr(&mut self) {
-        if let (
-            Location::Component {
-                mod_idx,
-                func_idx,
-                instr_idx,
-                ..
-            },
-            ..,
-        ) = self.comp_iterator.curr_loc()
-        {
-            match &mut self.comp.modules[*mod_idx as usize]
-                .functions
-                .get_mut(func_idx)
-                .kind
-            {
-                FuncKind::Import(_) => panic!("Can't inject into an imported function!"),
-                FuncKind::Local(l) => l.body.instructions[instr_idx].instr_flag.finish_instr(),
-            }
-        } else {
-            panic!("Should have gotten Component Location and not Module Location!")
-        }
-    }
 }
 impl<'b> IteratingInstrumenter<'b> for ComponentIterator<'_, 'b> {
-    /// Sets the type of Instrumentation Mode of the current location
-    fn set_instrument_mode(&mut self, mode: InstrumentationMode) {
-        if let (
-            Location::Component {
-                mod_idx: _mod_idx,
-                func_idx: _func_idx,
-                instr_idx: _instr_idx,
-                ..
-            },
-            ..,
-        ) = self.curr_loc()
-        {
-            self.set_instrument_mode_at(mode, self.curr_loc().0);
-        } else {
-            panic!("Should have gotten component location!")
-        }
-    }
-
     fn add_global(&mut self, global: Global) -> GlobalID {
         let curr_mod = *self.curr_module() as usize;
         self.comp.modules[curr_mod].globals.add(global)
