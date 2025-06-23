@@ -1,8 +1,6 @@
 //! Intermediate Representation of a wasm module.
 
-use super::types::{
-    DataType, InitExpr, InjectTag, InjectedInstrs, Instruction, InstrumentationMode,
-};
+use super::types::{DataType, InitExpr, InjectedInstrs, Instruction, InstrumentationMode, Tag};
 use crate::error::Error;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{DataSegmentID, FunctionID, GlobalID, ImportsID, LocalID, MemoryID, TypeID};
@@ -17,6 +15,7 @@ use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 use crate::ir::module::module_tables::{Element, ModuleTables, Table};
 use crate::ir::module::module_types::{ModuleTypes, Types};
+use crate::ir::module::side_effects::{InjectType, Injection};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
     BlockType, Body, CustomSections, DataSegment, DataSegmentKind, ElementItems, ElementKind,
@@ -47,6 +46,7 @@ pub mod module_imports;
 pub mod module_memories;
 pub mod module_tables;
 pub mod module_types;
+pub mod side_effects;
 #[cfg(test)]
 mod test;
 
@@ -652,6 +652,10 @@ impl<'a> Module<'a> {
     /// ```
     pub fn encode(&mut self) -> Vec<u8> {
         self.encode_internal().finish()
+    }
+
+    pub fn pull_side_effects(&mut self) -> HashMap<InjectType, Vec<Injection>> {
+        todo!()
     }
 
     /// Visits the Orca Module and resolves the special instrumentation by
@@ -1667,13 +1671,13 @@ impl<'a> Module<'a> {
     // ==== Memory Management ====
     // ===========================
 
-    pub fn add_local_memory(&mut self, ty: MemoryType, tag: InjectTag) -> MemoryID {
+    pub fn add_local_memory(&mut self, ty: MemoryType, tag: Tag) -> MemoryID {
         let local_mem = LocalMemory {
             mem_id: MemoryID(0), // will be fixed
         };
 
         self.num_local_memories += 1;
-        self.memories.add_local_mem(local_mem, ty, tag)
+        self.memories.add_local_mem(local_mem, ty, Some(tag))
     }
 
     pub fn add_import_memory(
@@ -1681,7 +1685,7 @@ impl<'a> Module<'a> {
         module: String,
         name: String,
         ty: MemoryType,
-        tag: InjectTag,
+        tag: Tag,
     ) -> (MemoryID, ImportsID) {
         let (imp_mem_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1689,11 +1693,12 @@ impl<'a> Module<'a> {
             ty: TypeRef::Memory(ty),
             custom_name: None,
             deleted: false,
-            tag: tag.clone(),
+            tag: Some(tag.clone()),
         });
 
         // Add to memories as well as it has imported memories
-        self.memories.add_import_mem(imp_id, ty, imp_mem_id, tag);
+        self.memories
+            .add_import_mem(imp_id, ty, imp_mem_id, Some(tag));
         (MemoryID(imp_mem_id), imp_id)
     }
 
@@ -1715,15 +1720,15 @@ impl<'a> Module<'a> {
         params: &[DataType],
         results: &[DataType],
         body: Body<'a>,
-        tag: InjectTag,
+        tag: Tag,
     ) -> FunctionID {
-        let ty = self.types.add_func_type(params, results, tag.clone());
+        let ty = self.types.add_func_type(params, results, Some(tag.clone()));
         let local_func = LocalFunction::new(
             ty,
             FunctionID(0), // will be fixed
             body,
             params.len(),
-            tag,
+            Some(tag),
         );
 
         self.num_local_functions += 1;
@@ -1739,7 +1744,7 @@ impl<'a> Module<'a> {
         module: String,
         name: String,
         ty_id: TypeID,
-        tag: InjectTag,
+        tag: Tag,
     ) -> (FunctionID, ImportsID) {
         let (imp_fn_id, imp_id) = self.add_import(Import {
             module: module.leak(),
@@ -1747,7 +1752,7 @@ impl<'a> Module<'a> {
             ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
-            tag,
+            tag: Some(tag),
         });
 
         // Add to functions as well as it has imported functions
@@ -1800,7 +1805,7 @@ impl<'a> Module<'a> {
         module: String,
         name: String,
         ty_id: TypeID,
-        tag: InjectTag,
+        tag: Tag,
     ) -> bool {
         if self.functions.is_import(function_id) {
             warn!("This is an imported function!");
@@ -1815,7 +1820,7 @@ impl<'a> Module<'a> {
             ty: TypeRef::Func(*ty_id),
             custom_name: None,
             deleted: false,
-            tag,
+            tag: Some(tag),
         });
         self.functions
             .get_mut(function_id)
@@ -1857,7 +1862,7 @@ impl<'a> Module<'a> {
         content_ty: DataType,
         mutable: bool,
         shared: bool,
-        tag: InjectTag,
+        tag: Tag,
     ) -> GlobalID {
         self.add_global_internal(Global {
             kind: GlobalKind::Local(LocalGlobal {
@@ -1870,7 +1875,7 @@ impl<'a> Module<'a> {
                 init_expr,
             }),
             deleted: false,
-            tag,
+            tag: Some(tag),
         })
     }
 
@@ -1885,7 +1890,7 @@ impl<'a> Module<'a> {
         content_ty: DataType,
         mutable: bool,
         shared: bool,
-        tag: InjectTag,
+        tag: Tag,
     ) -> (GlobalID, ImportsID) {
         let global_ty = GlobalType {
             mutable,
@@ -1898,7 +1903,7 @@ impl<'a> Module<'a> {
             ty: TypeRef::Global(global_ty),
             custom_name: None,
             deleted: false,
-            tag: tag.clone(),
+            tag: Some(tag.clone()),
         });
 
         // Add to globals as well since it has imported globals
@@ -1908,7 +1913,7 @@ impl<'a> Module<'a> {
                 GlobalID(imp_global_id),
                 global_ty,
             )),
-            tag,
+            Some(tag),
         ));
         self.globals.recalculate_ids = true;
         (GlobalID(imp_global_id), imp_id)

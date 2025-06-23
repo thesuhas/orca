@@ -21,11 +21,18 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// An optional tag that flags items that have been added to the module.
 /// It can also carry some bytes of information the explain why it was added.
+/// For injected items it will be Some(_), for items already in the module, it will be None.
 pub type InjectTag = Option<Tag>;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Tag {
     data: Vec<u8>,
+}
+impl Tag {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
+    pub fn data_mut(&mut self) -> &mut Vec<u8> { &mut self.data }
 }
 pub(crate) trait TagUtils {
     fn get_tag(&mut self) -> &mut Tag;

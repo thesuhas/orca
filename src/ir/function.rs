@@ -3,7 +3,7 @@
 use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::{add_local, add_locals, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
-use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode};
+use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode, Tag};
 use crate::ir::types::{DataType, InjectTag, InjectedInstrs};
 use crate::ir::types::{HasInjectTag, InstrumentationMode};
 use crate::module_builder::AddLocal;
@@ -37,7 +37,7 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, module: &mut Module<'a>, tag: InjectTag) -> FunctionID {
+    pub fn finish_module(mut self, module: &mut Module<'a>, tag: Tag) -> FunctionID {
         // add End as last instruction
         self.end();
         let id = module.add_local_func(
@@ -99,7 +99,7 @@ impl<'a> FunctionBuilder<'a> {
         mut self,
         comp: &mut Component<'a>,
         mod_idx: ModuleID,
-        tag: InjectTag,
+        tag: Tag,
     ) -> FunctionID {
         // add End as last instruction
         self.end();
