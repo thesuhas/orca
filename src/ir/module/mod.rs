@@ -633,7 +633,7 @@ impl<'a> Module<'a> {
 
     /// Emit the module into a wasm binary file.
     pub fn emit_wasm(&mut self, file_name: &str) -> Result<(), std::io::Error> {
-        let (module, _) = self.encode_internal();
+        let (module, _) = self.encode_internal(false);
         let wasm = module.finish();
         std::fs::write(file_name, wasm)?;
         Ok(())
@@ -652,7 +652,7 @@ impl<'a> Module<'a> {
     /// let result = module.encode();
     /// ```
     pub fn encode(&mut self) -> Vec<u8> {
-        self.encode_internal().0.finish()
+        self.encode_internal(false).0.finish()
     }
 
     /// Visits the Orca Module and resolves the special instrumentation by
@@ -662,6 +662,7 @@ impl<'a> Module<'a> {
         func_mapping: &HashMap<u32, u32>,
         global_mapping: &HashMap<u32, u32>,
         memory_mapping: &HashMap<u32, u32>,
+        pull_side_effects: bool,
         side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
     ) {
         if !self.num_local_functions > 0 {
@@ -695,13 +696,15 @@ impl<'a> Module<'a> {
                     // 2. remap the IDs of the original copy of the special instrumentation
                     // 3. append THAT copy of the injections that now have corrected IDs to the
                     //    side effects list.
-                    func.add_corrected_special_injections(
-                        rel_func_idx as u32,
-                        func_mapping,
-                        global_mapping,
-                        memory_mapping,
-                        side_effects,
-                    );
+                    if pull_side_effects {
+                        func.add_corrected_special_injections(
+                            rel_func_idx as u32,
+                            func_mapping,
+                            global_mapping,
+                            memory_mapping,
+                            side_effects,
+                        );
+                    }
 
                     func.instr_flag.exit.instrs.clear();
                     func.instr_flag.entry.instrs.clear();
@@ -1148,6 +1151,7 @@ impl<'a> Module<'a> {
     /// This requires a mutable reference to self due to the special instrumentation resolution step.
     pub(crate) fn encode_internal(
         &mut self,
+        pull_side_effects: bool,
     ) -> (wasm_encoder::Module, HashMap<InjectType, Vec<Injection>>) {
         // First fix the ID mappings throughout the module
         let func_mapping = if self.functions.recalculate_ids {
@@ -1183,6 +1187,7 @@ impl<'a> Module<'a> {
             &func_mapping,
             &global_mapping,
             &memory_mapping,
+            pull_side_effects,
             &mut side_effects,
         );
 
@@ -1231,15 +1236,17 @@ impl<'a> Module<'a> {
                 }
                 last_rg = curr_rg;
 
-                if let Some(tag) = ty.get_tag() {
-                    add_injection(
-                        &mut side_effects,
-                        InjectType::Type,
-                        Injection::Type {
-                            ty: ty.clone(),
-                            tag: tag.clone(),
-                        },
-                    );
+                if pull_side_effects {
+                    if let Some(tag) = ty.get_tag() {
+                        add_injection(
+                            &mut side_effects,
+                            InjectType::Type,
+                            Injection::Type {
+                                ty: ty.clone(),
+                                tag: tag.clone(),
+                            },
+                        );
+                    }
                 }
             }
             // If the last rg was a none, it was encoded in the binary, if it was an explicit rec group, was not encoded
@@ -1268,17 +1275,19 @@ impl<'a> Module<'a> {
                         reencode.entity_type(import.ty).unwrap(),
                     );
                 }
-                if let Some(tag) = import.get_tag() {
-                    add_injection(
-                        &mut side_effects,
-                        InjectType::Import,
-                        Injection::Import {
-                            module: import.module.to_string(),
-                            name: import.name.to_string(),
-                            type_ref: import.ty,
-                            tag: tag.clone(),
-                        },
-                    );
+                if pull_side_effects {
+                    if let Some(tag) = import.get_tag() {
+                        add_injection(
+                            &mut side_effects,
+                            InjectType::Import,
+                            Injection::Import {
+                                module: import.module.to_string(),
+                                name: import.name.to_string(),
+                                type_ref: import.ty,
+                                tag: tag.clone(),
+                            },
+                        );
+                    }
                 }
             }
             module.section(&imports);
@@ -1290,22 +1299,24 @@ impl<'a> Module<'a> {
                 if !func.deleted {
                     if let FuncKind::Local(l) = func.kind() {
                         functions.function(*l.ty_id);
-                        if let Some(tag) = l.get_tag() {
-                            let sig = self.types.get(l.ty_id).unwrap_or_else(|| {
-                                panic!("Could not find type for type ID: {}", *l.ty_id)
-                            });
-                            add_injection(
-                                &mut side_effects,
-                                InjectType::Func,
-                                Injection::Func {
-                                    id: *l.func_id,
-                                    fname: l.body.name.clone(),
-                                    sig: (sig.params(), sig.results()),
-                                    locals: l.body.locals_as_vec(),
-                                    tag: tag.clone(),
-                                    body: l.body.instructions.clone(),
-                                },
-                            );
+                        if pull_side_effects {
+                            if let Some(tag) = l.get_tag() {
+                                let sig = self.types.get(l.ty_id).unwrap_or_else(|| {
+                                    panic!("Could not find type for type ID: {}", *l.ty_id)
+                                });
+                                add_injection(
+                                    &mut side_effects,
+                                    InjectType::Func,
+                                    Injection::Func {
+                                        id: *l.func_id,
+                                        fname: l.body.name.clone(),
+                                        sig: (sig.params(), sig.results()),
+                                        locals: l.body.locals_as_vec(),
+                                        tag: tag.clone(),
+                                        body: l.body.instructions.clone(),
+                                    },
+                                );
+                            }
                         }
                     }
                 }
@@ -1338,12 +1349,14 @@ impl<'a> Module<'a> {
                     ),
                 };
 
-                if let Some(tag) = table.get_tag() {
-                    add_injection(
-                        &mut side_effects,
-                        InjectType::Table,
-                        Injection::Table { tag: tag.clone() },
-                    );
+                if pull_side_effects {
+                    if let Some(tag) = table.get_tag() {
+                        add_injection(
+                            &mut side_effects,
+                            InjectType::Table,
+                            Injection::Table { tag: tag.clone() },
+                        );
+                    }
                 }
             }
             module.section(&tables);
@@ -1355,17 +1368,19 @@ impl<'a> Module<'a> {
                 if memory.is_local() {
                     memories.memory(wasm_encoder::MemoryType::from(memory.ty));
 
-                    if let Some(tag) = memory.get_tag() {
-                        add_injection(
-                            &mut side_effects,
-                            InjectType::Memory,
-                            Injection::Memory {
-                                id: memory.get_id(),
-                                initial: memory.ty.initial,
-                                maximum: memory.ty.maximum,
-                                tag: tag.clone(),
-                            },
-                        );
+                    if pull_side_effects {
+                        if let Some(tag) = memory.get_tag() {
+                            add_injection(
+                                &mut side_effects,
+                                InjectType::Memory,
+                                Injection::Memory {
+                                    id: memory.get_id(),
+                                    initial: memory.ty.initial,
+                                    maximum: memory.ty.maximum,
+                                    tag: tag.clone(),
+                                },
+                            );
+                        }
                     }
                 }
             }
@@ -1402,19 +1417,21 @@ impl<'a> Module<'a> {
                             &init_expr.to_wasmencoder_type(),
                         );
 
-                        if let Some(tag) = tag {
-                            add_injection(
-                                &mut side_effects,
-                                InjectType::Global,
-                                Injection::Global {
-                                    id,
-                                    ty: DataType::from(ty.content_type),
-                                    shared: ty.shared,
-                                    mutable: ty.mutable,
-                                    tag,
-                                    init_expr: init_expr.clone(),
-                                },
-                            );
+                        if pull_side_effects {
+                            if let Some(tag) = tag {
+                                add_injection(
+                                    &mut side_effects,
+                                    InjectType::Global,
+                                    Injection::Global {
+                                        id,
+                                        ty: DataType::from(ty.content_type),
+                                        shared: ty.shared,
+                                        mutable: ty.mutable,
+                                        tag,
+                                        init_expr: init_expr.clone(),
+                                    },
+                                );
+                            }
                         }
                     }
                 }
@@ -1452,17 +1469,19 @@ impl<'a> Module<'a> {
                             );
                         }
                     }
-                    if let Some(tag) = export.get_tag() {
-                        add_injection(
-                            &mut side_effects,
-                            InjectType::Export,
-                            Injection::Export {
-                                name: export.name.clone(),
-                                kind: export.kind,
-                                index: export.index,
-                                tag: tag.clone(),
-                            },
-                        );
+                    if pull_side_effects {
+                        if let Some(tag) = export.get_tag() {
+                            add_injection(
+                                &mut side_effects,
+                                InjectType::Export,
+                                Injection::Export {
+                                    name: export.name.clone(),
+                                    kind: export.kind,
+                                    index: export.index,
+                                    tag: tag.clone(),
+                                },
+                            );
+                        }
                     }
                 }
             }
@@ -1531,12 +1550,14 @@ impl<'a> Module<'a> {
                     }
                 }
 
-                if let Some(tag) = element.get_tag() {
-                    add_injection(
-                        &mut side_effects,
-                        InjectType::Element,
-                        Injection::Element { tag: tag.clone() },
-                    );
+                if pull_side_effects {
+                    if let Some(tag) = element.get_tag() {
+                        add_injection(
+                            &mut side_effects,
+                            InjectType::Element,
+                            Injection::Element { tag: tag.clone() },
+                        );
+                    }
                 }
             }
             module.section(&elements);
@@ -1670,7 +1691,9 @@ impl<'a> Module<'a> {
 
                 // at this point the IDs in all the function instrumentation opcodes have been corrected
                 // add the probe side effects!
-                func.add_opcode_injections(rel_func_idx as u32, &mut side_effects);
+                if pull_side_effects {
+                    func.add_opcode_injections(rel_func_idx as u32, &mut side_effects);
+                }
                 if let Some(name) = &func.body.name {
                     function_names.append(rel_func_idx as u32, name.as_str());
                 }
@@ -1686,15 +1709,17 @@ impl<'a> Module<'a> {
                 let segment_data = segment.data.iter().copied();
                 match &mut segment.kind {
                     DataSegmentKind::Passive => {
-                        if let Some(tag) = segment.get_tag() {
-                            add_injection(
-                                &mut side_effects,
-                                InjectType::Data,
-                                Injection::PassiveData {
-                                    data: segment.data.to_vec(),
-                                    tag: tag.clone(),
-                                },
-                            );
+                        if pull_side_effects {
+                            if let Some(tag) = segment.get_tag() {
+                                add_injection(
+                                    &mut side_effects,
+                                    InjectType::Data,
+                                    Injection::PassiveData {
+                                        data: segment.data.to_vec(),
+                                        tag: tag.clone(),
+                                    },
+                                );
+                            }
                         }
                         data.passive(segment_data)
                     }
@@ -1712,17 +1737,19 @@ impl<'a> Module<'a> {
                                 memory_index
                             ),
                         };
-                        if let Some(tag) = tag {
-                            add_injection(
-                                &mut side_effects,
-                                InjectType::Data,
-                                Injection::ActiveData {
-                                    memory_index: *memory_index,
-                                    offset_expr: offset_expr.clone(),
-                                    data: segment.data.to_vec(),
-                                    tag,
-                                },
-                            );
+                        if pull_side_effects {
+                            if let Some(tag) = tag {
+                                add_injection(
+                                    &mut side_effects,
+                                    InjectType::Data,
+                                    Injection::ActiveData {
+                                        memory_index: *memory_index,
+                                        offset_expr: offset_expr.clone(),
+                                        data: segment.data.to_vec(),
+                                        tag,
+                                    },
+                                );
+                            }
                         }
 
                         data.active(new_idx, &offset_expr.to_wasmencoder_type(), segment_data)

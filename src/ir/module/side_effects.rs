@@ -7,7 +7,7 @@ use wasmparser::{ExternalKind, Operator, TypeRef};
 
 impl Module<'_> {
     pub fn pull_side_effects(&mut self) -> HashMap<InjectType, Vec<Injection>> {
-        self.encode_internal().1
+        self.encode_internal(true).1
     }
 }
 
