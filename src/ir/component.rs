@@ -20,7 +20,10 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::types::CustomSections;
-use crate::ir::wrappers::{add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration, convert_results, do_reencode, encode_core_type_subtype, process_alias};
+use crate::ir::wrappers::{
+    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
+    convert_results, do_reencode, encode_core_type_subtype, process_alias,
+};
 
 #[derive(Debug)]
 /// Intermediate Representation of a wasm component.
@@ -664,11 +667,21 @@ impl<'a> Component<'a> {
                                             new_comp.alias(process_alias(a, &mut reencode));
                                         }
                                         ComponentTypeDeclaration::Export { name, ty } => {
-                                            let ty = do_reencode(*ty, RoundtripReencoder::component_type_ref, &mut reencode, "component type");
+                                            let ty = do_reencode(
+                                                *ty,
+                                                RoundtripReencoder::component_type_ref,
+                                                &mut reencode,
+                                                "component type",
+                                            );
                                             new_comp.export(name.0, ty);
                                         }
                                         ComponentTypeDeclaration::Import(imp) => {
-                                            let ty = do_reencode(imp.ty, RoundtripReencoder::component_type_ref, &mut reencode, "component type");
+                                            let ty = do_reencode(
+                                                imp.ty,
+                                                RoundtripReencoder::component_type_ref,
+                                                &mut reencode,
+                                                "component type",
+                                            );
                                             new_comp.import(imp.name.0, ty);
                                         }
                                     }
@@ -693,7 +706,12 @@ impl<'a> Component<'a> {
                     let mut imports = wasm_encoder::ComponentImportSection::new();
                     for imp_idx in last_processed_imp..last_processed_imp + num {
                         let imp = &self.imports[imp_idx as usize];
-                        let ty = do_reencode(imp.ty, RoundtripReencoder::component_type_ref, &mut reencode, "component type");
+                        let ty = do_reencode(
+                            imp.ty,
+                            RoundtripReencoder::component_type_ref,
+                            &mut reencode,
+                            "component type",
+                        );
                         imports.import(imp.name.0, ty);
                         last_processed_imp += 1;
                     }
@@ -708,7 +726,14 @@ impl<'a> Component<'a> {
                             exp.name.0,
                             reencode.component_export_kind(exp.kind),
                             exp.index,
-                            exp.ty.map(|ty| do_reencode(ty, RoundtripReencoder::component_type_ref, &mut reencode, "component type")),
+                            exp.ty.map(|ty| {
+                                do_reencode(
+                                    ty,
+                                    RoundtripReencoder::component_type_ref,
+                                    &mut reencode,
+                                    "component type",
+                                )
+                            }),
                         );
                         last_processed_exp += 1;
                     }
@@ -805,8 +830,14 @@ impl<'a> Component<'a> {
                                 canon_sec.lift(
                                     *core_func_index,
                                     *type_index,
-                                    options.iter().map(|canon|
-                                        do_reencode(*canon, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                    options.iter().map(|canon| {
+                                        do_reencode(
+                                            *canon,
+                                            RoundtripReencoder::canonical_option,
+                                            &mut reencode,
+                                            "canonical option",
+                                        )
+                                    }),
                                 );
                             }
                             CanonicalFunction::Lower {
@@ -815,8 +846,14 @@ impl<'a> Component<'a> {
                             } => {
                                 canon_sec.lower(
                                     *func_index,
-                                    options.iter().map(|canon|
-                                        do_reencode(*canon, RoundtripReencoder::canonical_option, &mut reencode, "canonical option")),
+                                    options.iter().map(|canon| {
+                                        do_reencode(
+                                            *canon,
+                                            RoundtripReencoder::canonical_option,
+                                            &mut reencode,
+                                            "canonical option",
+                                        )
+                                    }),
                                 );
                             }
                             CanonicalFunction::ResourceNew { resource } => {
@@ -875,8 +912,14 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -885,8 +928,14 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -904,8 +953,14 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -914,8 +969,14 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -929,8 +990,14 @@ impl<'a> Component<'a> {
                                 canon_sec.error_context_new(
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -938,8 +1005,14 @@ impl<'a> Component<'a> {
                                 canon_sec.error_context_debug_message(
                                     options
                                         .into_iter()
-                                        .map(|t|
-                                        do_reencode(*t, RoundtripReencoder::canonical_option, &mut reencode, "canonical option"))
+                                        .map(|t| {
+                                            do_reencode(
+                                                *t,
+                                                RoundtripReencoder::canonical_option,
+                                                &mut reencode,
+                                                "canonical option",
+                                            )
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
