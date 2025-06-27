@@ -102,7 +102,7 @@ fn test_it_dup_instr() {
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            println!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
+            trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             let loc = mod_it.curr_loc().0;
             let orig = mod_it.curr_op_owned().unwrap();

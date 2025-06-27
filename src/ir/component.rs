@@ -617,8 +617,8 @@ impl<'a> Component<'a> {
                                         }
                                         None => enc.stream(None),
                                     },
-                                    wasmparser::ComponentDefinedType::FixedSizeList(_, _) => {
-                                        todo!()
+                                    wasmparser::ComponentDefinedType::FixedSizeList(ty, i) => {
+                                        enc.fixed_size_list(reencode.component_val_type(*ty), *i)
                                     }
                                 }
                             }

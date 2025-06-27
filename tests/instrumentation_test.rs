@@ -209,11 +209,11 @@ fn test_inject_locals() {
             instr_idx,
         } = mod_it.curr_loc().0
         {
-            println!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
+            trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             if mod_it.curr_op().unwrap() == &Operator::I32Add {
                 let local_id = mod_it.add_local(orca_wasm::ir::types::DataType::I32);
-                println!("new Local ID: {:?}", local_id);
+                trace!("new Local ID: {:?}", local_id);
             }
 
             if mod_it.curr_op().unwrap() == &(Operator::I32Const { value: 2 }) {
