@@ -349,7 +349,7 @@ fn test_middle_local_to_import() {
         FunctionID(2),
         "orca".to_string(),
         "better".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -371,7 +371,7 @@ fn test_first_local_to_import() {
         FunctionID(1),
         "orca".to_string(),
         "better".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -393,7 +393,7 @@ fn test_last_local_to_import() {
         FunctionID(3),
         "orca".to_string(),
         "better".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -415,19 +415,19 @@ fn test_all_local_to_import() {
         FunctionID(3),
         "all".to_string(),
         "local".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
     module.convert_local_fn_to_import(
         FunctionID(5),
         "please".to_string(),
         "work".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -449,13 +449,13 @@ fn test_some_local_to_import() {
         FunctionID(3),
         "all".to_string(),
         "local".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -492,19 +492,19 @@ fn test_all_local_to_import_all_import_to_local() {
         FunctionID(3),
         "all".to_string(),
         "local".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
     module.convert_local_fn_to_import(
         FunctionID(4),
         "to".to_string(),
         "import".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
     module.convert_local_fn_to_import(
         FunctionID(5),
         "please".to_string(),
         "work".to_string(),
-        TypeID(2)
+        TypeID(2),
     );
 
     check_validity(
@@ -554,8 +554,7 @@ fn test_add_imports_and_local_fns() {
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
     // add first import func
-    let (fid, ..) =
-        module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2));
+    let (fid, ..) = module.add_import_func("test0".to_string(), "func0".to_string(), TypeID(2));
 
     // add first local func
     let mut first_builder = FunctionBuilder::new(&[], &[]);
@@ -593,7 +592,7 @@ fn add_global_with_import() {
         InitExpr::new(vec![InitInstr::Value(Value::I32(0))]),
         DataType::I32,
         true,
-        false
+        false,
     );
     assert_eq!(1, *gid);
 

@@ -49,28 +49,55 @@ impl Hash for Types {
         // custom implementation to skip hashing the tag!
         state.write_u8(self.hash_id());
         match self {
-            Types::FuncType { params, results, super_type, is_final, shared, .. } => {
+            Types::FuncType {
+                params,
+                results,
+                super_type,
+                is_final,
+                shared,
+                ..
+            } => {
                 params.hash(state);
                 results.hash(state);
                 super_type.hash(state);
                 is_final.hash(state);
                 shared.hash(state);
             }
-            Types::ArrayType { fields, mutable, super_type, is_final, shared, .. } => {
+            Types::ArrayType {
+                fields,
+                mutable,
+                super_type,
+                is_final,
+                shared,
+                ..
+            } => {
                 fields.hash(state);
                 mutable.hash(state);
                 super_type.hash(state);
                 is_final.hash(state);
                 shared.hash(state);
             }
-            Types::StructType { fields, mutable, super_type, is_final, shared, .. } => {
+            Types::StructType {
+                fields,
+                mutable,
+                super_type,
+                is_final,
+                shared,
+                ..
+            } => {
                 fields.hash(state);
                 mutable.hash(state);
                 super_type.hash(state);
                 is_final.hash(state);
                 shared.hash(state);
             }
-            Types::ContType { packed_index, super_type, is_final, shared, .. } => {
+            Types::ContType {
+                packed_index,
+                super_type,
+                is_final,
+                shared,
+                ..
+            } => {
                 packed_index.hash(state);
                 super_type.hash(state);
                 is_final.hash(state);
@@ -83,19 +110,100 @@ impl PartialEq for Types {
     fn eq(&self, other: &Self) -> bool {
         // custom implementation to skip checking the tag!
         match (self, other) {
-            (Self::FuncType {params, results, super_type, is_final, shared, ..}, Self::FuncType {params: params1, results: results1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
-                params.eq(params1) && results.eq(results1) && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            (
+                Self::FuncType {
+                    params,
+                    results,
+                    super_type,
+                    is_final,
+                    shared,
+                    ..
+                },
+                Self::FuncType {
+                    params: params1,
+                    results: results1,
+                    super_type: super_type1,
+                    is_final: is_final1,
+                    shared: shared1,
+                    ..
+                },
+            ) => {
+                params.eq(params1)
+                    && results.eq(results1)
+                    && super_type.eq(super_type1)
+                    && *is_final == *is_final1
+                    && *shared == *shared1
             }
-            (Self::ArrayType {fields, mutable, super_type, is_final, shared, ..}, Self::ArrayType {fields: fields1, mutable: mutable1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
-                fields.eq(fields1) && *mutable == *mutable1 && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            (
+                Self::ArrayType {
+                    fields,
+                    mutable,
+                    super_type,
+                    is_final,
+                    shared,
+                    ..
+                },
+                Self::ArrayType {
+                    fields: fields1,
+                    mutable: mutable1,
+                    super_type: super_type1,
+                    is_final: is_final1,
+                    shared: shared1,
+                    ..
+                },
+            ) => {
+                fields.eq(fields1)
+                    && *mutable == *mutable1
+                    && super_type.eq(super_type1)
+                    && *is_final == *is_final1
+                    && *shared == *shared1
             }
-            (Self::StructType {fields, mutable, super_type, is_final, shared, ..}, Self::StructType {fields: fields1, mutable: mutable1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
-                fields.eq(fields1) && *mutable == *mutable1 && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            (
+                Self::StructType {
+                    fields,
+                    mutable,
+                    super_type,
+                    is_final,
+                    shared,
+                    ..
+                },
+                Self::StructType {
+                    fields: fields1,
+                    mutable: mutable1,
+                    super_type: super_type1,
+                    is_final: is_final1,
+                    shared: shared1,
+                    ..
+                },
+            ) => {
+                fields.eq(fields1)
+                    && *mutable == *mutable1
+                    && super_type.eq(super_type1)
+                    && *is_final == *is_final1
+                    && *shared == *shared1
             }
-            (Self::ContType {packed_index, super_type, is_final, shared, ..}, Self::ContType {packed_index: packed_index1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
-                packed_index.eq(packed_index1) && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            (
+                Self::ContType {
+                    packed_index,
+                    super_type,
+                    is_final,
+                    shared,
+                    ..
+                },
+                Self::ContType {
+                    packed_index: packed_index1,
+                    super_type: super_type1,
+                    is_final: is_final1,
+                    shared: shared1,
+                    ..
+                },
+            ) => {
+                packed_index.eq(packed_index1)
+                    && super_type.eq(super_type1)
+                    && *is_final == *is_final1
+                    && *shared == *shared1
             }
-            (_, _) => false
+            (_, _) => false,
         }
     }
 }
@@ -140,7 +248,7 @@ impl Types {
             Types::FuncType { .. } => 0,
             Types::ArrayType { .. } => 1,
             Types::StructType { .. } => 2,
-            Types::ContType { .. } => 3
+            Types::ContType { .. } => 3,
         }
     }
 }

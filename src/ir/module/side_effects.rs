@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use crate::ir::module::module_types::Types;
 use crate::ir::types::{FuncInstrMode, InitExpr, Instruction, InstrumentationMode, Tag};
 use crate::{DataType, Module};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use wasmparser::{ExternalKind, Operator, TypeRef};
 
 impl Module<'_> {
@@ -167,5 +167,5 @@ pub enum Injection<'a> {
         /// The body of the probe.
         body: Vec<Operator<'a>>,
         tag: Tag,
-    }
+    },
 }

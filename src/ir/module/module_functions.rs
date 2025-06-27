@@ -1,15 +1,17 @@
 //! Intermediate Representation of a Function
 
-use std::collections::HashMap;
 use crate::ir::function::FunctionModifier;
 use crate::ir::id::{FunctionID, ImportsID, LocalID, TypeID};
+use crate::ir::module::side_effects::{InjectType, Injection};
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::ir::types::{Body, FuncInstrFlag, HasInjectTag, InjectTag, Instruction, InstrumentationMode, Tag, TagUtils};
+use crate::ir::types::{
+    Body, FuncInstrFlag, HasInjectTag, InjectTag, Instruction, InstrumentationMode, Tag, TagUtils,
+};
 use crate::DataType;
 use log::warn;
+use std::collections::HashMap;
 use std::vec::IntoIter;
 use wasmparser::Operator;
-use crate::ir::module::side_effects::{Injection, InjectType};
 
 /// Represents a function. Local or Imported depends on the `FuncKind`.
 #[derive(Clone, Debug)]
@@ -220,11 +222,28 @@ impl<'a> LocalFunction<'a> {
         self.body.clear_instr(instr_idx, mode);
     }
 
-    pub(crate) fn add_corrected_special_injections(&mut self, rel_fid: u32, func_mapping: &HashMap<u32, u32>, global_mapping: &HashMap<u32, u32>, memory_mapping: &HashMap<u32, u32>, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
-        self.instr_flag.add_injections(rel_fid, func_mapping, global_mapping, memory_mapping, side_effects);
+    pub(crate) fn add_corrected_special_injections(
+        &mut self,
+        rel_fid: u32,
+        func_mapping: &HashMap<u32, u32>,
+        global_mapping: &HashMap<u32, u32>,
+        memory_mapping: &HashMap<u32, u32>,
+        side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
+    ) {
+        self.instr_flag.add_injections(
+            rel_fid,
+            func_mapping,
+            global_mapping,
+            memory_mapping,
+            side_effects,
+        );
     }
 
-    pub(crate) fn add_opcode_injections(&self, rel_fid: u32, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
+    pub(crate) fn add_opcode_injections(
+        &self,
+        rel_fid: u32,
+        side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
+    ) {
         for (idx, Instruction { instr_flag, .. }) in self.body.instructions.iter().enumerate() {
             instr_flag.add_injections(rel_fid, idx as u32, side_effects);
         }

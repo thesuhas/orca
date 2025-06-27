@@ -1,13 +1,13 @@
 //! Intermediate representation of sections in a wasm module.
 
 use std::borrow::Cow;
+use log::error;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
 use std::slice::Iter;
-use log::error;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{AbstractHeapType, Encode};
 
@@ -17,7 +17,7 @@ use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
 use crate::error::Error;
 use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
 use crate::ir::module::fix_op_id_mapping;
-use crate::ir::module::side_effects::{Injection, InjectType};
+use crate::ir::module::side_effects::{InjectType, Injection};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -34,9 +34,15 @@ impl Tag {
     pub fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
-    pub fn data_mut(&mut self) -> &mut Vec<u8> { &mut self.data }
-    pub fn data(&self) -> &Vec<u8> { &self.data }
-    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data
+    }
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 }
 pub(crate) trait TagUtils {
     fn get_or_create_tag(&mut self) -> &mut Tag;
@@ -886,28 +892,34 @@ impl<'a> FuncInstrFlag<'a> {
         }
     }
 
-    pub fn add_injections(&mut self, fid: u32, func_mapping: &HashMap<u32, u32>, global_mapping: &HashMap<u32, u32>, memory_mapping: &HashMap<u32, u32>, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
-        let Self {
-            entry,
-            exit,
-            ..
-        } = self;
+    pub fn add_injections(
+        &mut self,
+        fid: u32,
+        func_mapping: &HashMap<u32, u32>,
+        global_mapping: &HashMap<u32, u32>,
+        memory_mapping: &HashMap<u32, u32>,
+        side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
+    ) {
+        let Self { entry, exit, .. } = self;
         let mut add_injection = |mode: FuncInstrMode, instrs: &mut InjectedInstrs<'a>| {
             // Fix the ID mapping in each of the injected opcodes.
             for op in instrs.instrs.iter_mut() {
                 fix_op_id_mapping(op, func_mapping, global_mapping, memory_mapping);
             }
 
-            if instrs.instrs.is_empty() { return; }
+            if instrs.instrs.is_empty() {
+                return;
+            }
             let inj = Injection::FuncProbe {
                 target_fid: fid,
                 mode,
                 body: instrs.instrs.clone(),
-                tag: instrs.tag.clone().unwrap_or_default()
+                tag: instrs.tag.clone().unwrap_or_default(),
             };
-            side_effects.entry(InjectType::Probe).and_modify(|list: &mut Vec<Injection>| {
-                list.push(inj.clone())
-            }).or_insert(vec![inj]);
+            side_effects
+                .entry(InjectType::Probe)
+                .and_modify(|list: &mut Vec<Injection>| list.push(inj.clone()))
+                .or_insert(vec![inj]);
         };
 
         add_injection(FuncInstrMode::Entry, entry);
@@ -968,7 +980,9 @@ impl TagUtils for InstrumentationFlag<'_> {
             Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_or_create_tag(),
             Some(InstrumentationMode::BlockEntry) => self.block_entry.get_or_create_tag(),
             Some(InstrumentationMode::BlockExit) => self.block_exit.get_or_create_tag(),
-            Some(InstrumentationMode::BlockAlt) => self.block_alt.get_or_insert_default().get_or_create_tag(),
+            Some(InstrumentationMode::BlockAlt) => {
+                self.block_alt.get_or_insert_default().get_or_create_tag()
+            }
         }
     }
 
@@ -979,18 +993,22 @@ impl TagUtils for InstrumentationFlag<'_> {
             }
             Some(InstrumentationMode::Before) => self.before.get_tag(),
             Some(InstrumentationMode::After) => self.after.get_tag(),
-            Some(InstrumentationMode::Alternate) => if let Some(alt) = &self.alternate {
-                alt.get_tag()
-            } else {
-                &None
+            Some(InstrumentationMode::Alternate) => {
+                if let Some(alt) = &self.alternate {
+                    alt.get_tag()
+                } else {
+                    &None
+                }
             }
             Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_tag(),
             Some(InstrumentationMode::BlockEntry) => self.block_entry.get_tag(),
             Some(InstrumentationMode::BlockExit) => self.block_exit.get_tag(),
-            Some(InstrumentationMode::BlockAlt) => if let Some(alt) = &self.block_alt {
-                alt.get_tag()
-            } else {
-                &None
+            Some(InstrumentationMode::BlockAlt) => {
+                if let Some(alt) = &self.block_alt {
+                    alt.get_tag()
+                } else {
+                    &None
+                }
             }
         }
     }
@@ -1093,7 +1111,9 @@ impl<'a> InstrumentationFlag<'a> {
 
         // Check if special instrumentation modes have been resolved!
         if !semantic_after.instrs.is_empty() {
-            error!("BUG: Semantic after instrumentation should be resolved already, please report.");
+            error!(
+                "BUG: Semantic after instrumentation should be resolved already, please report."
+            );
         }
         if !block_entry.instrs.is_empty() {
             error!("BUG: Block entry instrumentation should be resolved already, please report.");
@@ -1106,7 +1126,12 @@ impl<'a> InstrumentationFlag<'a> {
         }
     }
 
-    pub(crate) fn add_injections(&self, fid: u32, idx: u32, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
+    pub(crate) fn add_injections(
+        &self,
+        fid: u32,
+        idx: u32,
+        side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
+    ) {
         let Self {
             before,
             after,
@@ -1115,17 +1140,20 @@ impl<'a> InstrumentationFlag<'a> {
         } = self;
 
         let mut add_injection = |mode: InstrumentationMode, instrs: &InjectedInstrs<'a>| {
-            if instrs.instrs.is_empty() { return; }
+            if instrs.instrs.is_empty() {
+                return;
+            }
             let inj = Injection::FuncLocProbe {
                 target_fid: fid,
                 target_opcode_idx: idx,
                 mode,
                 body: instrs.instrs.clone(),
-                tag: instrs.tag.clone().unwrap_or_default()
+                tag: instrs.tag.clone().unwrap_or_default(),
             };
-            side_effects.entry(InjectType::Probe).and_modify(|list: &mut Vec<Injection>| {
-                list.push(inj.clone())
-            }).or_insert(vec![inj]);
+            side_effects
+                .entry(InjectType::Probe)
+                .and_modify(|list: &mut Vec<Injection>| list.push(inj.clone()))
+                .or_insert(vec![inj]);
         };
 
         add_injection(InstrumentationMode::Before, before);
@@ -1396,7 +1424,7 @@ where
         let mut locals = vec![];
         for (count, ty) in self.locals.iter() {
             for _ in 0..*count {
-                locals.push(ty.clone());
+                locals.push(*ty);
             }
         }
         locals
