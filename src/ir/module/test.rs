@@ -242,7 +242,7 @@ fn test_convert_import_fn_to_local() {
     let mut builder = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
     builder.i32_const(1);
     builder.drop();
-    builder.replace_import_in_module(&mut module, ImportsID(0), None);
+    builder.replace_import_in_module(&mut module, ImportsID(0));
 
     // add local function using the translated function
     let mut builder = FunctionBuilder::new(&[], &[DataType::I32]);

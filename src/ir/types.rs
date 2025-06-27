@@ -1100,7 +1100,7 @@ impl<'a> InstrumentationFlag<'a> {
             || !block_alt.is_none() // Some(vec![]) means block removal!
     }
 
-    pub fn check_special_is_resolved(&self) {
+    pub(crate) fn check_special_is_resolved(&self) {
         let Self {
             semantic_after,
             block_entry,
@@ -1191,8 +1191,6 @@ impl<'a> InstrumentationFlag<'a> {
                 false
             }
             Some(InstrumentationMode::SemanticAfter) => {
-                // self.semantic_after.push(val);
-                // true
                 if Self::is_block_style_op(op) || Self::is_branching_op(op) {
                     self.semantic_after.instrs.push(val);
                     true

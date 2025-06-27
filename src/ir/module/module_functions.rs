@@ -199,7 +199,7 @@ impl<'a> LocalFunction<'a> {
 
     pub fn instr_len_at(&self, instr_idx: usize) -> usize {
         if self.instr_flag.current_mode.is_some() {
-            // inject at function level
+            // get at function level
             self.instr_flag.instr_len()
         } else {
             self.body.instructions[instr_idx].instr_len()

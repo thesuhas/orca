@@ -677,14 +677,15 @@ impl<'a> Module<'a> {
                 let mut instr_func_on_entry = None;
                 let mut instr_func_on_exit = None;
                 if let FuncKind::Local(func) = self.functions.get_kind_mut(func_idx) {
-                    // First (before resolving special instrumentation), save side effects.
-                    // Doing so ensures that the encoded tag metadata stays accurate.
-                    // func.add_injections(rel_func_idx as u32, side_effects);
-
-                    // let instr_flag = &mut func.instr_flag;
                     if !func.instr_flag.has_special_instr {
                         // skip functions without special instrumentation!
                         continue;
+                    }
+                    if !func.instr_flag.entry.instrs.is_empty() {
+                        instr_func_on_entry = Some(func.instr_flag.entry.clone());
+                    }
+                    if !func.instr_flag.exit.instrs.is_empty() {
+                        instr_func_on_exit = Some(func.instr_flag.exit.clone());
                     }
 
                     // save off the function entry/exit special mode bodies
@@ -694,28 +695,14 @@ impl<'a> Module<'a> {
                     // 2. remap the IDs of the original copy of the special instrumentation
                     // 3. append THAT copy of the injections that now have corrected IDs to the
                     //    side effects list.
-                    if !func.instr_flag.entry.instrs.is_empty() {
-                        instr_func_on_entry = Some(func.instr_flag.entry.clone());
+                    func.add_corrected_special_injections(
+                        rel_func_idx as u32,
+                        func_mapping,
+                        global_mapping,
+                        memory_mapping,
+                        side_effects,
+                    );
 
-                        func.add_corrected_special_injections(
-                            rel_func_idx as u32,
-                            func_mapping,
-                            global_mapping,
-                            memory_mapping,
-                            side_effects,
-                        );
-                    }
-                    if !func.instr_flag.exit.instrs.is_empty() {
-                        instr_func_on_exit = Some(func.instr_flag.exit.clone());
-
-                        func.add_corrected_special_injections(
-                            rel_func_idx as u32,
-                            func_mapping,
-                            global_mapping,
-                            memory_mapping,
-                            side_effects,
-                        );
-                    }
                     func.instr_flag.exit.instrs.clear();
                     func.instr_flag.entry.instrs.clear();
                 }
@@ -735,6 +722,9 @@ impl<'a> Module<'a> {
                         let on_entry = if let Some(on_entry) = &mut instr_func_on_entry {
                             on_entry
                         } else {
+                            // NOTE: This retains the tag information for function exit just in case
+                            // that's necessary for the library user. This may need to be handled on
+                            // the user side.
                             instr_func_on_entry = Some(InjectedInstrs {
                                 tag: on_exit.tag.clone(),
                                 ..Default::default()
@@ -748,6 +738,10 @@ impl<'a> Module<'a> {
 
                         let func_ty = self.functions.get_type_id(func_idx);
                         let func_results = self.types.get(func_ty).unwrap().results();
+
+                        // NOTE: This retains the tag information for function exit just in case
+                        // that's necessary for the library user. This may need to be handled on
+                        // the user side.
                         let block_ty =
                             self.types
                                 .add_func_type(&[], &func_results, on_exit.tag.clone());
@@ -1595,7 +1589,6 @@ impl<'a> Module<'a> {
                     if !instrument.has_instr() {
                         encode(&op.clone(), &mut function, &mut reencode);
                     } else {
-                        // TODO -- instrumentation should be appended after fixing IDs in calls!
                         instrument.check_special_is_resolved();
 
                         // this instruction has instrumentation, handle it!
@@ -1828,7 +1821,12 @@ impl<'a> Module<'a> {
     // ==== Memory Management ====
     // ===========================
 
-    pub fn add_local_memory(&mut self, ty: MemoryType, tag: Tag) -> MemoryID {
+    /// Add a local memory to the module.
+    pub fn add_local_memory(&mut self, ty: MemoryType) -> MemoryID {
+        self.add_local_memory_with_tag(ty, Tag::default())
+    }
+
+    pub fn add_local_memory_with_tag(&mut self, ty: MemoryType, tag: Tag) -> MemoryID {
         let local_mem = LocalMemory {
             mem_id: MemoryID(0), // will be fixed
         };
@@ -1837,7 +1835,17 @@ impl<'a> Module<'a> {
         self.memories.add_local_mem(local_mem, ty, Some(tag))
     }
 
+    /// Add a local memory to the module with an appended tag.
     pub fn add_import_memory(
+        &mut self,
+        module: String,
+        name: String,
+        ty: MemoryType,
+    ) -> (MemoryID, ImportsID) {
+        self.add_import_memory_with_tag(module, name, ty, Tag::default())
+    }
+    /// Add an imported memory to the module with an appended tag.
+    pub fn add_import_memory_with_tag(
         &mut self,
         module: String,
         name: String,
@@ -1871,7 +1879,7 @@ impl<'a> Module<'a> {
     // ==== Function Management ====
     // =============================
 
-    pub(crate) fn add_local_func(
+    pub(crate) fn add_local_func_with_tag(
         &mut self,
         name: Option<String>,
         params: &[DataType],

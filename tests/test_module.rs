@@ -166,7 +166,7 @@ fn test_middle_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
     check_validity(
         file,
@@ -187,7 +187,7 @@ fn test_first_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(0), None);
+    builder.replace_import_in_module(&mut module, ImportsID(0));
 
     check_validity(
         file,
@@ -208,7 +208,7 @@ fn test_last_import_to_local() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(2), None);
+    builder.replace_import_in_module(&mut module, ImportsID(2));
 
     check_validity(
         file,
@@ -229,17 +229,17 @@ fn test_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(3);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, ImportsID(2), None);
+    third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
     check_validity(
         file,
@@ -260,12 +260,12 @@ fn test_some_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(1);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(2);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     check_validity(
         file,
@@ -286,7 +286,7 @@ fn test_middle_import_to_local_import_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
     module.delete_func(FunctionID(2));
 
@@ -309,7 +309,7 @@ fn test_middle_import_to_local_local_delete() {
     builder.i32_const(1);
     builder.drop();
 
-    builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    builder.replace_import_in_module(&mut module, ImportsID(1));
 
     module.delete_func(FunctionID(2));
     module.delete_func(FunctionID(3));
@@ -476,17 +476,17 @@ fn test_all_local_to_import_all_import_to_local() {
     let mut first_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     first_builder.i32_const(4);
     first_builder.drop();
-    first_builder.replace_import_in_module(&mut module, ImportsID(0), None);
+    first_builder.replace_import_in_module(&mut module, ImportsID(0));
 
     let mut second_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     second_builder.i32_const(5);
     second_builder.drop();
-    second_builder.replace_import_in_module(&mut module, ImportsID(1), None);
+    second_builder.replace_import_in_module(&mut module, ImportsID(1));
 
     let mut third_builder = FunctionBuilder::new(&[DataType::I32, DataType::I32], &[]);
     third_builder.i32_const(6);
     third_builder.drop();
-    third_builder.replace_import_in_module(&mut module, ImportsID(2), None);
+    third_builder.replace_import_in_module(&mut module, ImportsID(2));
 
     module.convert_local_fn_to_import(
         FunctionID(3),

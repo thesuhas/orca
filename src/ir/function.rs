@@ -4,7 +4,7 @@ use crate::ir::id::{FunctionID, ImportsID, LocalID, ModuleID, TypeID};
 use crate::ir::module::module_functions::{add_local, add_locals, LocalFunction};
 use crate::ir::module::{Module, ReIndexable};
 use crate::ir::types::{Body, FuncInstrFlag, FuncInstrMode, Tag};
-use crate::ir::types::{DataType, InjectTag, InjectedInstrs};
+use crate::ir::types::{DataType, InjectedInstrs};
 use crate::ir::types::{HasInjectTag, InstrumentationMode};
 use crate::module_builder::AddLocal;
 use crate::opcode::{Inject, InjectAt, Instrumenter, MacroOpcode, Opcode};
@@ -41,10 +41,12 @@ impl<'a> FunctionBuilder<'a> {
         self.finish_module_with_tag(module, Tag::default())
     }
 
+    /// Finish building a function (have side effect on module IR)
+    /// and append a tag to that injection, return function index
     pub fn finish_module_with_tag(mut self, module: &mut Module<'a>, tag: Tag) -> FunctionID {
         // add End as last instruction
         self.end();
-        let id = module.add_local_func(
+        let id = module.add_local_func_with_tag(
             self.name,
             &self.params,
             &self.results,
@@ -60,11 +62,21 @@ impl<'a> FunctionBuilder<'a> {
         id
     }
 
-    pub fn replace_import_in_module(
+    /// Use this built function to replace an import in the module (turns into
+    /// a local function). This action will redirect all calls to that import
+    /// to call this new function.
+    pub fn replace_import_in_module(self, module: &mut Module<'a>, import_id: ImportsID) {
+        self.replace_import_in_module_with_tag(module, import_id, Tag::default())
+    }
+
+    /// Use this built function to replace an import in the module (turns into
+    /// a local function) and append a tag to that injection. This action will
+    /// redirect all calls to that import to call this new function.
+    pub fn replace_import_in_module_with_tag(
         mut self,
         module: &mut Module<'a>,
         import_id: ImportsID,
-        tag: InjectTag,
+        tag: Tag,
     ) {
         // add End as last instruction
         self.end();
@@ -79,7 +91,7 @@ impl<'a> FunctionBuilder<'a> {
                         FunctionID(*import_id),
                         self.body.clone(),
                         self.params.len(),
-                        tag,
+                        Some(tag),
                     );
                     local_func.body.name = Some(imp.name.to_string());
                     module.convert_import_fn_to_local(import_id, local_func);
@@ -99,7 +111,13 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on component IR),
     /// return function index
-    pub fn finish_component(
+    pub fn finish_component(self, comp: &mut Component<'a>, mod_idx: ModuleID) -> FunctionID {
+        self.finish_component_with_tag(comp, mod_idx, Tag::default())
+    }
+
+    /// Finish building a function (have side effect on component IR),
+    /// and append a tag to that injection, return function index
+    pub fn finish_component_with_tag(
         mut self,
         comp: &mut Component<'a>,
         mod_idx: ModuleID,
@@ -108,7 +126,7 @@ impl<'a> FunctionBuilder<'a> {
         // add End as last instruction
         self.end();
 
-        let id = comp.modules[*mod_idx as usize].add_local_func(
+        let id = comp.modules[*mod_idx as usize].add_local_func_with_tag(
             self.name,
             &self.params,
             &self.results,
@@ -268,12 +286,13 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
         self.instr_flag.current_mode = Some(mode);
     }
 
+    /// Get the number of injected instructions for the current instrumentation mode.
     fn curr_instr_len(&self) -> usize {
         if self.instr_flag.current_mode.is_some() {
-            // inject at the function level
+            // get at the function level
             self.instr_flag.instr_len()
         } else {
-            // inject at instruction level
+            // get at instruction level
             if let Some(idx) = self.instr_idx {
                 self.body.instructions[idx].instr_len()
             } else {
@@ -321,6 +340,9 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
         self
     }
 
+    /// Append data to a tag at the specified location. If a function-level instrumentation
+    /// mode is active, this tag will instead be applied to that instrumentation flag
+    /// (meaning the location will be ignored).
     fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
         if self.instr_flag.current_mode.is_some() {
             // append at function level
