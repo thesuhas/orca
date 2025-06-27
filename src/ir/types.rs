@@ -1,7 +1,7 @@
 //! Intermediate representation of sections in a wasm module.
 
-use std::borrow::Cow;
 use log::error;
+use std::borrow::Cow;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Formatter;
