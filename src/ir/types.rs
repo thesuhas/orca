@@ -16,8 +16,8 @@ use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
 
 use crate::error::Error;
 use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
-use crate::ir::module::fix_op_id_mapping;
 use crate::ir::module::side_effects::{InjectType, Injection};
+use crate::ir::module::{add_injection, fix_op_id_mapping};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -901,7 +901,7 @@ impl<'a> FuncInstrFlag<'a> {
         side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
     ) {
         let Self { entry, exit, .. } = self;
-        let mut add_injection = |mode: FuncInstrMode, instrs: &mut InjectedInstrs<'a>| {
+        let mut add_inj = |mode: FuncInstrMode, instrs: &mut InjectedInstrs<'a>| {
             // Fix the ID mapping in each of the injected opcodes.
             for op in instrs.instrs.iter_mut() {
                 fix_op_id_mapping(op, func_mapping, global_mapping, memory_mapping);
@@ -910,20 +910,21 @@ impl<'a> FuncInstrFlag<'a> {
             if instrs.instrs.is_empty() {
                 return;
             }
-            let inj = Injection::FuncProbe {
-                target_fid: fid,
-                mode,
-                body: instrs.instrs.clone(),
-                tag: instrs.tag.clone().unwrap_or_default(),
-            };
-            side_effects
-                .entry(InjectType::Probe)
-                .and_modify(|list: &mut Vec<Injection>| list.push(inj.clone()))
-                .or_insert(vec![inj]);
+
+            add_injection(
+                side_effects,
+                InjectType::Probe,
+                Injection::FuncProbe {
+                    target_fid: fid,
+                    mode,
+                    body: instrs.instrs.clone(),
+                    tag: instrs.tag.clone().unwrap_or_default(),
+                },
+            );
         };
 
-        add_injection(FuncInstrMode::Entry, entry);
-        add_injection(FuncInstrMode::Exit, exit);
+        add_inj(FuncInstrMode::Entry, entry);
+        add_inj(FuncInstrMode::Exit, exit);
     }
 
     /// Can be called after finishing some instrumentation to reset the mode.
@@ -1139,27 +1140,27 @@ impl<'a> InstrumentationFlag<'a> {
             ..
         } = self;
 
-        let mut add_injection = |mode: InstrumentationMode, instrs: &InjectedInstrs<'a>| {
+        let mut add_inj = |mode: InstrumentationMode, instrs: &InjectedInstrs<'a>| {
             if instrs.instrs.is_empty() {
                 return;
             }
-            let inj = Injection::FuncLocProbe {
-                target_fid: fid,
-                target_opcode_idx: idx,
-                mode,
-                body: instrs.instrs.clone(),
-                tag: instrs.tag.clone().unwrap_or_default(),
-            };
-            side_effects
-                .entry(InjectType::Probe)
-                .and_modify(|list: &mut Vec<Injection>| list.push(inj.clone()))
-                .or_insert(vec![inj]);
+            add_injection(
+                side_effects,
+                InjectType::Probe,
+                Injection::FuncLocProbe {
+                    target_fid: fid,
+                    target_opcode_idx: idx,
+                    mode,
+                    body: instrs.instrs.clone(),
+                    tag: instrs.tag.clone().unwrap_or_default(),
+                },
+            );
         };
 
-        add_injection(InstrumentationMode::Before, before);
-        add_injection(InstrumentationMode::After, after);
+        add_inj(InstrumentationMode::Before, before);
+        add_inj(InstrumentationMode::After, after);
         if let Some(alt) = alternate {
-            add_injection(InstrumentationMode::Alternate, alt);
+            add_inj(InstrumentationMode::Alternate, alt);
         }
     }
 

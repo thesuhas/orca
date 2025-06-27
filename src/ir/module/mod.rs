@@ -1401,9 +1401,10 @@ impl<'a> Module<'a> {
         if !self.globals.is_empty() {
             let mut globals = wasm_encoder::GlobalSection::new();
             for global in self.globals.iter_mut() {
-                let id = global.get_id();
-                let tag = global.get_tag().clone();
                 if !global.deleted {
+                    // save these off for the side effect processing before matching on global.kind (due to rust borrow issues)
+                    let id = global.get_id();
+                    let tag = global.get_tag().clone();
                     if let GlobalKind::Local(LocalGlobal { ty, init_expr, .. }) = &mut global.kind {
                         for expr in init_expr.exprs.iter_mut() {
                             expr.fix_id_mapping(&func_mapping, &global_mapping);
@@ -1705,6 +1706,7 @@ impl<'a> Module<'a> {
         if !self.data.is_empty() {
             let mut data = wasm_encoder::DataSection::new();
             for segment in self.data.iter_mut() {
+                // save this off for the side effect processing before matching on segment.kind (due to rust borrow issues)
                 let tag = segment.get_tag().clone();
                 let segment_data = segment.data.iter().copied();
                 match &mut segment.kind {
@@ -1716,7 +1718,7 @@ impl<'a> Module<'a> {
                                     InjectType::Data,
                                     Injection::PassiveData {
                                         data: segment.data.to_vec(),
-                                        tag: tag.clone(),
+                                        tag: tag.to_owned(),
                                     },
                                 );
                             }
@@ -1746,7 +1748,7 @@ impl<'a> Module<'a> {
                                         memory_index: *memory_index,
                                         offset_expr: offset_expr.clone(),
                                         data: segment.data.to_vec(),
-                                        tag,
+                                        tag: tag.to_owned(),
                                     },
                                 );
                             }
@@ -2014,7 +2016,7 @@ impl<'a> Module<'a> {
         self.convert_local_fn_to_import_with_tag(function_id, module, name, ty_id, Tag::default())
     }
 
-    /// Convert a local function to an imported function.
+    /// Convert a local function to an imported function and append a tag to this operation.
     /// Continue using the FunctionID as normal (like in `call` instructions), this library will take care of ID changes for you during encoding.
     /// Returns false if it is an imported function.
     pub fn convert_local_fn_to_import_with_tag(
@@ -2718,7 +2720,7 @@ fn resolve_bodies<'a, 'b, 'c>(
     }
 }
 
-fn add_injection<'a>(
+pub(crate) fn add_injection<'a>(
     side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>,
     ty: InjectType,
     inj: Injection<'a>,
