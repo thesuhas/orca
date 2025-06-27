@@ -63,6 +63,7 @@ pub struct Component<'a> {
     pub(crate) core_func_names: wasm_encoder::NameMap,
     pub(crate) global_names: wasm_encoder::NameMap,
     pub(crate) memory_names: wasm_encoder::NameMap,
+    pub(crate) tag_names: wasm_encoder::NameMap,
     pub(crate) table_names: wasm_encoder::NameMap,
     pub(crate) module_names: wasm_encoder::NameMap,
     pub(crate) core_instances_names: wasm_encoder::NameMap,
@@ -103,6 +104,7 @@ impl<'a> Component<'a> {
             core_func_names: wasm_encoder::NameMap::new(),
             global_names: wasm_encoder::NameMap::new(),
             memory_names: wasm_encoder::NameMap::new(),
+            tag_names: wasm_encoder::NameMap::new(),
             table_names: wasm_encoder::NameMap::new(),
             module_names: wasm_encoder::NameMap::new(),
             core_instances_names: wasm_encoder::NameMap::new(),
@@ -192,6 +194,7 @@ impl<'a> Component<'a> {
         let mut component_name: Option<String> = None;
         let mut core_func_names = wasm_encoder::NameMap::new();
         let mut global_names = wasm_encoder::NameMap::new();
+        let mut tag_names = wasm_encoder::NameMap::new();
         let mut memory_names = wasm_encoder::NameMap::new();
         let mut table_names = wasm_encoder::NameMap::new();
         let mut module_names = wasm_encoder::NameMap::new();
@@ -409,6 +412,9 @@ impl<'a> Component<'a> {
                                     wasmparser::ComponentName::CoreMemories(names) => {
                                         add_to_namemap(&mut memory_names, names);
                                     }
+                                    wasmparser::ComponentName::CoreTags(names) => {
+                                        add_to_namemap(&mut tag_names, names);
+                                    }
                                     wasmparser::ComponentName::Unknown { .. } => {}
                                 }
                             }
@@ -453,6 +459,7 @@ impl<'a> Component<'a> {
             core_func_names,
             global_names,
             memory_names,
+            tag_names,
             table_names,
             module_names,
             core_instances_names: core_instance_names,
@@ -610,6 +617,9 @@ impl<'a> Component<'a> {
                                         }
                                         None => enc.stream(None),
                                     },
+                                    wasmparser::ComponentDefinedType::FixedSizeList(_, _) => {
+                                        todo!()
+                                    }
                                 }
                             }
                             ComponentType::Func(func_ty) => {
@@ -657,14 +667,18 @@ impl<'a> Component<'a> {
                                             new_comp.alias(process_alias(a, &mut reencode));
                                         }
                                         ComponentTypeDeclaration::Export { name, ty } => {
-                                            new_comp
-                                                .export(name.0, reencode.component_type_ref(*ty));
+                                            let ty = match reencode.component_type_ref(*ty) {
+                                                Ok(t) => t,
+                                                Err(e) => panic!("Couldn't encode component type due to error: {}", e)
+                                            };
+                                            new_comp.export(name.0, ty);
                                         }
                                         ComponentTypeDeclaration::Import(imp) => {
-                                            new_comp.import(
-                                                imp.name.0,
-                                                reencode.component_type_ref(imp.ty),
-                                            );
+                                            let ty = match reencode.component_type_ref(imp.ty) {
+                                                Ok(t) => t,
+                                                Err(e) => panic!("Couldn't encode component type due to error: {}", e)
+                                            };
+                                            new_comp.import(imp.name.0, ty);
                                         }
                                     }
                                 }
@@ -688,7 +702,11 @@ impl<'a> Component<'a> {
                     let mut imports = wasm_encoder::ComponentImportSection::new();
                     for imp_idx in last_processed_imp..last_processed_imp + num {
                         let imp = &self.imports[imp_idx as usize];
-                        imports.import(imp.name.0, reencode.component_type_ref(imp.ty));
+                        let ty = match reencode.component_type_ref(imp.ty) {
+                            Ok(t) => t,
+                            Err(e) => panic!("Couldn't encode component type due to error: {}", e),
+                        };
+                        imports.import(imp.name.0, ty);
                         last_processed_imp += 1;
                     }
                     component.section(&imports);
@@ -702,7 +720,12 @@ impl<'a> Component<'a> {
                             exp.name.0,
                             reencode.component_export_kind(exp.kind),
                             exp.index,
-                            exp.ty.map(|ty| reencode.component_type_ref(ty)),
+                            exp.ty.map(|ty| match reencode.component_type_ref(ty) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    panic!("Couldn't encode component type due to error: {}", e)
+                                }
+                            }),
                         );
                         last_processed_exp += 1;
                     }
@@ -799,9 +822,15 @@ impl<'a> Component<'a> {
                                 canon_sec.lift(
                                     *core_func_index,
                                     *type_index,
-                                    options
-                                        .iter()
-                                        .map(|canon| reencode.canonical_option(*canon)),
+                                    options.iter().map(|canon| {
+                                        match reencode.canonical_option(*canon) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode canonical option due to error: {}",
+                                                e
+                                            ),
+                                        }
+                                    }),
                                 );
                             }
                             CanonicalFunction::Lower {
@@ -810,9 +839,15 @@ impl<'a> Component<'a> {
                             } => {
                                 canon_sec.lower(
                                     *func_index,
-                                    options
-                                        .iter()
-                                        .map(|canon| reencode.canonical_option(*canon)),
+                                    options.iter().map(|canon| {
+                                        match reencode.canonical_option(*canon) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode canonical option due to error: {}",
+                                                e
+                                            ),
+                                        }
+                                    }),
                                 );
                             }
                             CanonicalFunction::ResourceNew { resource } => {
@@ -823,9 +858,6 @@ impl<'a> Component<'a> {
                             }
                             CanonicalFunction::ResourceRep { resource } => {
                                 canon_sec.resource_rep(*resource);
-                            }
-                            CanonicalFunction::ThreadSpawn { func_ty_index } => {
-                                canon_sec.thread_spawn(*func_ty_index);
                             }
                             CanonicalFunction::ResourceDropAsync { resource } => {
                                 canon_sec.resource_drop_async(*resource);
@@ -874,7 +906,13 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -883,7 +921,13 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -893,12 +937,6 @@ impl<'a> Component<'a> {
                             CanonicalFunction::StreamCancelWrite { ty, async_ } => {
                                 canon_sec.stream_cancel_write(*ty, *async_);
                             }
-                            CanonicalFunction::StreamCloseReadable { ty } => {
-                                canon_sec.stream_close_readable(*ty);
-                            }
-                            CanonicalFunction::StreamCloseWritable { ty } => {
-                                canon_sec.stream_close_writable(*ty);
-                            }
                             CanonicalFunction::FutureNew { ty } => {
                                 canon_sec.future_new(*ty);
                             }
@@ -907,7 +945,13 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -916,7 +960,13 @@ impl<'a> Component<'a> {
                                     *ty,
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -926,17 +976,17 @@ impl<'a> Component<'a> {
                             CanonicalFunction::FutureCancelWrite { ty, async_ } => {
                                 canon_sec.future_cancel_write(*ty, *async_);
                             }
-                            CanonicalFunction::FutureCloseReadable { ty } => {
-                                canon_sec.future_close_readable(*ty);
-                            }
-                            CanonicalFunction::FutureCloseWritable { ty } => {
-                                canon_sec.future_close_writable(*ty);
-                            }
                             CanonicalFunction::ErrorContextNew { options } => {
                                 canon_sec.error_context_new(
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
@@ -944,12 +994,51 @@ impl<'a> Component<'a> {
                                 canon_sec.error_context_debug_message(
                                     options
                                         .into_iter()
-                                        .map(|t| reencode.canonical_option(*t))
+                                        .map(|t| match reencode.canonical_option(*t) {
+                                            Ok(opt) => opt,
+                                            Err(e) => panic!(
+                                                "Couldn't encode component type due to error: {}",
+                                                e
+                                            ),
+                                        })
                                         .collect::<Vec<wasm_encoder::CanonicalOption>>(),
                                 );
                             }
                             CanonicalFunction::ErrorContextDrop => {
                                 canon_sec.error_context_drop();
+                            }
+                            CanonicalFunction::ThreadSpawnRef { func_ty_index } => {
+                                canon_sec.thread_spawn_ref(*func_ty_index);
+                            }
+                            CanonicalFunction::ThreadSpawnIndirect {
+                                func_ty_index,
+                                table_index,
+                            } => {
+                                canon_sec.thread_spawn_indirect(*func_ty_index, *table_index);
+                            }
+                            CanonicalFunction::TaskCancel => {
+                                canon_sec.task_cancel();
+                            }
+                            CanonicalFunction::ContextGet(i) => {
+                                canon_sec.context_get(*i);
+                            }
+                            CanonicalFunction::ContextSet(i) => {
+                                canon_sec.context_set(*i);
+                            }
+                            CanonicalFunction::SubtaskCancel { async_ } => {
+                                canon_sec.subtask_cancel(*async_);
+                            }
+                            CanonicalFunction::StreamDropReadable { ty } => {
+                                canon_sec.stream_drop_readable(*ty);
+                            }
+                            CanonicalFunction::StreamDropWritable { ty } => {
+                                canon_sec.stream_drop_writable(*ty);
+                            }
+                            CanonicalFunction::FutureDropReadable { ty } => {
+                                canon_sec.future_drop_readable(*ty);
+                            }
+                            CanonicalFunction::FutureDropWritable { ty } => {
+                                canon_sec.future_drop_writable(*ty);
                             }
                         }
                         last_processed_canon += 1;
@@ -998,6 +1087,7 @@ impl<'a> Component<'a> {
         name_sec.core_funcs(&self.core_func_names);
         name_sec.core_tables(&self.table_names);
         name_sec.core_memories(&self.memory_names);
+        name_sec.core_tags(&self.tag_names);
         name_sec.core_globals(&self.global_names);
         name_sec.core_types(&self.core_type_names);
         name_sec.core_modules(&self.module_names);

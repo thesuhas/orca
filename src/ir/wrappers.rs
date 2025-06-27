@@ -94,7 +94,10 @@ pub fn convert_instance_type(
                 } => {
                     ity.alias(Alias::CoreInstanceExport {
                         instance: *instance_index,
-                        kind: reencode.export_kind(*kind),
+                        kind: match reencode.export_kind(*kind) {
+                            Ok(t) => t,
+                            Err(e) => panic!("Couldn't encode component type due to error: {}", e),
+                        },
                         name,
                     });
                 }
@@ -107,7 +110,13 @@ pub fn convert_instance_type(
                 }
             },
             InstanceTypeDeclaration::Export { name, ty } => {
-                ity.export(name.0, reencode.component_type_ref(*ty));
+                ity.export(
+                    name.0,
+                    match reencode.component_type_ref(*ty) {
+                        Ok(t) => t,
+                        Err(e) => panic!("Couldn't encode component type due to error: {}", e),
+                    },
+                );
             }
         }
     }
@@ -186,7 +195,10 @@ pub fn process_alias<'a>(
             name,
         } => Alias::CoreInstanceExport {
             instance: *instance_index,
-            kind: reencode.export_kind(*kind),
+            kind: match reencode.export_kind(*kind) {
+                Ok(t) => t,
+                Err(e) => panic!("Couldn't encode component type due to error: {}", e),
+            },
             name,
         },
         ComponentAlias::Outer { kind, count, index } => Alias::Outer {
@@ -256,6 +268,9 @@ pub fn convert_component_type(
                     Some(u) => def_enc.stream(Some(reencode.component_val_type(*u))),
                     None => def_enc.future(None),
                 },
+                wasmparser::ComponentDefinedType::FixedSizeList(ty, len) => {
+                    def_enc.fixed_size_list(reencode.component_val_type(*ty), *len)
+                }
             }
         }
         ComponentType::Func(func_ty) => {
@@ -294,10 +309,26 @@ pub fn convert_component_type(
                         new_comp.alias(process_alias(a, reencode));
                     }
                     ComponentTypeDeclaration::Export { name, ty } => {
-                        new_comp.export(name.0, reencode.component_type_ref(*ty));
+                        new_comp.export(
+                            name.0,
+                            match reencode.component_type_ref(*ty) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    panic!("Couldn't encode component type due to error: {}", e)
+                                }
+                            },
+                        );
                     }
                     ComponentTypeDeclaration::Import(imp) => {
-                        new_comp.import(imp.name.0, reencode.component_type_ref(imp.ty));
+                        new_comp.import(
+                            imp.name.0,
+                            match reencode.component_type_ref(imp.ty) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    panic!("Couldn't encode component type due to error: {}", e)
+                                }
+                            },
+                        );
                     }
                 }
             }
