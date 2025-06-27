@@ -7,7 +7,7 @@ use std::fmt::Formatter;
 use std::fmt::{self};
 use std::mem::discriminant;
 use std::slice::Iter;
-
+use log::error;
 use wasm_encoder::reencode::Reencode;
 use wasm_encoder::{AbstractHeapType, Encode};
 
@@ -16,6 +16,8 @@ use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
 
 use crate::error::Error;
 use crate::ir::id::{CustomSectionID, FunctionID, GlobalID, ModuleID, TypeID};
+use crate::ir::module::fix_op_id_mapping;
+use crate::ir::module::side_effects::{Injection, InjectType};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -33,15 +35,18 @@ impl Tag {
         Self { data }
     }
     pub fn data_mut(&mut self) -> &mut Vec<u8> { &mut self.data }
+    pub fn data(&self) -> &Vec<u8> { &self.data }
+    pub fn is_empty(&self) -> bool { self.data.is_empty() }
 }
 pub(crate) trait TagUtils {
-    fn get_tag(&mut self) -> &mut Tag;
+    fn get_or_create_tag(&mut self) -> &mut Tag;
+    fn get_tag(&self) -> &Option<Tag>;
 }
 // Override the default private_bounds warning since I don't want the TagUtils trait to be public
 #[allow(private_bounds)]
 pub trait HasInjectTag: TagUtils {
     fn append_to_tag(&mut self, mut data: Vec<u8>) {
-        self.get_tag().data.append(&mut data);
+        self.get_or_create_tag().data.append(&mut data);
     }
 }
 
@@ -649,8 +654,12 @@ impl DataSegment {
     }
 }
 impl TagUtils for DataSegment {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 
@@ -764,8 +773,17 @@ pub struct FuncInstrFlag<'a> {
 }
 
 impl TagUtils for FuncInstrFlag<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
-        self.has_special_instr = true;
+    fn get_or_create_tag(&mut self) -> &mut Tag {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot append to the tag!")
+            }
+            Some(FuncInstrMode::Entry) => self.entry.get_or_create_tag(),
+            Some(FuncInstrMode::Exit) => self.exit.get_or_create_tag(),
+        }
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
         match self.current_mode {
             None => {
                 panic!("Current mode is not set...cannot append to the tag!")
@@ -868,6 +886,34 @@ impl<'a> FuncInstrFlag<'a> {
         }
     }
 
+    pub fn add_injections(&mut self, fid: u32, func_mapping: &HashMap<u32, u32>, global_mapping: &HashMap<u32, u32>, memory_mapping: &HashMap<u32, u32>, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
+        let Self {
+            entry,
+            exit,
+            ..
+        } = self;
+        let mut add_injection = |mode: FuncInstrMode, instrs: &mut InjectedInstrs<'a>| {
+            // Fix the ID mapping in each of the injected opcodes.
+            for op in instrs.instrs.iter_mut() {
+                fix_op_id_mapping(op, func_mapping, global_mapping, memory_mapping);
+            }
+
+            if instrs.instrs.is_empty() { return; }
+            let inj = Injection::FuncProbe {
+                target_fid: fid,
+                mode,
+                body: instrs.instrs.clone(),
+                tag: instrs.tag.clone().unwrap_or_default()
+            };
+            side_effects.entry(InjectType::Probe).and_modify(|list: &mut Vec<Injection>| {
+                list.push(inj.clone())
+            }).or_insert(vec![inj]);
+        };
+
+        add_injection(FuncInstrMode::Entry, entry);
+        add_injection(FuncInstrMode::Exit, exit);
+    }
+
     /// Can be called after finishing some instrumentation to reset the mode.
     pub fn finish_instr(&mut self) {
         self.current_mode = None
@@ -909,20 +955,43 @@ pub struct InstrumentationFlag<'a> {
     pub block_alt: Option<InjectedInstrs<'a>>,
 }
 impl TagUtils for InstrumentationFlag<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
+        match self.current_mode {
+            None => {
+                panic!("Current mode is not set...cannot get the tag!")
+            }
+            Some(InstrumentationMode::Before) => self.before.get_or_create_tag(),
+            Some(InstrumentationMode::After) => self.after.get_or_create_tag(),
+            Some(InstrumentationMode::Alternate) => {
+                self.alternate.get_or_insert_default().get_or_create_tag()
+            }
+            Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_or_create_tag(),
+            Some(InstrumentationMode::BlockEntry) => self.block_entry.get_or_create_tag(),
+            Some(InstrumentationMode::BlockExit) => self.block_exit.get_or_create_tag(),
+            Some(InstrumentationMode::BlockAlt) => self.block_alt.get_or_insert_default().get_or_create_tag(),
+        }
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
         match self.current_mode {
             None => {
                 panic!("Current mode is not set...cannot get the tag!")
             }
             Some(InstrumentationMode::Before) => self.before.get_tag(),
             Some(InstrumentationMode::After) => self.after.get_tag(),
-            Some(InstrumentationMode::Alternate) => {
-                self.alternate.get_or_insert_default().get_tag()
+            Some(InstrumentationMode::Alternate) => if let Some(alt) = &self.alternate {
+                alt.get_tag()
+            } else {
+                &None
             }
             Some(InstrumentationMode::SemanticAfter) => self.semantic_after.get_tag(),
             Some(InstrumentationMode::BlockEntry) => self.block_entry.get_tag(),
             Some(InstrumentationMode::BlockExit) => self.block_exit.get_tag(),
-            Some(InstrumentationMode::BlockAlt) => self.block_alt.get_or_insert_default().get_tag(),
+            Some(InstrumentationMode::BlockAlt) => if let Some(alt) = &self.block_alt {
+                alt.get_tag()
+            } else {
+                &None
+            }
         }
     }
 }
@@ -1011,6 +1080,59 @@ impl<'a> InstrumentationFlag<'a> {
             || !block_entry.instrs.is_empty()
             || !block_exit.instrs.is_empty()
             || !block_alt.is_none() // Some(vec![]) means block removal!
+    }
+
+    pub fn check_special_is_resolved(&self) {
+        let Self {
+            semantic_after,
+            block_entry,
+            block_exit,
+            block_alt,
+            ..
+        } = self;
+
+        // Check if special instrumentation modes have been resolved!
+        if !semantic_after.instrs.is_empty() {
+            error!("BUG: Semantic after instrumentation should be resolved already, please report.");
+        }
+        if !block_entry.instrs.is_empty() {
+            error!("BUG: Block entry instrumentation should be resolved already, please report.");
+        }
+        if !block_exit.instrs.is_empty() {
+            error!("BUG: Block exit instrumentation should be resolved already, please report.");
+        }
+        if !block_alt.is_none() {
+            error!("BUG: Block alt instrumentation should be resolved already, please report.");
+        }
+    }
+
+    pub(crate) fn add_injections(&self, fid: u32, idx: u32, side_effects: &mut HashMap<InjectType, Vec<Injection<'a>>>) {
+        let Self {
+            before,
+            after,
+            alternate,
+            ..
+        } = self;
+
+        let mut add_injection = |mode: InstrumentationMode, instrs: &InjectedInstrs<'a>| {
+            if instrs.instrs.is_empty() { return; }
+            let inj = Injection::FuncLocProbe {
+                target_fid: fid,
+                target_opcode_idx: idx,
+                mode,
+                body: instrs.instrs.clone(),
+                tag: instrs.tag.clone().unwrap_or_default()
+            };
+            side_effects.entry(InjectType::Probe).and_modify(|list: &mut Vec<Injection>| {
+                list.push(inj.clone())
+            }).or_insert(vec![inj]);
+        };
+
+        add_injection(InstrumentationMode::Before, before);
+        add_injection(InstrumentationMode::After, after);
+        if let Some(alt) = alternate {
+            add_injection(InstrumentationMode::Alternate, alt);
+        }
     }
 
     /// Add an instruction to the current InstrumentationMode's list
@@ -1199,8 +1321,12 @@ pub struct InjectedInstrs<'a> {
     pub(crate) tag: InjectTag,
 }
 impl TagUtils for InjectedInstrs<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 impl HasInjectTag for InjectedInstrs<'_> {}
@@ -1264,6 +1390,16 @@ where
     /// Push an end operator (instruction) to the end of the body
     pub fn end(&mut self) {
         self.push_op(Operator::End);
+    }
+
+    pub fn locals_as_vec(&self) -> Vec<DataType> {
+        let mut locals = vec![];
+        for (count, ty) in self.locals.iter() {
+            for _ in 0..*count {
+                locals.push(ty.clone());
+            }
+        }
+        locals
     }
 }
 

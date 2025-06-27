@@ -37,7 +37,11 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Finish building a function (have side effect on module IR),
     /// return function index
-    pub fn finish_module(mut self, module: &mut Module<'a>, tag: Tag) -> FunctionID {
+    pub fn finish_module(self, module: &mut Module<'a>) -> FunctionID {
+        self.finish_module_with_tag(module, Tag::default())
+    }
+
+    pub fn finish_module_with_tag(mut self, module: &mut Module<'a>, tag: Tag) -> FunctionID {
         // add End as last instruction
         self.end();
         let id = module.add_local_func(
@@ -318,13 +322,12 @@ impl<'b> Instrumenter<'b> for FunctionModifier<'_, 'b> {
     }
 
     fn append_tag_at(&mut self, data: Vec<u8>, loc: Location) -> &mut Self {
-        let (Location::Component { instr_idx, .. } | Location::Module { instr_idx, .. }) = loc;
-
         if self.instr_flag.current_mode.is_some() {
             // append at function level
             self.instr_flag.append_to_tag(data);
         } else {
             // append at instruction level
+            let (Location::Component { instr_idx, .. } | Location::Module { instr_idx, .. }) = loc;
             self.body.instructions[instr_idx]
                 .instr_flag
                 .append_to_tag(data);

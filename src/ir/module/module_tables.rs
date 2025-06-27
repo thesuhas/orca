@@ -80,8 +80,12 @@ pub struct Table<'a> {
     tag: InjectTag,
 }
 impl TagUtils for Table<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 impl<'a> Table<'a> {
@@ -101,8 +105,12 @@ pub struct Element<'a> {
     tag: InjectTag,
 }
 impl TagUtils for Element<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 impl<'a> Element<'a> {

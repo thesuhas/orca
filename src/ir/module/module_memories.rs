@@ -186,8 +186,12 @@ impl LocalOrImport for Memory {
     }
 }
 impl TagUtils for Memory {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 impl Memory {

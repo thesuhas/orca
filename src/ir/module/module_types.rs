@@ -4,13 +4,13 @@ use crate::ir::id::TypeID;
 use crate::ir::types::{InjectTag, Tag, TagUtils};
 use crate::DataType;
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use wasmparser::{PackedIndex, UnpackedIndex};
 
 /// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
 ///
 /// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq)]
 pub enum Types {
     FuncType {
         params: Box<[DataType]>,
@@ -44,13 +44,77 @@ pub enum Types {
         tag: InjectTag,
     },
 }
+impl Hash for Types {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // custom implementation to skip hashing the tag!
+        state.write_u8(self.hash_id());
+        match self {
+            Types::FuncType { params, results, super_type, is_final, shared, .. } => {
+                params.hash(state);
+                results.hash(state);
+                super_type.hash(state);
+                is_final.hash(state);
+                shared.hash(state);
+            }
+            Types::ArrayType { fields, mutable, super_type, is_final, shared, .. } => {
+                fields.hash(state);
+                mutable.hash(state);
+                super_type.hash(state);
+                is_final.hash(state);
+                shared.hash(state);
+            }
+            Types::StructType { fields, mutable, super_type, is_final, shared, .. } => {
+                fields.hash(state);
+                mutable.hash(state);
+                super_type.hash(state);
+                is_final.hash(state);
+                shared.hash(state);
+            }
+            Types::ContType { packed_index, super_type, is_final, shared, .. } => {
+                packed_index.hash(state);
+                super_type.hash(state);
+                is_final.hash(state);
+                shared.hash(state);
+            }
+        }
+    }
+}
+impl PartialEq for Types {
+    fn eq(&self, other: &Self) -> bool {
+        // custom implementation to skip checking the tag!
+        match (self, other) {
+            (Self::FuncType {params, results, super_type, is_final, shared, ..}, Self::FuncType {params: params1, results: results1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
+                params.eq(params1) && results.eq(results1) && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            }
+            (Self::ArrayType {fields, mutable, super_type, is_final, shared, ..}, Self::ArrayType {fields: fields1, mutable: mutable1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
+                fields.eq(fields1) && *mutable == *mutable1 && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            }
+            (Self::StructType {fields, mutable, super_type, is_final, shared, ..}, Self::StructType {fields: fields1, mutable: mutable1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
+                fields.eq(fields1) && *mutable == *mutable1 && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            }
+            (Self::ContType {packed_index, super_type, is_final, shared, ..}, Self::ContType {packed_index: packed_index1, super_type: super_type1, is_final: is_final1, shared: shared1, ..}) => {
+                packed_index.eq(packed_index1) && super_type.eq(super_type1) && *is_final == *is_final1 && *shared == *shared1
+            }
+            (_, _) => false
+        }
+    }
+}
 impl TagUtils for Types {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         match self {
             Types::FuncType { tag, .. }
             | Types::ArrayType { tag, .. }
             | Types::StructType { tag, .. }
             | Types::ContType { tag, .. } => tag.get_or_insert_default(),
+        }
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        match self {
+            Types::FuncType { tag, .. }
+            | Types::ArrayType { tag, .. }
+            | Types::StructType { tag, .. }
+            | Types::ContType { tag, .. } => tag,
         }
     }
 }
@@ -68,6 +132,15 @@ impl Types {
         match &self {
             Types::FuncType { results, .. } => results.to_vec(),
             _ => panic!("Not a function!"),
+        }
+    }
+
+    fn hash_id(&self) -> u8 {
+        match self {
+            Types::FuncType { .. } => 0,
+            Types::ArrayType { .. } => 1,
+            Types::StructType { .. } => 2,
+            Types::ContType { .. } => 3
         }
     }
 }
@@ -101,7 +174,7 @@ impl ModuleTypes {
         self.types.is_empty()
     }
 
-    /// Add a new function type to the module, returns the index of the new type. By default encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
+    /// Add a new function type to the module, returns the index of the new type. By default, encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
     pub fn add_func_type(
         &mut self,
         param: &[DataType],

@@ -18,8 +18,12 @@ pub struct Export {
     pub tag: InjectTag,
 }
 impl TagUtils for Export {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 

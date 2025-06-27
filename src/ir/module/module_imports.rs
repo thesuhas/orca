@@ -20,8 +20,12 @@ pub struct Import<'a> {
     pub tag: InjectTag,
 }
 impl TagUtils for Import<'_> {
-    fn get_tag(&mut self) -> &mut Tag {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
         self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
     }
 }
 impl<'a> From<wasmparser::Import<'a>> for Import<'a> {
