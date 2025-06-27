@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use wasm_encoder::reencode::{Reencode, ReencodeComponent};
+use wasm_encoder::reencode::{Reencode, ReencodeComponent, RoundtripReencoder};
 use wasm_encoder::{
     Alias, ComponentCoreTypeEncoder, ComponentFuncTypeEncoder, ComponentTypeEncoder,
     CoreTypeEncoder, InstanceType,
@@ -17,7 +17,7 @@ use wasmparser::{
 pub fn convert_module_type_declaration(
     module: &[wasmparser::ModuleTypeDeclaration],
     enc: ComponentCoreTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     let mut mty = wasm_encoder::ModuleType::new();
     for m in module.iter() {
@@ -54,7 +54,7 @@ pub fn convert_module_type_declaration(
 /// Convert Instance Types
 pub fn convert_instance_type(
     instance: &[InstanceTypeDeclaration],
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) -> InstanceType {
     let mut ity = InstanceType::new();
     for value in instance.iter() {
@@ -94,10 +94,7 @@ pub fn convert_instance_type(
                 } => {
                     ity.alias(Alias::CoreInstanceExport {
                         instance: *instance_index,
-                        kind: match reencode.export_kind(*kind) {
-                            Ok(t) => t,
-                            Err(e) => panic!("Couldn't encode component type due to error: {}", e),
-                        },
+                        kind: do_reencode(*kind, RoundtripReencoder::export_kind, reencode, "export kind"),
                         name,
                     });
                 }
@@ -112,10 +109,7 @@ pub fn convert_instance_type(
             InstanceTypeDeclaration::Export { name, ty } => {
                 ity.export(
                     name.0,
-                    match reencode.component_type_ref(*ty) {
-                        Ok(t) => t,
-                        Err(e) => panic!("Couldn't encode component type due to error: {}", e),
-                    },
+                    do_reencode(*ty, RoundtripReencoder::component_type_ref, reencode, "component type")
                 );
             }
         }
@@ -195,10 +189,7 @@ pub fn process_alias<'a>(
             name,
         } => Alias::CoreInstanceExport {
             instance: *instance_index,
-            kind: match reencode.export_kind(*kind) {
-                Ok(t) => t,
-                Err(e) => panic!("Couldn't encode component type due to error: {}", e),
-            },
+            kind: do_reencode(*kind, RoundtripReencoder::export_kind, reencode, "export kind"),
             name,
         },
         ComponentAlias::Outer { kind, count, index } => Alias::Outer {
@@ -311,23 +302,13 @@ pub fn convert_component_type(
                     ComponentTypeDeclaration::Export { name, ty } => {
                         new_comp.export(
                             name.0,
-                            match reencode.component_type_ref(*ty) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    panic!("Couldn't encode component type due to error: {}", e)
-                                }
-                            },
+                            do_reencode(*ty, RoundtripReencoder::component_type_ref, reencode, "component type")
                         );
                     }
                     ComponentTypeDeclaration::Import(imp) => {
                         new_comp.import(
                             imp.name.0,
-                            match reencode.component_type_ref(imp.ty) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    panic!("Couldn't encode component type due to error: {}", e)
-                                }
-                            },
+                            do_reencode(imp.ty, RoundtripReencoder::component_type_ref, reencode, "component type")
                         );
                     }
                 }
@@ -612,5 +593,16 @@ pub(crate) fn update_memory_instr(op: &mut Operator, mapping: &HashMap<u32, u32>
             }
         }
         _ => panic!("Operation doesn't need to be checked for memory IDs!"),
+    }
+}
+
+pub(crate) fn do_reencode<I,O>(i: I, reencode: fn (&mut RoundtripReencoder, I) -> Result<O, wasm_encoder::reencode::Error>, inst: &mut RoundtripReencoder, msg: &str) -> O {
+    match reencode(inst, i) {
+        Ok(o) => o,
+        Err(e) => panic!(
+            "Couldn't encode {} due to error: {}",
+            msg,
+            e
+        ),
     }
 }
