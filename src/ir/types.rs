@@ -9,7 +9,7 @@ use std::fmt::{self};
 use std::mem::discriminant;
 use std::slice::Iter;
 use wasm_encoder::reencode::Reencode;
-use wasm_encoder::{AbstractHeapType, Encode};
+use wasm_encoder::{AbstractHeapType, Encode, Ieee32, Ieee64};
 
 use wasmparser::types::TypeIdentifier;
 use wasmparser::{ConstExpr, HeapType, Operator, RefType, ValType};
@@ -1588,7 +1588,9 @@ impl InitExpr {
             };
             instrs.push(val);
         }
-        reader.ensure_end().unwrap();
+        if !reader.eof() {
+            panic!("There was more data after the function end!");
+        }
         InitExpr { exprs: instrs }
     }
 
@@ -1599,8 +1601,12 @@ impl InitExpr {
                 InitInstr::Value(v) => match v {
                     Value::I32(v) => wasm_encoder::Instruction::I32Const(*v).encode(&mut bytes),
                     Value::I64(v) => wasm_encoder::Instruction::I64Const(*v).encode(&mut bytes),
-                    Value::F32(v) => wasm_encoder::Instruction::F32Const(*v).encode(&mut bytes),
-                    Value::F64(v) => wasm_encoder::Instruction::F64Const(*v).encode(&mut bytes),
+                    Value::F32(v) => {
+                        wasm_encoder::Instruction::F32Const(Ieee32::from(*v)).encode(&mut bytes)
+                    }
+                    Value::F64(v) => {
+                        wasm_encoder::Instruction::F64Const(Ieee64::from(*v)).encode(&mut bytes)
+                    }
                     Value::V128(v) => {
                         wasm_encoder::Instruction::V128Const(*v as i128).encode(&mut bytes)
                     }
