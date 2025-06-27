@@ -515,7 +515,7 @@ impl<'a> Component<'a> {
                     assert!(*num as usize + last_processed_module as usize <= self.modules.len());
                     for mod_idx in last_processed_module..last_processed_module + num {
                         component.section(&ModuleSection(
-                            &self.modules[mod_idx as usize].encode_internal(),
+                            &self.modules[mod_idx as usize].encode_internal(false).0,
                         ));
                         last_processed_module += 1;
                     }

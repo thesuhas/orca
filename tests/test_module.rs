@@ -27,21 +27,23 @@ fn test_fn_types() {
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(1)),
-        Local(LocalFunction::new(
+        Local(Box::new(LocalFunction::new(
             TypeID(5),
             FunctionID(0),
             Body::default(),
-            0
-        ))
+            0,
+            None
+        )))
     );
     assert_eq!(
         *module.functions.get_kind(FunctionID(2)),
-        Local(LocalFunction::new(
+        Local(Box::new(LocalFunction::new(
             TypeID(0),
             FunctionID(0),
             Body::default(),
-            0
-        ))
+            0,
+            None
+        )))
     );
 }
 

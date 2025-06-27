@@ -1,17 +1,18 @@
 //! Intermediate representation of the Tables in a Module
 
 use crate::ir::id::TableID;
+use crate::ir::types::{ElementItems, ElementKind, InjectTag, Tag, TagUtils};
 use wasmparser::{RefType, TableType};
 
 /// Tables Section of a module
 #[derive(Clone, Debug, Default)]
 pub struct ModuleTables<'a> {
-    tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>,
+    tables: Vec<Table<'a>>,
 }
 
 impl<'a> ModuleTables<'a> {
     /// Create a new table section
-    pub fn new(tables: Vec<(TableType, Option<wasmparser::ConstExpr<'a>>)>) -> Self {
+    pub fn new(tables: Vec<Table<'a>>) -> Self {
         ModuleTables { tables }
     }
 
@@ -21,7 +22,7 @@ impl<'a> ModuleTables<'a> {
     }
 
     /// Create an iterable over the table section
-    pub fn iter(&self) -> std::slice::Iter<'_, (TableType, Option<wasmparser::ConstExpr<'a>>)> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Table> {
         self.tables.iter()
     }
 
@@ -44,7 +45,7 @@ impl<'a> ModuleTables<'a> {
             .tables
             .iter()
             .enumerate()
-            .filter(|(_, (t, _))| t.element_type == RefType::FUNCREF);
+            .filter(|(_, t)| t.ty.element_type == RefType::FUNCREF);
         let id = match tables.next() {
             Some((index, _)) => Some(TableID(index as u32)),
             None => return None,
@@ -58,7 +59,7 @@ impl<'a> ModuleTables<'a> {
     /// Get a table
     pub fn get(&self, table_id: TableID) -> Option<TableType> {
         if *table_id < self.tables.len() as u32 {
-            return Some(self.tables[*table_id as usize].0);
+            return Some(self.tables[*table_id as usize].ty);
         }
         None
     }
@@ -66,8 +67,54 @@ impl<'a> ModuleTables<'a> {
     /// Get a mutable reference to a table
     pub fn get_mut(&mut self, table_id: TableID) -> &mut TableType {
         if *table_id < self.tables.len() as u32 {
-            return &mut self.tables[*table_id as usize].0;
+            return &mut self.tables[*table_id as usize].ty;
         }
         panic!("Invalid Table ID")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Table<'a> {
+    pub ty: TableType,
+    pub init_expr: Option<wasmparser::ConstExpr<'a>>,
+    tag: InjectTag,
+}
+impl TagUtils for Table<'_> {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
+    }
+}
+impl<'a> Table<'a> {
+    pub fn new(
+        ty: TableType,
+        init_expr: Option<wasmparser::ConstExpr<'a>>,
+        tag: InjectTag,
+    ) -> Self {
+        Self { ty, init_expr, tag }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Element<'a> {
+    pub kind: ElementKind<'a>,
+    pub items: ElementItems<'a>,
+    tag: InjectTag,
+}
+impl TagUtils for Element<'_> {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
+
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
+    }
+}
+impl<'a> Element<'a> {
+    pub fn new(kind: ElementKind<'a>, items: ElementItems<'a>, tag: InjectTag) -> Self {
+        Self { kind, items, tag }
     }
 }

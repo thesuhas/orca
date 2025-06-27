@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::ir::id::{GlobalID, ImportsID};
 use crate::ir::module::module_imports::ModuleImports;
 use crate::ir::module::{GetID, Iter, LocalOrImport, ReIndexable};
-use crate::ir::types::InitExpr;
+use crate::ir::types::{InitExpr, InjectTag, Tag, TagUtils};
 use std::vec::IntoIter;
 use wasmparser::{GlobalType, TypeRef};
 
@@ -50,6 +50,7 @@ pub struct Global {
     pub(crate) kind: GlobalKind,
     /// Whether this global was deleted.
     pub(crate) deleted: bool,
+    pub tag: InjectTag,
 }
 
 impl GetID for Global {
@@ -81,12 +82,21 @@ impl LocalOrImport for Global {
         self.deleted
     }
 }
+impl TagUtils for Global {
+    fn get_or_create_tag(&mut self) -> &mut Tag {
+        self.tag.get_or_insert_default()
+    }
 
+    fn get_tag(&self) -> &Option<Tag> {
+        &self.tag
+    }
+}
 impl Global {
-    pub fn new(kind: GlobalKind) -> Self {
+    pub fn new(kind: GlobalKind, tag: InjectTag) -> Self {
         Self {
             kind,
             deleted: false,
+            tag,
         }
     }
 
@@ -102,6 +112,7 @@ impl Global {
                 init_expr,
             }),
             deleted: false,
+            tag: None,
         })
     }
 
@@ -176,6 +187,7 @@ impl ModuleGlobals {
                         ty,
                     }),
                     deleted: false,
+                    tag: import.tag.clone(),
                 });
             };
         }
