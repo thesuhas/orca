@@ -106,8 +106,10 @@ fn test_it_dup_instr() {
 
             let loc = mod_it.curr_loc().0;
             let orig = mod_it.curr_op_owned().unwrap();
-            mod_it.before();
-            mod_it.add_instr_at(loc, orig);
+            if !matches!(orig, Operator::End) {
+                mod_it.before();
+                mod_it.add_instr_at(loc, orig);
+            }
         } else {
             panic!("Should've gotten Component Location!");
         }
