@@ -1,4 +1,4 @@
-use orca_wasm::ir::component::Component;
+use wirm::ir::component::Component;
 
 mod common;
 use common::{write_to_file, WASM_OUTPUT_DIR};

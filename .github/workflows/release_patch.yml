@@ -36,7 +36,7 @@ jobs:
         run: cargo test --verbose
 
   release:
-    name: Release a new version of orca
+    name: Release a new version of wirm
     needs: [ rustfmt, build_and_test ]
     runs-on: ubuntu-latest
     permissions:

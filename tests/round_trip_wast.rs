@@ -1,9 +1,9 @@
-use orca_wasm::Component;
-use orca_wasm::Module;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use wirm::Component;
+use wirm::Module;
 
 fn wasm_tools() -> Command {
     Command::new("wasm-tools")

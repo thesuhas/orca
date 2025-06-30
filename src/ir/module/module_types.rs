@@ -458,7 +458,7 @@ impl ModuleTypes {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum HeapType {
     Abstract { shared: bool, ty: AbstractHeapType },
-    // TODO: See to replace UnpackedIndex with `orca` specific implementation
+    // TODO: See to replace UnpackedIndex with `wirm` specific implementation
     Concrete(UnpackedIndex),
 }
 

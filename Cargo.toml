@@ -1,12 +1,12 @@
 [package]
-name = "orca-wasm"
+name = "wirm"
 version = "0.9.2"
 edition = "2021"
 authors = ["Suhas Thalanki", "Alex Bai", "Elizabeth Gilbert"]
 description = "A lightweight WebAssembly Transformation Library for the Component Model"
 readme = "README.md"
-homepage = "https://github.com/thesuhas/orca"
-repository = "https://github.com/thesuhas/orca"
+homepage = "https://github.com/thesuhas/wirm"
+repository = "https://github.com/thesuhas/wirm"
 license = "Apache-2.0"
 categories = ["wasm"]
 keywords = ["wasm", "WebAssembly", "instrumentation"]

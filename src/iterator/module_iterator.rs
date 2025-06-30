@@ -56,12 +56,12 @@ impl<'b> Inject<'b> for ModuleIterator<'_, 'b> {
     ///
     /// # Example
     /// ```no_run
-    /// use orca_wasm::ir::module::Module;
-    /// use orca_wasm::iterator::module_iterator::ModuleIterator;
+    /// use wirm::ir::module::Module;
+    /// use wirm::iterator::module_iterator::ModuleIterator;
     /// use wasmparser::Operator;
-    /// use orca_wasm::ir::types::{Location};
-    /// use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
-    /// use orca_wasm::opcode::{Instrumenter, Opcode};
+    /// use wirm::ir::types::{Location};
+    /// use wirm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
+    /// use wirm::opcode::{Instrumenter, Opcode};
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");

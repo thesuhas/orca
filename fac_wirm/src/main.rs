@@ -1,22 +1,24 @@
-//! Contructs a wasm module from scratch with orca
+//! Constructs a wasm module from scratch with `wirm`
 //! from https://github.com/rustwasm/walrus/blob/main/examples/build-wasm-from-scratch.rs
 //!
 //! You can run this wasm file with `fact.js`
 
-use orca_wasm::ir::function::FunctionBuilder;
-use orca_wasm::ir::module::*;
-use orca_wasm::ir::types::*;
-use orca_wasm::opcode::Opcode;
+use wirm::ir::function::FunctionBuilder;
+use wirm::ir::module::*;
+use wirm::ir::types::*;
+use wirm::opcode::Opcode;
+use wirm::module_builder::AddLocal;
+use wirm::ir::id::LocalID;
 
 fn main() {
-    let mut module = Module::new();
-    let log_type_id = module.add_type(&[DataType::I32], &[]);
-    let log_func_id = module.add_import_func("env".to_string(), "log".to_string(), log_type_id);
+    let mut module = Module::default();
+    let log_type_id = module.types.add_func_type(&[DataType::I32], &[], None);
+    let (log_func_id, _) = module.add_import_func("env".to_string(), "log".to_string(), log_type_id);
 
     let mut factorial = FunctionBuilder::new(&[DataType::I32], &[DataType::I32]);
 
     // Create our parameter and our two locals.
-    let n = 0u32;
+    let n = LocalID(0);
     let i = factorial.add_local(DataType::I32);
     let res = factorial.add_local(DataType::I32);
 
@@ -60,7 +62,7 @@ fn main() {
     let fact_id = factorial.finish_module(&mut module);
 
     // Export the `factorial` function.
-    module.add_export_func("factorial".to_string(), fact_id);
+    module.exports.add_export_func("factorial".to_string(), *fact_id, None);
 
     module.emit_wasm("target/out.wasm").unwrap();
 

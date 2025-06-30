@@ -156,7 +156,7 @@ impl<'a> Component<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Component;
+    /// use wirm::Component;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -478,7 +478,7 @@ impl<'a> Component<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Component;
+    /// use wirm::Component;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");

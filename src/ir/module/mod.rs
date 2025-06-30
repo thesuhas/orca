@@ -114,7 +114,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Module;
+    /// use wirm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -632,7 +632,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Module;
+    /// use wirm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -1845,7 +1845,7 @@ impl<'a> Module<'a> {
         &mut self,
         module: String,
         name: String,
-        ty: MemoryType
+        ty: MemoryType,
     ) -> (MemoryID, ImportsID) {
         self.add_import_memory_with_tag(module, name, ty, Tag::default())
     }

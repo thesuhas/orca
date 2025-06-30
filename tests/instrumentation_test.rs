@@ -4,14 +4,14 @@ use std::mem::discriminant;
 use log::{error, trace};
 use wasmparser::Operator;
 
-use orca_wasm::ir::id::{FunctionID, TypeID};
-use orca_wasm::ir::types::InstrumentationMode;
-use orca_wasm::iterator::component_iterator::ComponentIterator;
-use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
-use orca_wasm::iterator::module_iterator::ModuleIterator;
-use orca_wasm::module_builder::AddLocal;
-use orca_wasm::opcode::{Inject, Instrumenter};
-use orca_wasm::{Component, Location, Module, Opcode};
+use wirm::ir::id::{FunctionID, TypeID};
+use wirm::ir::types::InstrumentationMode;
+use wirm::iterator::component_iterator::ComponentIterator;
+use wirm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
+use wirm::iterator::module_iterator::ModuleIterator;
+use wirm::module_builder::AddLocal;
+use wirm::opcode::{Inject, Instrumenter};
+use wirm::{Component, Location, Module, Opcode};
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -212,12 +212,12 @@ fn test_inject_locals() {
             trace!("Func: {:?}, {}: {:?},", func_idx, instr_idx, op);
 
             if mod_it.curr_op().unwrap() == &Operator::I32Add {
-                let local_id = mod_it.add_local(orca_wasm::ir::types::DataType::I32);
+                let local_id = mod_it.add_local(wirm::ir::types::DataType::I32);
                 trace!("new Local ID: {:?}", local_id);
             }
 
             if mod_it.curr_op().unwrap() == &(Operator::I32Const { value: 2 }) {
-                let local_id = mod_it.add_local(orca_wasm::ir::types::DataType::I32);
+                let local_id = mod_it.add_local(wirm::ir::types::DataType::I32);
                 println!("new Local ID: {:?}", local_id);
             }
         } else {

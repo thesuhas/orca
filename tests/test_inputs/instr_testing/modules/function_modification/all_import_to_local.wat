@@ -6,7 +6,7 @@
   (type (;4;) (func (param i32 i32 i32 i32 i32 i32 i32 i32)))
   (type (;5;) (func (param i32 i32) (result i32)))
   (import "bogus" "hi" (func (;0;) (type 2))) ;; rm
-  (import "orca" "better" (func (;1;) (type 2))) ;; rm
+  (import "wirm" "better" (func (;1;) (type 2))) ;; rm
   (import "than" "walrus" (func (;2;) (type 2))) ;; rm
   (func (;3;) (type 0)
     i32.const 0
