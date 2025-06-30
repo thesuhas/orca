@@ -1,11 +1,11 @@
 <div align="center">
-
   <h1>Wirm 🐉</h1>
 
-<strong>Wirm is a **W**ebAssembly **IR** **M**anipulation Library for the Component Model</strong>
+  Wirm is a **W**ebAssembly **IR** **M**anipulation Library for the Component Model.
 
-It is based on [Dfinity's IC codebase](https://github.com/dfinity/ic/tree/master/rs/wasm_transform) and [Walrus](https://github.com/rustwasm/walrus/tree/main).
+  **NOTE: This project used to be known as Orca, see discussion on refactor [here](https://github.com/thesuhas/wirm/issues/245).**
 
+  It is based on [Dfinity's IC codebase](https://github.com/dfinity/ic/tree/master/rs/wasm_transform) and [Walrus](https://github.com/rustwasm/walrus/tree/main).
 </div>
 
 ## About ##
