@@ -12,16 +12,16 @@
   )
 )
 
-;;(component
-;;  (core module $m
-;;    (func (export "param-list") (param i32 i32 i32 i32) unreachable)
-;;  )
-;;  (core instance $i (instantiate $m))
-;;
-;;  (func (export "param-list") (param "l" (list u32 4))
-;;    (canon lift (core func $i "param-list"))
-;;  )
-;;)
+(component
+  (core module $m
+    (func (export "param-list") (param i32 i32 i32 i32) unreachable)
+  )
+  (core instance $i (instantiate $m))
+
+  (func (export "param-list") (param "l" (list u32 4))
+    (canon lift (core func $i "param-list"))
+  )
+)
 
 (assert_invalid
   (component

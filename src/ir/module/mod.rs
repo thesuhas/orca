@@ -33,7 +33,6 @@ use log::warn;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::vec::IntoIter;
-use gimli::write::Writer;
 use wasm_encoder::reencode::{Reencode, RoundtripReencoder};
 use wasm_encoder::TagSection;
 use wasmparser::{

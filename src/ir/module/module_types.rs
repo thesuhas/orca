@@ -295,16 +295,17 @@ impl ModuleTypes {
     }
 
     fn add_type(&mut self, ty: Types, id: usize) -> TypeID {
-        let ty_id = TypeID(id as u32);
-        if !self.types_map.contains_key(&ty) {
-            self.types.insert(ty_id, ty.clone());
-        }
-        let _ = *self
+        let ty_id = *self
             .types_map
             .entry(ty.clone())
-            .or_insert(ty_id);
+            .or_insert(TypeID(id as u32));
 
-        self.groups.push(RecGroup::new(vec![ty_id], false));
+        if !self.types_map.contains_key(&ty) {
+            // add in this type if it's not already been added!
+            self.types.insert(ty_id, ty.clone());
+            self.groups.push(RecGroup::new(vec![ty_id], false));
+        }
+
         ty_id
     }
 
