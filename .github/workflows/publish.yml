@@ -16,7 +16,7 @@ jobs:
     if: startsWith(github.event.pull_request.head.ref, 'release-v')
     steps:
       - name: cargo login
-        run: cargo login ${{ secrets.ORCA_API_TOKEN }}
+        run: cargo login ${{ secrets.WIRM_API_TOKEN }}
 
       - uses: actions/checkout@v4
         with:

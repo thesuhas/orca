@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use wasmparser::{PackedIndex, UnpackedIndex};
 
+<<<<<<< HEAD
 #[derive(Clone, Debug, Default)]
 pub struct RecGroup {
     pub types: Vec<TypeID>,
@@ -18,7 +19,7 @@ impl RecGroup {
     }
 }
 
-/// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
+/// Wirm's representation of types, initially shortened from [Walrus' Representation] but now extended to support WASM GC.
 ///
 /// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Clone, Debug, Eq)]

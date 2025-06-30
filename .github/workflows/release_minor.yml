@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: cargo login
-        run: cargo login ${{ secrets.ORCA_API_TOKEN }}
+        run: cargo login ${{ secrets.WIRM_API_TOKEN }}
 
       - uses: actions/checkout@v4
         with:
@@ -67,6 +67,6 @@ jobs:
           git add .
           git commit -m "Release Version v$version"
           git push --set-upstream origin release-v$version
-          gh pr create --title "Release v$version" --body "Creating a release for Orca v$version"
+          gh pr create --title "Release v$version" --body "Creating a release for Wirm v$version"
         env:
           GH_TOKEN: ${{ github.token }}
