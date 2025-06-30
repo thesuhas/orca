@@ -9,7 +9,6 @@ use wirm::{Location, Module};
 
 #[test]
 // build factorial from scratch
-// #[allow(dead_code)]
 fn run_fac_wirm() {
     // run cargo run in fac_wirm dir
     let res = Command::new("cargo")
