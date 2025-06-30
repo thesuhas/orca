@@ -1201,7 +1201,7 @@ impl<'a> Module<'a> {
             let mut type_sect = wasm_encoder::TypeSection::new();
             // let mut last_rg = None;
             // let mut rg_types = vec![];
-            for RecGroup {types, is_explicit} in self.types.groups.iter() {
+            for RecGroup { types, is_explicit } in self.types.groups.iter() {
                 let mut subtypes = vec![];
                 for ty_id in types.iter() {
                     let ty = self.types.types.get(ty_id).unwrap();

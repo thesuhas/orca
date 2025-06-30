@@ -3,7 +3,11 @@
 
 use wasm_encoder::reencode::{Reencode, ReencodeComponent, RoundtripReencoder};
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
-use wasmparser::{CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance, ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance, Parser, Payload};
+use wasmparser::{
+    CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
+    ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance,
+    Parser, Payload,
+};
 
 use crate::error::Error;
 use crate::ir::helpers::{
@@ -16,7 +20,10 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::types::CustomSections;
-use crate::ir::wrappers::{add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration, convert_results, do_reencode, process_alias};
+use crate::ir::wrappers::{
+    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
+    convert_results, do_reencode, process_alias,
+};
 
 #[derive(Debug)]
 /// Intermediate Representation of a wasm component.
@@ -529,8 +536,8 @@ impl<'a> Component<'a> {
                     for cty_idx in last_processed_core_ty..last_processed_core_ty + num {
                         match &self.core_types[cty_idx as usize] {
                             CoreType::Rec(recgroup) => {
-                                let types = recgroup.types()
-                                    .into_iter()
+                                let types = recgroup
+                                    .types()
                                     .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
                                     .collect::<Vec<_>>();
 
@@ -644,9 +651,13 @@ impl<'a> Component<'a> {
                                     match c {
                                         ComponentTypeDeclaration::CoreType(core) => match core {
                                             CoreType::Rec(recgroup) => {
-                                                let types = recgroup.types()
-                                                    .into_iter()
-                                                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                                                let types = recgroup
+                                                    .types()
+                                                    .map(|ty| {
+                                                        reencode
+                                                            .sub_type(ty.to_owned())
+                                                            .expect("TODO")
+                                                    })
                                                     .collect::<Vec<_>>();
 
                                                 if recgroup.is_explicit_rec_group() {

@@ -23,8 +23,8 @@ pub fn convert_module_type_declaration(
     for m in module.iter() {
         match m {
             wasmparser::ModuleTypeDeclaration::Type(recgroup) => {
-                let types = recgroup.types()
-                    .into_iter()
+                let types = recgroup
+                    .types()
                     .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
                     .collect::<Vec<_>>();
 

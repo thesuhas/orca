@@ -10,13 +10,11 @@ use wasmparser::{PackedIndex, UnpackedIndex};
 #[derive(Clone, Debug, Default)]
 pub struct RecGroup {
     pub types: Vec<TypeID>,
-    pub is_explicit: bool
+    pub is_explicit: bool,
 }
 impl RecGroup {
     pub fn new(types: Vec<TypeID>, is_explicit: bool) -> RecGroup {
-        Self {
-            types, is_explicit
-        }
+        Self { types, is_explicit }
     }
 }
 
@@ -272,7 +270,7 @@ pub struct ModuleTypes {
     pub groups: Vec<RecGroup>,
     pub types: HashMap<TypeID, Types>,
     /// This enables us to quickly do a lookup to determine if a type has already been added
-    pub types_map: HashMap<Types, TypeID>
+    pub types_map: HashMap<Types, TypeID>,
 }
 
 impl ModuleTypes {
@@ -285,7 +283,7 @@ impl ModuleTypes {
         ModuleTypes {
             groups,
             types,
-            types_map
+            types_map,
         }
     }
 
@@ -448,7 +446,7 @@ impl ModuleTypes {
 
     /// Create an iterable over the Type Section
     pub fn iter(&self) -> std::collections::hash_map::Values<'_, TypeID, Types> {
-        self.types.values().into_iter()
+        self.types.values()
     }
 
     /// Get type from index of the type section
