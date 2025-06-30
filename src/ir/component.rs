@@ -269,7 +269,6 @@ impl<'a> Component<'a> {
                     );
                 }
                 Payload::ComponentTypeSection(component_type_reader) => {
-                    // TODO -- fails on this parse!
                     let temp: &mut Vec<ComponentType> = &mut component_type_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
@@ -538,7 +537,11 @@ impl<'a> Component<'a> {
                             CoreType::Rec(recgroup) => {
                                 let types = recgroup
                                     .types()
-                                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                                    .map(|ty| {
+                                        reencode.sub_type(ty.to_owned()).unwrap_or_else(|_| {
+                                            panic!("Could not encode type as subtype: {:?}", ty)
+                                        })
+                                    })
                                     .collect::<Vec<_>>();
 
                                 if recgroup.is_explicit_rec_group() {
@@ -549,10 +552,6 @@ impl<'a> Component<'a> {
                                         type_section.ty().core().subtype(&subty);
                                     }
                                 }
-                                // for subtype in recgroup.types() {
-                                //     let enc = type_section.ty().core();
-                                //     encode_core_type_subtype(enc, subtype, &mut reencode);
-                                // }
                             }
                             CoreType::Module(module) => {
                                 let enc = type_section.ty();
@@ -656,7 +655,7 @@ impl<'a> Component<'a> {
                                                     .map(|ty| {
                                                         reencode
                                                             .sub_type(ty.to_owned())
-                                                            .expect("TODO")
+                                                            .unwrap_or_else(|_| panic!("Could not encode type as subtype: {:?}", ty))
                                                     })
                                                     .collect::<Vec<_>>();
 

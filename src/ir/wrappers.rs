@@ -25,7 +25,11 @@ pub fn convert_module_type_declaration(
             wasmparser::ModuleTypeDeclaration::Type(recgroup) => {
                 let types = recgroup
                     .types()
-                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                    .map(|ty| {
+                        reencode.sub_type(ty.to_owned()).unwrap_or_else(|_| {
+                            panic!("Could not encode type as subtype: {:?}", ty)
+                        })
+                    })
                     .collect::<Vec<_>>();
 
                 if recgroup.is_explicit_rec_group() {
@@ -141,7 +145,7 @@ pub fn convert_instance_type(
 pub fn convert_results(
     result: Option<ComponentValType>,
     mut enc: ComponentFuncTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     enc.result(result.map(|v| reencode.component_val_type(v)));
 }
@@ -151,50 +155,18 @@ pub fn convert_results(
 pub fn encode_core_type_subtype(
     enc: CoreTypeEncoder,
     subtype: &SubType,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
-    let subty = reencode.sub_type(subtype.to_owned()).expect("TODO");
+    let subty = reencode
+        .sub_type(subtype.to_owned())
+        .unwrap_or_else(|_| panic!("Could not encode type as subtype: {:?}", subtype));
     enc.subtype(&subty);
-    // match &subtype.composite_type.inner {
-    //     wasmparser::CompositeInnerType::Func(..) => {
-    //         let subty = reencode.sub_type(subtype.to_owned()).expect("TODO");
-    //         enc.subtype(&subty);
-    //         // enc.function(
-    //         //     func.params()
-    //         //         .iter()
-    //         //         .map(|val_type| reencode.val_type(*val_type).unwrap())
-    //         //         .collect::<Vec<_>>(),
-    //         //     func.results()
-    //         //         .iter()
-    //         //         .map(|val_type| reencode.val_type(*val_type).unwrap())
-    //         //         .collect::<Vec<_>>(),
-    //         // );
-    //     }
-    //     wasmparser::CompositeInnerType::Array(array_ty) => {
-    //         enc.array(
-    //             &reencode.storage_type(array_ty.0.element_type).unwrap(),
-    //             array_ty.0.mutable,
-    //         );
-    //     }
-    //     wasmparser::CompositeInnerType::Struct(struct_ty) => {
-    //         enc.struct_(
-    //             struct_ty
-    //                 .fields
-    //                 .iter()
-    //                 .map(|field_ty| reencode.field_type(*field_ty).unwrap())
-    //                 .collect::<Vec<_>>(),
-    //         );
-    //     }
-    //     wasmparser::CompositeInnerType::Cont(_) => {
-    //         todo!()
-    //     }
-    // }
 }
 
 /// Process Alias
 pub fn process_alias<'a>(
     a: &'a ComponentAlias<'a>,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) -> Alias<'a> {
     match a {
         ComponentAlias::InstanceExport {
@@ -232,7 +204,7 @@ pub fn process_alias<'a>(
 pub fn convert_component_type(
     ty: &ComponentType,
     enc: ComponentTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     match ty {
         ComponentType::Defined(comp_ty) => {
