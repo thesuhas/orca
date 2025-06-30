@@ -3,11 +3,7 @@
 
 use wasm_encoder::reencode::{Reencode, ReencodeComponent, RoundtripReencoder};
 use wasm_encoder::{ComponentAliasSection, ModuleArg, ModuleSection, NestedComponentSection};
-use wasmparser::{
-    CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance,
-    ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance,
-    Parser, Payload,
-};
+use wasmparser::{CanonicalFunction, ComponentAlias, ComponentExport, ComponentImport, ComponentInstance, ComponentStartFunction, ComponentType, ComponentTypeDeclaration, CoreType, Encoding, Instance, Parser, Payload};
 
 use crate::error::Error;
 use crate::ir::helpers::{
@@ -20,10 +16,7 @@ use crate::ir::module::module_globals::Global;
 use crate::ir::module::Module;
 use crate::ir::section::ComponentSection;
 use crate::ir::types::CustomSections;
-use crate::ir::wrappers::{
-    add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration,
-    convert_results, do_reencode, encode_core_type_subtype, process_alias,
-};
+use crate::ir::wrappers::{add_to_namemap, convert_component_type, convert_instance_type, convert_module_type_declaration, convert_results, do_reencode, process_alias};
 
 #[derive(Debug)]
 /// Intermediate Representation of a wasm component.
@@ -269,6 +262,7 @@ impl<'a> Component<'a> {
                     );
                 }
                 Payload::ComponentTypeSection(component_type_reader) => {
+                    // TODO -- fails on this parse!
                     let temp: &mut Vec<ComponentType> = &mut component_type_reader
                         .into_iter()
                         .collect::<Result<_, _>>()?;
@@ -535,10 +529,23 @@ impl<'a> Component<'a> {
                     for cty_idx in last_processed_core_ty..last_processed_core_ty + num {
                         match &self.core_types[cty_idx as usize] {
                             CoreType::Rec(recgroup) => {
-                                for subtype in recgroup.types() {
-                                    let enc = type_section.ty().core();
-                                    encode_core_type_subtype(enc, subtype, &mut reencode);
+                                let types = recgroup.types()
+                                    .into_iter()
+                                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                                    .collect::<Vec<_>>();
+
+                                if recgroup.is_explicit_rec_group() {
+                                    type_section.ty().core().rec(types);
+                                } else {
+                                    // it's implicit!
+                                    for subty in types {
+                                        type_section.ty().core().subtype(&subty);
+                                    }
                                 }
+                                // for subtype in recgroup.types() {
+                                //     let enc = type_section.ty().core();
+                                //     encode_core_type_subtype(enc, subtype, &mut reencode);
+                                // }
                             }
                             CoreType::Module(module) => {
                                 let enc = type_section.ty();
@@ -637,13 +644,18 @@ impl<'a> Component<'a> {
                                     match c {
                                         ComponentTypeDeclaration::CoreType(core) => match core {
                                             CoreType::Rec(recgroup) => {
-                                                for sub in recgroup.types() {
-                                                    let enc = new_comp.core_type().core();
-                                                    encode_core_type_subtype(
-                                                        enc,
-                                                        sub,
-                                                        &mut reencode,
-                                                    );
+                                                let types = recgroup.types()
+                                                    .into_iter()
+                                                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                                                    .collect::<Vec<_>>();
+
+                                                if recgroup.is_explicit_rec_group() {
+                                                    new_comp.core_type().core().rec(types);
+                                                } else {
+                                                    // it's implicit!
+                                                    for subty in types {
+                                                        new_comp.core_type().core().subtype(&subty);
+                                                    }
                                                 }
                                             }
                                             CoreType::Module(module) => {

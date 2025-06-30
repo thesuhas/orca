@@ -75,8 +75,11 @@ pub enum DataType {
     Any,
     AnyNull,
     None,
+    NoneNull,
     NoExtern,
+    NoExternNull,
     NoFunc,
+    NoFuncNull,
     Eq,
     EqNull,
     Struct,
@@ -126,6 +129,9 @@ impl fmt::Display for DataType {
             DataType::FuncRefNull => write!(f, "funcref: null"),
             DataType::ExternRefNull => write!(f, "externref: null"),
             DataType::AnyNull => write!(f, "any: null"),
+            DataType::NoneNull => write!(f, "none: null"),
+            DataType::NoFuncNull => write!(f, "nofunc: null"),
+            DataType::NoExternNull => write!(f, "noextern: null"),
             DataType::EqNull => write!(f, "eq: null"),
             DataType::StructNull => write!(f, "struct: null"),
             DataType::ArrayNull => write!(f, "array: null"),
@@ -185,9 +191,27 @@ impl From<ValType> for DataType {
                             DataType::Any
                         }
                     }
-                    wasmparser::AbstractHeapType::None => DataType::None,
-                    wasmparser::AbstractHeapType::NoExtern => DataType::NoExtern,
-                    wasmparser::AbstractHeapType::NoFunc => DataType::NoFunc,
+                    wasmparser::AbstractHeapType::None => {
+                        if ref_type.is_nullable() {
+                            DataType::NoneNull
+                        } else {
+                            DataType::None
+                        }
+                    },
+                    wasmparser::AbstractHeapType::NoExtern => {
+                        if ref_type.is_nullable() {
+                            DataType::NoExternNull
+                        } else {
+                            DataType::NoExtern
+                        }
+                    },
+                    wasmparser::AbstractHeapType::NoFunc => {
+                        if ref_type.is_nullable() {
+                            DataType::NoFuncNull
+                        } else {
+                            DataType::NoFunc
+                        }
+                    },
                     wasmparser::AbstractHeapType::Eq => {
                         if ref_type.is_nullable() {
                             DataType::EqNull
@@ -267,6 +291,13 @@ impl From<&DataType> for wasm_encoder::ValType {
                     ty: AbstractHeapType::Any,
                 },
             }),
+            DataType::NoneNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::None,
+                },
+            }),
             DataType::None => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
                 heap_type: wasm_encoder::HeapType::Abstract {
@@ -281,8 +312,22 @@ impl From<&DataType> for wasm_encoder::ValType {
                     ty: AbstractHeapType::NoExtern,
                 },
             }),
+            DataType::NoExternNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoExtern,
+                },
+            }),
             DataType::NoFunc => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
                 nullable: false,
+                heap_type: wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: AbstractHeapType::NoFunc,
+                },
+            }),
+            DataType::NoFuncNull => wasm_encoder::ValType::Ref(wasm_encoder::RefType {
+                nullable: true,
                 heap_type: wasm_encoder::HeapType::Abstract {
                     shared: false,
                     ty: AbstractHeapType::NoFunc,
@@ -442,6 +487,16 @@ impl From<&DataType> for ValType {
                 )
                 .unwrap(),
             ),
+            DataType::NoneNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::None,
+                    },
+                )
+                    .unwrap(),
+            ),
             DataType::NoExtern => ValType::Ref(
                 RefType::new(
                     false,
@@ -452,6 +507,16 @@ impl From<&DataType> for ValType {
                 )
                 .unwrap(),
             ),
+            DataType::NoExternNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoExtern,
+                    },
+                )
+                    .unwrap(),
+            ),
             DataType::NoFunc => ValType::Ref(
                 RefType::new(
                     false,
@@ -461,6 +526,16 @@ impl From<&DataType> for ValType {
                     },
                 )
                 .unwrap(),
+            ),
+            DataType::NoFuncNull => ValType::Ref(
+                RefType::new(
+                    true,
+                    HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::NoFunc,
+                    },
+                )
+                    .unwrap(),
             ),
             DataType::Eq => ValType::Ref(
                 RefType::new(

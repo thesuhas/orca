@@ -23,9 +23,18 @@ pub fn convert_module_type_declaration(
     for m in module.iter() {
         match m {
             wasmparser::ModuleTypeDeclaration::Type(recgroup) => {
-                for subtype in recgroup.types() {
-                    let enc_mty = mty.ty();
-                    encode_core_type_subtype(enc_mty, subtype, reencode);
+                let types = recgroup.types()
+                    .into_iter()
+                    .map(|ty| reencode.sub_type(ty.to_owned()).expect("TODO"))
+                    .collect::<Vec<_>>();
+
+                if recgroup.is_explicit_rec_group() {
+                    mty.ty().rec(types);
+                } else {
+                    // it's implicit!
+                    for subty in types {
+                        mty.ty().subtype(&subty);
+                    }
                 }
             }
             wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
@@ -144,38 +153,42 @@ pub fn encode_core_type_subtype(
     subtype: &SubType,
     reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
 ) {
-    match &subtype.composite_type.inner {
-        wasmparser::CompositeInnerType::Func(func) => {
-            enc.function(
-                func.params()
-                    .iter()
-                    .map(|val_type| reencode.val_type(*val_type).unwrap())
-                    .collect::<Vec<_>>(),
-                func.results()
-                    .iter()
-                    .map(|val_type| reencode.val_type(*val_type).unwrap())
-                    .collect::<Vec<_>>(),
-            );
-        }
-        wasmparser::CompositeInnerType::Array(array_ty) => {
-            enc.array(
-                &reencode.storage_type(array_ty.0.element_type).unwrap(),
-                array_ty.0.mutable,
-            );
-        }
-        wasmparser::CompositeInnerType::Struct(struct_ty) => {
-            enc.struct_(
-                struct_ty
-                    .fields
-                    .iter()
-                    .map(|field_ty| reencode.field_type(*field_ty).unwrap())
-                    .collect::<Vec<_>>(),
-            );
-        }
-        wasmparser::CompositeInnerType::Cont(_) => {
-            todo!()
-        }
-    }
+    let subty = reencode.sub_type(subtype.to_owned()).expect("TODO");
+    enc.subtype(&subty);
+    // match &subtype.composite_type.inner {
+    //     wasmparser::CompositeInnerType::Func(..) => {
+    //         let subty = reencode.sub_type(subtype.to_owned()).expect("TODO");
+    //         enc.subtype(&subty);
+    //         // enc.function(
+    //         //     func.params()
+    //         //         .iter()
+    //         //         .map(|val_type| reencode.val_type(*val_type).unwrap())
+    //         //         .collect::<Vec<_>>(),
+    //         //     func.results()
+    //         //         .iter()
+    //         //         .map(|val_type| reencode.val_type(*val_type).unwrap())
+    //         //         .collect::<Vec<_>>(),
+    //         // );
+    //     }
+    //     wasmparser::CompositeInnerType::Array(array_ty) => {
+    //         enc.array(
+    //             &reencode.storage_type(array_ty.0.element_type).unwrap(),
+    //             array_ty.0.mutable,
+    //         );
+    //     }
+    //     wasmparser::CompositeInnerType::Struct(struct_ty) => {
+    //         enc.struct_(
+    //             struct_ty
+    //                 .fields
+    //                 .iter()
+    //                 .map(|field_ty| reencode.field_type(*field_ty).unwrap())
+    //                 .collect::<Vec<_>>(),
+    //         );
+    //     }
+    //     wasmparser::CompositeInnerType::Cont(_) => {
+    //         todo!()
+    //     }
+    // }
 }
 
 /// Process Alias
