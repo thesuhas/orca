@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use wasmparser::{PackedIndex, UnpackedIndex};
 
-<<<<<<< HEAD
 #[derive(Clone, Debug, Default)]
 pub struct RecGroup {
     pub types: Vec<TypeID>,
