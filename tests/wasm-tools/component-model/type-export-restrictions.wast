@@ -406,7 +406,7 @@
   (import "bar" (instance
     (alias outer $C $bar (type $bar'))
     (export "bar" (type $bar (eq $bar')))
-    (export  "a" (func $f (result $bar)))
+    (export "a" (func $f (result $bar)))
   ))
 )
 

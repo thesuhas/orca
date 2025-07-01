@@ -1,3 +1,5 @@
+;; RUN: wast --assert default --snapshot tests/snapshots %
+
 ;; Definitions
 
 (module
@@ -316,34 +318,6 @@
 (assert_trap (invoke "fail3") "cast")
 (assert_trap (invoke "fail4") "cast")
 
-(module
-  (type $t1 (sub (func)))
-  (type $t2 (sub $t1 (func)))
-  (type $t3 (sub $t2 (func)))
-  (type $t4 (sub final (func)))
-
-  (func $f2 (type $t2))
-  (func $f3 (type $t3))
-  (table (ref null $t2) (elem $f2 $f3))
-
-  (func (export "run")
-    (call_indirect (type $t1) (i32.const 0))
-    (call_indirect (type $t1) (i32.const 1))
-    (call_indirect (type $t2) (i32.const 0))
-    (call_indirect (type $t2) (i32.const 1))
-    (call_indirect (type $t3) (i32.const 1))
-  )
-
-  (func (export "fail1")
-    (call_indirect (type $t3) (i32.const 0))
-  )
-  (func (export "fail2")
-    (call_indirect (type $t4) (i32.const 0))
-  )
-)
-(assert_return (invoke "run"))
-(assert_trap (invoke "fail1") "indirect call")
-(assert_trap (invoke "fail2") "indirect call")
 
 (module
   (rec (type $f1 (sub (func))) (type (struct (field (ref $f1)))))
@@ -375,48 +349,48 @@
 )
 (assert_return (invoke "run") (i32.const 1))
 
-(module
-  (rec (type $f1 (sub (func))) (type (struct (field (ref $f1)))))
-  (rec (type $f2 (sub (func))) (type (struct (field (ref $f1)))))
-  (rec (type $g1 (sub $f1 (func))) (type (struct)))
-  (rec (type $g2 (sub $f2 (func))) (type (struct)))
-  (func $g (type $g2)) (elem declare func $g)
-  (func (export "run") (result i32)
-    (ref.test (ref $g1) (ref.func $g))
-  )
-)
-(assert_return (invoke "run") (i32.const 0))
+ (module
+   (rec (type $f1 (sub (func))) (type (struct (field (ref $f1)))))
+   (rec (type $f2 (sub (func))) (type (struct (field (ref $f1)))))
+   (rec (type $g1 (sub $f1 (func))) (type (struct)))
+   (rec (type $g2 (sub $f2 (func))) (type (struct)))
+   (func $g (type $g2)) (elem declare func $g)
+   (func (export "run") (result i32)
+     (ref.test (ref $g1) (ref.func $g))
+   )
+ )
+ (assert_return (invoke "run") (i32.const 0))
 
-(module
-  (rec (type $f1 (sub (func))) (type (struct (field (ref $f1)))))
-  (rec (type $f2 (sub (func))) (type (struct (field (ref $f2)))))
-  (rec (type $g (sub $f1 (func))) (type (struct)))
-  (func $g (type $g)) (elem declare func $g)
-  (func (export "run") (result i32)
-    (ref.test (ref $f1) (ref.func $g))
-  )
-)
-(assert_return (invoke "run") (i32.const 1))
+ (module
+   (rec (type $f1 (sub (func))) (type (struct (field (ref $f1)))))
+   (rec (type $f2 (sub (func))) (type (struct (field (ref $f2)))))
+   (rec (type $g (sub $f1 (func))) (type (struct)))
+   (func $g (type $g)) (elem declare func $g)
+   (func (export "run") (result i32)
+     (ref.test (ref $f1) (ref.func $g))
+   )
+ )
+ (assert_return (invoke "run") (i32.const 1))
 
-(module
-  (rec (type $f1 (sub (func))) (type $s1 (sub (struct (field (ref $f1))))))
-  (rec (type $f2 (sub (func))) (type $s2 (sub (struct (field (ref $f2))))))
-  (rec
-    (type $g1 (sub $f1 (func)))
-    (type (sub $s1 (struct (field (ref $f1) (ref $f1) (ref $f2) (ref $f2) (ref $g1)))))
-  )
-  (rec
-    (type $g2 (sub $f2 (func)))
-    (type (sub $s2 (struct (field (ref $f1) (ref $f2) (ref $f1) (ref $f2) (ref $g2)))))
-  )
-  (rec (type $h (sub $g2 (func))) (type (struct)))
-  (func $h (type $h)) (elem declare func $h)
-  (func (export "run") (result i32 i32)
-    (ref.test (ref $f1) (ref.func $h))
-    (ref.test (ref $g1) (ref.func $h))
-  )
-)
-(assert_return (invoke "run") (i32.const 1) (i32.const 1))
+ (module
+   (rec (type $f1 (sub (func))) (type $s1 (sub (struct (field (ref $f1))))))
+   (rec (type $f2 (sub (func))) (type $s2 (sub (struct (field (ref $f2))))))
+   (rec
+     (type $g1 (sub $f1 (func)))
+     (type (sub $s1 (struct (field (ref $f1) (ref $f1) (ref $f2) (ref $f2) (ref $g1)))))
+   )
+   (rec
+     (type $g2 (sub $f2 (func)))
+     (type (sub $s2 (struct (field (ref $f1) (ref $f2) (ref $f1) (ref $f2) (ref $g2)))))
+   )
+   (rec (type $h (sub $g2 (func))) (type (struct)))
+   (func $h (type $h)) (elem declare func $h)
+   (func (export "run") (result i32 i32)
+     (ref.test (ref $f1) (ref.func $h))
+     (ref.test (ref $g1) (ref.func $h))
+   )
+ )
+ (assert_return (invoke "run") (i32.const 1) (i32.const 1))
 
 
 (module
@@ -435,49 +409,49 @@
   (i32.const 1) (i32.const 1) (i32.const 1) (i32.const 1)
 )
 
-(module
-  (rec (type $f11 (sub (func (result (ref func))))) (type $f12 (sub $f11 (func (result (ref $f11))))))
-  (rec (type $f21 (sub (func (result (ref func))))) (type $f22 (sub $f21 (func (result (ref $f21))))))
-  (rec (type $g11 (sub $f11 (func (result (ref func))))) (type $g12 (sub $g11 (func (result (ref $g11))))))
-  (rec (type $g21 (sub $f21 (func (result (ref func))))) (type $g22 (sub $g21 (func (result (ref $g21))))))
-  (func $g11 (type $g11) (unreachable)) (elem declare func $g11)
-  (func $g12 (type $g12) (unreachable)) (elem declare func $g12)
-  (func (export "run") (result i32 i32 i32 i32 i32 i32 i32 i32)
-    (ref.test (ref $f11) (ref.func $g11))
-    (ref.test (ref $f21) (ref.func $g11))
-    (ref.test (ref $f11) (ref.func $g12))
-    (ref.test (ref $f21) (ref.func $g12))
-    (ref.test (ref $g11) (ref.func $g11))
-    (ref.test (ref $g21) (ref.func $g11))
-    (ref.test (ref $g12) (ref.func $g12))
-    (ref.test (ref $g22) (ref.func $g12))
-  )
-)
-(assert_return (invoke "run")
-  (i32.const 1) (i32.const 1) (i32.const 1) (i32.const 1)
-  (i32.const 1) (i32.const 1) (i32.const 1) (i32.const 1)
-)
+ (module
+   (rec (type $f11 (sub (func (result (ref func))))) (type $f12 (sub $f11 (func (result (ref $f11))))))
+   (rec (type $f21 (sub (func (result (ref func))))) (type $f22 (sub $f21 (func (result (ref $f21))))))
+   (rec (type $g11 (sub $f11 (func (result (ref func))))) (type $g12 (sub $g11 (func (result (ref $g11))))))
+   (rec (type $g21 (sub $f21 (func (result (ref func))))) (type $g22 (sub $g21 (func (result (ref $g21))))))
+   (func $g11 (type $g11) (unreachable)) (elem declare func $g11)
+   (func $g12 (type $g12) (unreachable)) (elem declare func $g12)
+   (func (export "run") (result i32 i32 i32 i32 i32 i32 i32 i32)
+     (ref.test (ref $f11) (ref.func $g11))
+     (ref.test (ref $f21) (ref.func $g11))
+     (ref.test (ref $f11) (ref.func $g12))
+     (ref.test (ref $f21) (ref.func $g12))
+     (ref.test (ref $g11) (ref.func $g11))
+     (ref.test (ref $g21) (ref.func $g11))
+     (ref.test (ref $g12) (ref.func $g12))
+     (ref.test (ref $g22) (ref.func $g12))
+   )
+ )
+ (assert_return (invoke "run")
+   (i32.const 1) (i32.const 1) (i32.const 1) (i32.const 1)
+   (i32.const 1) (i32.const 1) (i32.const 1) (i32.const 1)
+ )
 
-(module
-  (rec (type $f11 (sub (func))) (type $f12 (sub $f11 (func))))
-  (rec (type $f21 (sub (func))) (type $f22 (sub $f11 (func))))
-  (func $f (type $f21)) (elem declare func $f)
-  (func (export "run") (result i32)
-    (ref.test (ref $f11) (ref.func $f))
-  )
-)
-(assert_return (invoke "run") (i32.const 0))
+ (module
+   (rec (type $f11 (sub (func))) (type $f12 (sub $f11 (func))))
+   (rec (type $f21 (sub (func))) (type $f22 (sub $f11 (func))))
+   (func $f (type $f21)) (elem declare func $f)
+   (func (export "run") (result i32)
+     (ref.test (ref $f11) (ref.func $f))
+   )
+ )
+ (assert_return (invoke "run") (i32.const 0))
 
-(module
-  (rec (type $f01 (sub (func))) (type $f02 (sub $f01 (func))))
-  (rec (type $f11 (sub (func))) (type $f12 (sub $f01 (func))))
-  (rec (type $f21 (sub (func))) (type $f22 (sub $f11 (func))))
-  (func $f (type $f21)) (elem declare func $f)
-  (func (export "run") (result i32)
-    (ref.test (ref $f11) (ref.func $f))
-  )
-)
-(assert_return (invoke "run") (i32.const 0))
+ (module
+   (rec (type $f01 (sub (func))) (type $f02 (sub $f01 (func))))
+   (rec (type $f11 (sub (func))) (type $f12 (sub $f01 (func))))
+   (rec (type $f21 (sub (func))) (type $f22 (sub $f11 (func))))
+   (func $f (type $f21)) (elem declare func $f)
+   (func (export "run") (result i32)
+     (ref.test (ref $f11) (ref.func $f))
+   )
+ )
+ (assert_return (invoke "run") (i32.const 0))
 
 
 

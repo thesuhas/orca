@@ -16,7 +16,7 @@ use crate::ir::module::module_globals::{
 use crate::ir::module::module_imports::{Import, ModuleImports};
 use crate::ir::module::module_memories::{ImportedMemory, LocalMemory, MemKind, Memories, Memory};
 use crate::ir::module::module_tables::{Element, ModuleTables, Table};
-use crate::ir::module::module_types::{ModuleTypes, Types};
+use crate::ir::module::module_types::{ModuleTypes, RecGroup, Types};
 use crate::ir::module::side_effects::{InjectType, Injection};
 use crate::ir::types::InstrumentationMode::{BlockAlt, BlockEntry, BlockExit, SemanticAfter};
 use crate::ir::types::{
@@ -131,7 +131,8 @@ impl<'a> Module<'a> {
         parser: Parser,
     ) -> Result<Self, Error> {
         let mut imports: ModuleImports = ModuleImports::default();
-        let mut types: Vec<Types> = vec![];
+        let mut types: HashMap<TypeID, Types> = HashMap::new();
+        let mut recgroups = vec![];
         let mut data = vec![];
         let mut tables = vec![];
         let mut memories = vec![];
@@ -158,7 +159,6 @@ impl<'a> Module<'a> {
         let mut data_names = wasm_encoder::NameMap::new();
         let mut field_names = wasm_encoder::IndirectNameMap::new();
         let mut tag_names = wasm_encoder::NameMap::new();
-        let mut recgroup_map = HashMap::new();
 
         for payload in parser.parse_all(wasm) {
             let payload = payload?;
@@ -173,56 +173,46 @@ impl<'a> Module<'a> {
                     imports = ModuleImports::new(temp);
                 }
                 Payload::TypeSection(type_section_reader) => {
-                    let mut ty_idx: u32 = 0;
-                    for (id, ty) in type_section_reader.into_iter().enumerate() {
-                        let rec_group = ty.clone()?.is_explicit_rec_group();
+                    for ty in type_section_reader.into_iter() {
+                        let mut group_types = vec![];
+                        let explicit_rec_group = ty.clone()?.is_explicit_rec_group();
                         for subtype in ty?.types() {
                             match subtype.composite_type.inner.clone() {
                                 CompositeInnerType::Func(fty) => {
-                                    let fun_ty = fty;
-                                    let params = fun_ty
+                                    let params = fty
                                         .params()
                                         .iter()
                                         .map(|x| DataType::from(*x))
                                         .collect::<Vec<_>>()
                                         .into_boxed_slice();
-                                    let results = fun_ty
+                                    let results = fty
                                         .results()
                                         .iter()
                                         .map(|x| DataType::from(*x))
                                         .collect::<Vec<_>>()
                                         .into_boxed_slice();
-                                    let final_ty = Types::FuncType {
+
+                                    group_types.push(Types::FuncType {
                                         params,
                                         results,
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
                                         tag: None,
-                                    };
-                                    types.push(final_ty.clone());
-
-                                    if rec_group {
-                                        recgroup_map.insert(ty_idx, id as u32);
-                                    }
+                                    });
                                 }
                                 CompositeInnerType::Array(aty) => {
-                                    let array_ty = Types::ArrayType {
+                                    group_types.push(Types::ArrayType {
                                         mutable: aty.0.mutable,
                                         fields: DataType::from(aty.0.element_type),
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
                                         tag: None,
-                                    };
-                                    types.push(array_ty.clone());
-
-                                    if rec_group {
-                                        recgroup_map.insert(ty_idx, id as u32);
-                                    }
+                                    });
                                 }
                                 CompositeInnerType::Struct(sty) => {
-                                    let struct_ty = Types::StructType {
+                                    group_types.push(Types::StructType {
                                         mutable: sty
                                             .fields
                                             .iter()
@@ -237,28 +227,26 @@ impl<'a> Module<'a> {
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
                                         tag: None,
-                                    };
-                                    types.push(struct_ty.clone());
-                                    if rec_group {
-                                        recgroup_map.insert(ty_idx, id as u32);
-                                    }
+                                    });
                                 }
                                 CompositeInnerType::Cont(cty) => {
-                                    let cont_ty = Types::ContType {
+                                    group_types.push(Types::ContType {
                                         packed_index: cty.0,
                                         super_type: subtype.supertype_idx,
                                         is_final: subtype.is_final,
                                         shared: subtype.composite_type.shared,
                                         tag: None,
-                                    };
-                                    types.push(cont_ty.clone());
-                                    if rec_group {
-                                        recgroup_map.insert(ty_idx, id as u32);
-                                    }
+                                    });
                                 }
                             }
-                            ty_idx += 1;
                         }
+                        let mut ids = vec![];
+                        for ty in group_types.iter() {
+                            let ty_id = TypeID(types.len() as u32);
+                            ids.push(ty_id);
+                            types.insert(ty_id, ty.to_owned());
+                        }
+                        recgroups.push(RecGroup::new(ids, explicit_rec_group));
                     }
                 }
                 Payload::DataSection(data_section_reader) => {
@@ -546,7 +534,7 @@ impl<'a> Module<'a> {
                     functions[index],
                     FunctionID(imports.num_funcs + index as u32),
                     (*code_sec).clone(),
-                    types[*functions[index] as usize].params().len(),
+                    types[&functions[index]].params().len(),
                     None,
                 ))),
                 (*code_sec).clone().name,
@@ -585,7 +573,7 @@ impl<'a> Module<'a> {
         let num_tables = tables.len() as u32;
         let module_globals = ModuleGlobals::new(&imports, globals);
         Ok(Module {
-            types: ModuleTypes::new(types, recgroup_map),
+            types: ModuleTypes::new(recgroups, types),
             imports,
             functions: Functions::new(final_funcs),
             tables: ModuleTables::new(tables),
@@ -1208,52 +1196,40 @@ impl<'a> Module<'a> {
         };
         self.start = new_start;
 
-        if !self.types.is_empty() {
-            let mut types = wasm_encoder::TypeSection::new();
-            let mut last_rg = None;
-            let mut rg_types = vec![];
-            for (idx, ty) in self.types.iter().enumerate() {
-                let curr_rg = self.types.recgroup_map.get(&(idx as u32));
-                // If current one is not the same as last one and it is not the first rg, encode it
-                // If it is a new one
-                if curr_rg != last_rg {
-                    // If the previous one was an explicit rec group
-                    if last_rg.is_some() {
-                        // Encode the last one as a recgroup
-                        types.ty().rec(rg_types.clone());
-                        // Reset the vector
-                        rg_types.clear();
+        // handle recursion groups
+        if !self.types.groups.is_empty() {
+            let mut type_sect = wasm_encoder::TypeSection::new();
+            for RecGroup { types, is_explicit } in self.types.groups.iter() {
+                let mut subtypes = vec![];
+                for ty_id in types.iter() {
+                    let ty = self.types.types.get(ty_id).unwrap();
+                    if pull_side_effects {
+                        if let Some(tag) = ty.get_tag() {
+                            add_injection(
+                                &mut side_effects,
+                                InjectType::Type,
+                                Injection::Type {
+                                    ty: ty.clone(),
+                                    tag: tag.clone(),
+                                },
+                            );
+                        }
                     }
-                    // If it was not, then it was already encoded
-                }
-                match curr_rg {
-                    // If it is part of an explicit rec group
-                    Some(_) => {
-                        rg_types.push(self.encode_type(ty));
-                        // first_rg = false;
-                    }
-                    None => types.ty().subtype(&self.encode_type(ty)),
-                }
-                last_rg = curr_rg;
 
-                if pull_side_effects {
-                    if let Some(tag) = ty.get_tag() {
-                        add_injection(
-                            &mut side_effects,
-                            InjectType::Type,
-                            Injection::Type {
-                                ty: ty.clone(),
-                                tag: tag.clone(),
-                            },
-                        );
+                    let subtype = self.encode_type(ty);
+                    if *is_explicit {
+                        subtypes.push(subtype);
+                    } else {
+                        type_sect.ty().subtype(&subtype);
                     }
                 }
+
+                if *is_explicit {
+                    type_sect.ty().rec(subtypes);
+                }
+                // otherwise already handled!
             }
-            // If the last rg was a none, it was encoded in the binary, if it was an explicit rec group, was not encoded
-            if last_rg.is_some() {
-                types.ty().rec(rg_types.clone());
-            }
-            module.section(&types);
+            module.section(&type_sect);
         }
 
         // initialize function name section

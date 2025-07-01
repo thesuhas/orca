@@ -285,7 +285,7 @@
     (core instance $i (instantiate $m2))
     (core instance (instantiate $m1 (with "" (instance $i))))
   )
-  "expected: [] -> []")
+  "expected: (func)")
 (assert_invalid
   (component
     (import "m1" (core module $m1 (import "" "" (func))))
@@ -293,7 +293,7 @@
     (core instance $i (instantiate $m2))
     (core instance (instantiate $m1 (with "" (instance $i))))
   )
-  "expected: [] -> []")
+  "expected: (func)")
 (assert_invalid
   (component
     (import "m1" (core module $m1 (import "" "" (global i32))))
@@ -389,7 +389,7 @@
   "function index out of bounds")
 
 (assert_invalid
-  (component (instance $i (export "" (instance 0))))
+  (component (instance (export "" (instance 0))))
   "index out of bounds")
 
 (assert_invalid
@@ -397,7 +397,7 @@
   "index out of bounds")
 
 (assert_invalid
-  (component (instance $i (export "" (instance 0))))
+  (component (instance (export "" (instance 0))))
   "index out of bounds")
 
 (assert_invalid

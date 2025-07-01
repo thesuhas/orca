@@ -28,11 +28,11 @@
   ))
 )
 
-(assert_invalid
+(assert_malformed
   (component quote
     "(type (instance"
       "(type $t u8)"
-      "(export $t \"t\" (type (eq $t)))"
+      "(export \"t\" (type $t (eq $t)))"
     "))"
   )
   "duplicate type identifier")

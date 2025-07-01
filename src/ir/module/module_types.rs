@@ -7,6 +7,17 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use wasmparser::{PackedIndex, UnpackedIndex};
 
+#[derive(Clone, Debug, Default)]
+pub struct RecGroup {
+    pub types: Vec<TypeID>,
+    pub is_explicit: bool,
+}
+impl RecGroup {
+    pub fn new(types: Vec<TypeID>, is_explicit: bool) -> RecGroup {
+        Self { types, is_explicit }
+    }
+}
+
 /// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
 ///
 /// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
@@ -256,30 +267,44 @@ impl Types {
 /// The Module Types Section
 #[derive(Clone, Debug, Default)]
 pub struct ModuleTypes {
-    pub types: Vec<Types>,
+    pub groups: Vec<RecGroup>,
+    pub types: HashMap<TypeID, Types>,
     /// This enables us to quickly do a lookup to determine if a type has already been added
     pub types_map: HashMap<Types, TypeID>,
-    // Mapping between recursive group and TypeID
-    pub(crate) recgroup_map: HashMap<u32, u32>,
 }
 
 impl ModuleTypes {
     /// Create a new Module Types section
-    pub fn new(types: Vec<Types>, recgroup_map: HashMap<u32, u32>) -> Self {
+    pub fn new(groups: Vec<RecGroup>, types: HashMap<TypeID, Types>) -> Self {
         let mut types_map = HashMap::default();
-        for (id, ty) in types.iter().enumerate() {
-            types_map.insert(ty.clone(), TypeID(id as u32));
+        for (id, ty) in types.iter() {
+            types_map.insert(ty.clone(), *id);
         }
         ModuleTypes {
+            groups,
             types,
             types_map,
-            recgroup_map,
         }
     }
 
     /// Check if there are any types in this module
     pub fn is_empty(&self) -> bool {
         self.types.is_empty()
+    }
+
+    fn add_type(&mut self, ty: Types, id: usize) -> TypeID {
+        let ty_id = *self
+            .types_map
+            .entry(ty.clone())
+            .or_insert(TypeID(id as u32));
+
+        if !self.types_map.contains_key(&ty) {
+            // add in this type if it's not already been added!
+            self.types.insert(ty_id, ty.clone());
+            self.groups.push(RecGroup::new(vec![ty_id], false));
+        }
+
+        ty_id
     }
 
     /// Add a new function type to the module, returns the index of the new type. By default, encodes the supertype as `None`, shared as `true`, and `is_final` as false for now.
@@ -289,7 +314,6 @@ impl ModuleTypes {
         ret: &[DataType],
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::FuncType {
             params: param.to_vec().into_boxed_slice(),
             results: ret.to_vec().into_boxed_slice(),
@@ -299,13 +323,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Add a new function type to the module with all parameters.
@@ -318,7 +336,6 @@ impl ModuleTypes {
         shared: bool,
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::FuncType {
             params: param.to_vec().into_boxed_slice(),
             results: ret.to_vec().into_boxed_slice(),
@@ -331,13 +348,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Add a new array type to the module. Assumes no `super_type` and `is_final` is `true`
@@ -347,7 +358,6 @@ impl ModuleTypes {
         mutable: bool,
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::ArrayType {
             fields: field_type,
             mutable,
@@ -357,14 +367,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Add a new array type with all parameters.
@@ -377,7 +380,6 @@ impl ModuleTypes {
         shared: bool,
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::ArrayType {
             fields: field_type,
             mutable,
@@ -390,14 +392,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Add a new struct type to the module. Assumes no `super_type` and `is_final` is `true`
@@ -407,7 +402,6 @@ impl ModuleTypes {
         mutable: Vec<bool>,
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::StructType {
             fields: field_type,
             mutable,
@@ -417,14 +411,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Add a new array type with all parameters.
@@ -437,7 +424,6 @@ impl ModuleTypes {
         shared: bool,
         tag: InjectTag,
     ) -> TypeID {
-        let index = self.types.len();
         let ty = Types::StructType {
             fields: field_type,
             mutable,
@@ -450,14 +436,7 @@ impl ModuleTypes {
             tag,
         };
 
-        if !self.types_map.contains_key(&ty) {
-            self.types.push(ty.clone());
-        }
-
-        *self
-            .types_map
-            .entry(ty.clone())
-            .or_insert(TypeID(index as u32))
+        self.add_type(ty, self.types.len())
     }
 
     /// Number of types in this module
@@ -466,13 +445,13 @@ impl ModuleTypes {
     }
 
     /// Create an iterable over the Type Section
-    pub fn iter(&self) -> std::slice::Iter<'_, Types> {
-        self.types.iter()
+    pub fn iter(&self) -> std::collections::hash_map::Values<'_, TypeID, Types> {
+        self.types.values()
     }
 
     /// Get type from index of the type section
-    pub fn get(&self, index: TypeID) -> Option<&Types> {
-        self.types.get(*index as usize)
+    pub fn get(&self, id: TypeID) -> Option<&Types> {
+        self.types.get(&id)
     }
 }
 

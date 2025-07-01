@@ -120,16 +120,16 @@
   )
   "import name `a` conflicts with previous name `A`")
 
-(assert_invalid
+(assert_malformed
   (component quote
     "(component $c (core type $t (module (alias outer $c $t (type)))))"
   )
   "unknown core type")
 
 (assert_invalid
-  (component $c
-    (core type $t (module
-      (alias outer $c 0 (type))
+  (component
+    (core type (module
+      (alias outer 1 0 (type))
     ))
   )
   "type index out of bounds")
@@ -141,16 +141,16 @@
   ))
 )
 
-(assert_invalid
+(assert_malformed
   (component quote
     "(component $c (type $t (component (alias outer $c $t (type)))))"
   )
   "unknown type")
 
 (assert_invalid
-  (component $c
-    (type $t (component
-      (alias outer $c 0 (type))
+  (component
+    (type (component
+      (alias outer 1 0 (type))
     ))
   )
   "type index out of bounds")
@@ -193,16 +193,16 @@
   )
   "export name `FOO-bar-BAZ` conflicts with previous name `foo-BAR-baz`")
 
-(assert_invalid
+(assert_malformed
   (component quote
     "(component $c (type $t (instance (alias outer $c $t (type)))))"
   )
   "unknown type")
 
 (assert_invalid
-  (component $c
-    (type $t (instance
-      (alias outer $c 0 (type))
+  (component
+    (type (instance
+      (alias outer 1 0 (type))
     ))
   )
   "type index out of bounds")

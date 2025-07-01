@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use wasm_encoder::reencode::{Reencode, ReencodeComponent};
+use wasm_encoder::reencode::{Reencode, ReencodeComponent, RoundtripReencoder};
 use wasm_encoder::{
     Alias, ComponentCoreTypeEncoder, ComponentFuncTypeEncoder, ComponentTypeEncoder,
     CoreTypeEncoder, InstanceType,
@@ -17,15 +17,28 @@ use wasmparser::{
 pub fn convert_module_type_declaration(
     module: &[wasmparser::ModuleTypeDeclaration],
     enc: ComponentCoreTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     let mut mty = wasm_encoder::ModuleType::new();
     for m in module.iter() {
         match m {
             wasmparser::ModuleTypeDeclaration::Type(recgroup) => {
-                for subtype in recgroup.types() {
-                    let enc_mty = mty.ty();
-                    encode_core_type_subtype(enc_mty, subtype, reencode);
+                let types = recgroup
+                    .types()
+                    .map(|ty| {
+                        reencode.sub_type(ty.to_owned()).unwrap_or_else(|_| {
+                            panic!("Could not encode type as subtype: {:?}", ty)
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                if recgroup.is_explicit_rec_group() {
+                    mty.ty().rec(types);
+                } else {
+                    // it's implicit!
+                    for subty in types {
+                        mty.ty().subtype(&subty);
+                    }
                 }
             }
             wasmparser::ModuleTypeDeclaration::Export { name, ty } => {
@@ -54,7 +67,7 @@ pub fn convert_module_type_declaration(
 /// Convert Instance Types
 pub fn convert_instance_type(
     instance: &[InstanceTypeDeclaration],
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) -> InstanceType {
     let mut ity = InstanceType::new();
     for value in instance.iter() {
@@ -94,7 +107,12 @@ pub fn convert_instance_type(
                 } => {
                     ity.alias(Alias::CoreInstanceExport {
                         instance: *instance_index,
-                        kind: reencode.export_kind(*kind),
+                        kind: do_reencode(
+                            *kind,
+                            RoundtripReencoder::export_kind,
+                            reencode,
+                            "export kind",
+                        ),
                         name,
                     });
                 }
@@ -107,7 +125,15 @@ pub fn convert_instance_type(
                 }
             },
             InstanceTypeDeclaration::Export { name, ty } => {
-                ity.export(name.0, reencode.component_type_ref(*ty));
+                ity.export(
+                    name.0,
+                    do_reencode(
+                        *ty,
+                        RoundtripReencoder::component_type_ref,
+                        reencode,
+                        "component type",
+                    ),
+                );
             }
         }
     }
@@ -119,7 +145,7 @@ pub fn convert_instance_type(
 pub fn convert_results(
     result: Option<ComponentValType>,
     mut enc: ComponentFuncTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     enc.result(result.map(|v| reencode.component_val_type(v)));
 }
@@ -129,46 +155,18 @@ pub fn convert_results(
 pub fn encode_core_type_subtype(
     enc: CoreTypeEncoder,
     subtype: &SubType,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
-    match &subtype.composite_type.inner {
-        wasmparser::CompositeInnerType::Func(func) => {
-            enc.function(
-                func.params()
-                    .iter()
-                    .map(|val_type| reencode.val_type(*val_type).unwrap())
-                    .collect::<Vec<_>>(),
-                func.results()
-                    .iter()
-                    .map(|val_type| reencode.val_type(*val_type).unwrap())
-                    .collect::<Vec<_>>(),
-            );
-        }
-        wasmparser::CompositeInnerType::Array(array_ty) => {
-            enc.array(
-                &reencode.storage_type(array_ty.0.element_type).unwrap(),
-                array_ty.0.mutable,
-            );
-        }
-        wasmparser::CompositeInnerType::Struct(struct_ty) => {
-            enc.struct_(
-                struct_ty
-                    .fields
-                    .iter()
-                    .map(|field_ty| reencode.field_type(*field_ty).unwrap())
-                    .collect::<Vec<_>>(),
-            );
-        }
-        wasmparser::CompositeInnerType::Cont(_) => {
-            todo!()
-        }
-    }
+    let subty = reencode
+        .sub_type(subtype.to_owned())
+        .unwrap_or_else(|_| panic!("Could not encode type as subtype: {:?}", subtype));
+    enc.subtype(&subty);
 }
 
 /// Process Alias
 pub fn process_alias<'a>(
     a: &'a ComponentAlias<'a>,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) -> Alias<'a> {
     match a {
         ComponentAlias::InstanceExport {
@@ -186,7 +184,12 @@ pub fn process_alias<'a>(
             name,
         } => Alias::CoreInstanceExport {
             instance: *instance_index,
-            kind: reencode.export_kind(*kind),
+            kind: do_reencode(
+                *kind,
+                RoundtripReencoder::export_kind,
+                reencode,
+                "export kind",
+            ),
             name,
         },
         ComponentAlias::Outer { kind, count, index } => Alias::Outer {
@@ -201,7 +204,7 @@ pub fn process_alias<'a>(
 pub fn convert_component_type(
     ty: &ComponentType,
     enc: ComponentTypeEncoder,
-    reencode: &mut wasm_encoder::reencode::RoundtripReencoder,
+    reencode: &mut RoundtripReencoder,
 ) {
     match ty {
         ComponentType::Defined(comp_ty) => {
@@ -256,6 +259,9 @@ pub fn convert_component_type(
                     Some(u) => def_enc.stream(Some(reencode.component_val_type(*u))),
                     None => def_enc.future(None),
                 },
+                wasmparser::ComponentDefinedType::FixedSizeList(ty, len) => {
+                    def_enc.fixed_size_list(reencode.component_val_type(*ty), *len)
+                }
             }
         }
         ComponentType::Func(func_ty) => {
@@ -294,10 +300,26 @@ pub fn convert_component_type(
                         new_comp.alias(process_alias(a, reencode));
                     }
                     ComponentTypeDeclaration::Export { name, ty } => {
-                        new_comp.export(name.0, reencode.component_type_ref(*ty));
+                        new_comp.export(
+                            name.0,
+                            do_reencode(
+                                *ty,
+                                RoundtripReencoder::component_type_ref,
+                                reencode,
+                                "component type",
+                            ),
+                        );
                     }
                     ComponentTypeDeclaration::Import(imp) => {
-                        new_comp.import(imp.name.0, reencode.component_type_ref(imp.ty));
+                        new_comp.import(
+                            imp.name.0,
+                            do_reencode(
+                                imp.ty,
+                                RoundtripReencoder::component_type_ref,
+                                reencode,
+                                "component type",
+                            ),
+                        );
                     }
                 }
             }
@@ -581,5 +603,17 @@ pub(crate) fn update_memory_instr(op: &mut Operator, mapping: &HashMap<u32, u32>
             }
         }
         _ => panic!("Operation doesn't need to be checked for memory IDs!"),
+    }
+}
+
+pub(crate) fn do_reencode<I, O>(
+    i: I,
+    reencode: fn(&mut RoundtripReencoder, I) -> Result<O, wasm_encoder::reencode::Error>,
+    inst: &mut RoundtripReencoder,
+    msg: &str,
+) -> O {
+    match reencode(inst, i) {
+        Ok(o) => o,
+        Err(e) => panic!("Couldn't encode {} due to error: {}", msg, e),
     }
 }
