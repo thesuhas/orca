@@ -17,7 +17,8 @@ fn run_fac_wirm() {
         .output()
         .expect("failed to execute process");
     if !res.status.success() {
-        println!("{:?}", std::str::from_utf8(&res.stderr).unwrap());
+        println!("{}", std::str::from_utf8(&res.stdout).unwrap());
+        println!("{}", std::str::from_utf8(&res.stderr).unwrap());
     }
     assert!(res.status.success());
 
