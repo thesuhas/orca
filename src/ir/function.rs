@@ -15,7 +15,7 @@ use wasmparser::{Operator, TypeRef};
 /// Build a function from scratch
 /// See an example [here].
 ///
-/// [here]: https://github.com/thesuhas/orca/blob/314af2df01203e7715aa728e7388cf39c564e9d7/fac_orca/src/main.rs#L16
+/// [here]: https://github.com/thesuhas/wirm/blob/314af2df01203e7715aa728e7388cf39c564e9d7/fac_wirm/src/main.rs#L16
 pub struct FunctionBuilder<'a> {
     // pub(crate) id: u32, // function index
     pub(crate) params: Vec<DataType>,

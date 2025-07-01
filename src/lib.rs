@@ -1,4 +1,4 @@
-//! Orca is a WebAssembly Transformation Library for the Component Model. The design has been inspired by [Dfinity's IC]
+//! Wirm is a WebAssembly Transformation Library for the Component Model. The design has been inspired by [Dfinity's IC]
 //! and [Walrus].
 //!
 //! [Dfinity's IC]: https://github.com/dfinity/ic/tree/master/rs/wasm_transform

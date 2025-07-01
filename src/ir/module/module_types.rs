@@ -18,7 +18,7 @@ impl RecGroup {
     }
 }
 
-/// Orca's representation of types, initally shortened from [Walrus' Representation] but now extended to support WASM GC.
+/// Wirm's representation of types, initially shortened from [Walrus' Representation] but now extended to support WASM GC.
 ///
 /// [Walrus' Representation]: https://docs.rs/walrus/latest/walrus/struct.Type.html
 #[derive(Clone, Debug, Eq)]
@@ -293,12 +293,13 @@ impl ModuleTypes {
     }
 
     fn add_type(&mut self, ty: Types, id: usize) -> TypeID {
+        let already_exists = self.types_map.contains_key(&ty);
         let ty_id = *self
             .types_map
             .entry(ty.clone())
             .or_insert(TypeID(id as u32));
 
-        if !self.types_map.contains_key(&ty) {
+        if !already_exists {
             // add in this type if it's not already been added!
             self.types.insert(ty_id, ty.clone());
             self.groups.push(RecGroup::new(vec![ty_id], false));
@@ -458,7 +459,7 @@ impl ModuleTypes {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum HeapType {
     Abstract { shared: bool, ty: AbstractHeapType },
-    // TODO: See to replace UnpackedIndex with `orca` specific implementation
+    // TODO: See to replace UnpackedIndex with `wirm` specific implementation
     Concrete(UnpackedIndex),
 }
 

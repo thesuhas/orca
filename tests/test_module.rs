@@ -1,12 +1,12 @@
 use log::{debug, error};
-use orca_wasm::ir::function::FunctionBuilder;
-use orca_wasm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
-use orca_wasm::ir::module::module_functions::FuncKind::{Import, Local};
-use orca_wasm::ir::module::module_functions::{ImportedFunction, LocalFunction};
-use orca_wasm::ir::types::{Body, InitExpr, Value};
-use orca_wasm::{DataType, InitInstr, Module, Opcode};
 use std::path::PathBuf;
 use std::process::Command;
+use wirm::ir::function::FunctionBuilder;
+use wirm::ir::id::{ExportsID, FunctionID, ImportsID, TypeID};
+use wirm::ir::module::module_functions::FuncKind::{Import, Local};
+use wirm::ir::module::module_functions::{ImportedFunction, LocalFunction};
+use wirm::ir::types::{Body, InitExpr, Value};
+use wirm::{DataType, InitInstr, Module, Opcode};
 
 mod common;
 use crate::common::check_instrumentation_encoding;
@@ -328,7 +328,7 @@ fn test_add_import() {
     let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&buff, false).expect("Unable to parse module");
 
-    module.add_import_func("orca".to_string(), "better".to_string(), TypeID(2));
+    module.add_import_func("wirm".to_string(), "better".to_string(), TypeID(2));
 
     check_validity(
         file,
@@ -347,7 +347,7 @@ fn test_middle_local_to_import() {
 
     module.convert_local_fn_to_import(
         FunctionID(2),
-        "orca".to_string(),
+        "wirm".to_string(),
         "better".to_string(),
         TypeID(2),
     );
@@ -369,7 +369,7 @@ fn test_first_local_to_import() {
 
     module.convert_local_fn_to_import(
         FunctionID(1),
-        "orca".to_string(),
+        "wirm".to_string(),
         "better".to_string(),
         TypeID(2),
     );
@@ -391,7 +391,7 @@ fn test_last_local_to_import() {
 
     module.convert_local_fn_to_import(
         FunctionID(3),
-        "orca".to_string(),
+        "wirm".to_string(),
         "better".to_string(),
         TypeID(2),
     );

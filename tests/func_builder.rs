@@ -1,33 +1,36 @@
-use orca_wasm::ir::function::FunctionBuilder;
-use orca_wasm::ir::id::{FunctionID, TypeID};
-use orca_wasm::iterator::iterator_trait::Iterator;
-use orca_wasm::iterator::module_iterator::ModuleIterator;
-use orca_wasm::opcode::Instrumenter;
-use orca_wasm::{DataType, Opcode};
-use orca_wasm::{Location, Module};
 use std::process::Command;
+use wirm::ir::function::FunctionBuilder;
+use wirm::ir::id::{FunctionID, TypeID};
+use wirm::iterator::iterator_trait::Iterator;
+use wirm::iterator::module_iterator::ModuleIterator;
+use wirm::opcode::Instrumenter;
+use wirm::{DataType, Opcode};
+use wirm::{Location, Module};
 
-// #[test]
+#[test]
 // build factorial from scratch
-#[allow(dead_code)]
-fn run_fac_orca() {
-    // run cargo run in fac_orca dir
-    let a = Command::new("cargo")
+fn run_fac_wirm() {
+    // run cargo run in fac_wirm dir
+    let res = Command::new("cargo")
         .arg("run")
-        .current_dir("fac_orca")
+        .current_dir("fac_wirm")
         .output()
         .expect("failed to execute process");
-    assert!(a.status.success());
+    if !res.status.success() {
+        println!("{}", std::str::from_utf8(&res.stdout).unwrap());
+        println!("{}", std::str::from_utf8(&res.stderr).unwrap());
+    }
+    assert!(res.status.success());
 
-    let fac_generated = wasmprinter::print_file("fac_orca/target/out.wasm").unwrap();
-    let fac_standard = wasmprinter::print_file("fac_orca/fact.wasm").unwrap();
+    let fac_generated = wasmprinter::print_file("fac_wirm/target/out.wasm").unwrap();
+    let fac_standard = wasmprinter::print_file("fac_wirm/fact.wasm").unwrap();
     assert_eq!(fac_generated, fac_standard);
 }
 
 // #[test]
 // test start function instrumentation with FunctionModifier
 #[allow(dead_code)]
-fn run_start_orca() {
+fn run_start_wirm() {
     let file_name = "tests/test_inputs/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");
@@ -50,7 +53,7 @@ fn run_start_orca() {
 #[ignore]
 #[test]
 // test start function instrumentation with FunctionModifier
-fn run_start_orca_default() {
+fn run_start_wirm_default() {
     let file_name = "tests/test_inputs/handwritten/modules/start.wat";
     let wasm = wat::parse_file(file_name).expect("couldn't convert the input wat to Wasm");
     let mut module = Module::parse(&wasm, false).expect("Unable to parse");

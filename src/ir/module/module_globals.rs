@@ -100,7 +100,7 @@ impl Global {
         }
     }
 
-    /// Convert from wasmparser Global representation to Orca's representation.
+    /// Convert from wasmparser Global representation to Wirm's representation.
     /// Assumes this is a locally-defined global (not imported).
     pub(crate) fn from_wasmparser(global: wasmparser::Global) -> Result<Global> {
         let ty = global.ty;

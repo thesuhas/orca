@@ -56,7 +56,7 @@ pub trait HasInjectTag: TagUtils {
     }
 }
 
-/// Orca's Datatype. Combination of multiple [`wasmparser`] datatypes.
+/// Wirm's Datatype. Combination of multiple [`wasmparser`] datatypes.
 ///
 /// [ValType]: https://docs.rs/wasmparser/latest/wasmparser/enum.ValType.html
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Copy)]
@@ -258,7 +258,7 @@ impl From<ValType> for DataType {
     }
 }
 
-/// Converts from Orca's DataType to [`wasm_encoder::ValType`].
+/// Converts from Wirm's DataType to [`wasm_encoder::ValType`].
 ///
 /// [`wasm_encoder::ValType`]: https://docs.rs/wasm-encoder/0.214.0/wasm_encoder/enum.ValType.html
 impl From<&DataType> for wasm_encoder::ValType {

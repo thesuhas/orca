@@ -1,9 +1,9 @@
 [package]
-name = "fac_orca"
+name = "fac_wirm"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-orca = { path = "../../orca" }
+wirm = { path = "../../wirm" }
 wasmprinter = "0.235.0"
 wasmparser = "0.235.0"

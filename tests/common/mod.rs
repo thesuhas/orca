@@ -39,11 +39,11 @@ pub fn write_to_file(bytes: &[u8], path: impl AsRef<Path>) {
 // ==== TEST FRAMEWORK ====
 // ========================
 
-pub fn check_instrumentation_encoding(orca_wat: &String, file: &str) -> Result<(), std::io::Error> {
+pub fn check_instrumentation_encoding(wirm_wat: &String, file: &str) -> Result<(), std::io::Error> {
     let f = File::open(file)?;
     let mut reader = BufReader::new(f);
     let wat_with_instr = get_wat_with_inline_instrumentation(&mut reader)?;
-    assert_eq!(*orca_wat, wat_with_instr);
+    assert_eq!(*wirm_wat, wat_with_instr);
     Ok(())
 }
 

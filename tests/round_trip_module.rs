@@ -1,6 +1,6 @@
 use log::debug;
-use orca_wasm::ir::id::FunctionID;
-use orca_wasm::ir::module::Module;
+use wirm::ir::id::FunctionID;
+use wirm::ir::module::Module;
 
 mod common;
 use common::{write_to_file, WASM_OUTPUT_DIR, WAT_OUTPUT_DIR};

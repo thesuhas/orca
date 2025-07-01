@@ -106,12 +106,12 @@ impl<'b> Inject<'b> for ComponentIterator<'_, 'b> {
     /// # Example
     /// ```no_run
     /// use std::collections::HashMap;
-    /// use orca_wasm::ir::component::Component;
-    /// use orca_wasm::iterator::component_iterator::ComponentIterator;
+    /// use wirm::ir::component::Component;
+    /// use wirm::iterator::component_iterator::ComponentIterator;
     /// use wasmparser::Operator;
-    /// use orca_wasm::ir::types::{Location};
-    /// use orca_wasm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
-    /// use orca_wasm::opcode::{Instrumenter, Opcode};
+    /// use wirm::ir::types::{Location};
+    /// use wirm::iterator::iterator_trait::{IteratingInstrumenter, Iterator};
+    /// use wirm::opcode::{Instrumenter, Opcode};
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");

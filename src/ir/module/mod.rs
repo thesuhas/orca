@@ -114,7 +114,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Module;
+    /// use wirm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -632,7 +632,7 @@ impl<'a> Module<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use orca_wasm::Module;
+    /// use wirm::Module;
     ///
     /// let file = "path_to_file";
     /// let buff = wat::parse_file(file).expect("couldn't convert the input wat to Wasm");
@@ -643,7 +643,7 @@ impl<'a> Module<'a> {
         self.encode_internal(false).0.finish()
     }
 
-    /// Visits the Orca Module and resolves the special instrumentation by
+    /// Visits the Wirm Module and resolves the special instrumentation by
     /// translating them into the straightforward before/after/alt modes.
     fn resolve_special_instrumentation(
         &mut self,
@@ -1135,7 +1135,7 @@ impl<'a> Module<'a> {
         }
     }
 
-    /// Encodes an Orca Module to a wasm_encoder Module.
+    /// Encodes an Wirm Module to a wasm_encoder Module.
     /// This requires a mutable reference to self due to the special instrumentation resolution step.
     pub(crate) fn encode_internal(
         &mut self,
