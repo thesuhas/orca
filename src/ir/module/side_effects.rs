@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use wasmparser::{ExternalKind, Operator, TypeRef};
 
-impl Module<'_> {
-    pub fn pull_side_effects(&mut self) -> HashMap<InjectType, Vec<Injection>> {
+impl<'a> Module<'a> {
+    pub fn pull_side_effects(&mut self) -> HashMap<InjectType, Vec<Injection<'a>>> {
         self.encode_internal(true).1
     }
 }

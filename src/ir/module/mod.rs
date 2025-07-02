@@ -1140,7 +1140,10 @@ impl<'a> Module<'a> {
     pub(crate) fn encode_internal(
         &mut self,
         pull_side_effects: bool,
-    ) -> (wasm_encoder::Module, HashMap<InjectType, Vec<Injection>>) {
+    ) -> (
+        wasm_encoder::Module,
+        HashMap<InjectType, Vec<Injection<'a>>>,
+    ) {
         // First fix the ID mappings throughout the module
         let func_mapping = if self.functions.recalculate_ids {
             Self::recalculate_ids(
