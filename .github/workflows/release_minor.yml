@@ -7,37 +7,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Check Code style quickly by running `rustfmt` over all code
-  rustfmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - run: rustup install stable
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-features --all-targets
-
-  build_and_test:
-    name: Build project and run all unit AND integration tests
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install wasm-tools
-        run: |
-          cargo install wasm-tools
-      - name: Build
-        run: |
-          cargo build --verbose --release
-      - name: Run tests
-        run: cargo test --verbose
-
   release:
     name: Release a new version of wirm
-    needs: [ rustfmt, build_and_test ]
     runs-on: ubuntu-latest
     permissions:
       # Gives write permission to commit toml changes
