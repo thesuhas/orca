@@ -2471,7 +2471,8 @@ fn resolve_block_entry<'a, 'b, 'c>(
         Operator::Block { .. }
         | Operator::Loop { .. }
         | Operator::If { .. }
-        | Operator::Else { .. } => {
+        | Operator::Else { .. }
+        | Operator::TryTable { .. } => {
             // just inject immediately after the start of the block
             builder.after_at(Location::Module {
                 func_idx: FunctionID(0), // not used
@@ -2507,7 +2508,10 @@ fn plan_resolution_block_exit<'a, 'b, 'c>(
                 block_exit,
             );
         }
-        Operator::Block { .. } | Operator::Loop { .. } | Operator::Else { .. } => {
+        Operator::Block { .. }
+        | Operator::Loop { .. }
+        | Operator::Else { .. }
+        | Operator::TryTable { .. } => {
             // add body-to-inject as non-flagged
             let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
             save_not_flagged_body_to_resolve(
@@ -2537,7 +2541,8 @@ where
         Operator::Block { .. }
         | Operator::Loop { .. }
         | Operator::If { .. }
-        | Operator::Else { .. } => {
+        | Operator::Else { .. }
+        | Operator::TryTable { .. } => {
             let loc = Location::Module {
                 func_idx: FunctionID(0), // not used
                 instr_idx: idx,
@@ -2582,7 +2587,8 @@ where
         Operator::Block { .. }
         | Operator::Loop { .. }
         | Operator::If { .. }
-        | Operator::Else { .. } => {
+        | Operator::Else { .. }
+        | Operator::TryTable { .. } => {
             // add body-to-inject as non-flagged
             let block_id = block_stack.last().unwrap(); // should always have something (e.g. func block)
             save_not_flagged_body_to_resolve(

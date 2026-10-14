@@ -118,6 +118,7 @@ pub enum SupportedOperators {
     Loop,
     If,
     Else,
+    TryTable,
     // branching
     Br,
     BrIf,
@@ -339,6 +340,9 @@ pub fn run_block_injection<'a, 'b, 'c>(
                     }
                     SupportedOperators::Else => {
                         matches!(mod_it.curr_op().unwrap(), Operator::Else)
+                    }
+                    SupportedOperators::TryTable => {
+                        matches!(mod_it.curr_op().unwrap(), Operator::TryTable { .. })
                     }
                     SupportedOperators::Br => {
                         matches!(mod_it.curr_op().unwrap(), Operator::Br { .. })

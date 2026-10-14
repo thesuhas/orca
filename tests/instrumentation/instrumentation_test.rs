@@ -496,6 +496,115 @@ fn test_block_alt_remove_block_with_legacy_try() {
     });
 }
 
+// ==== TRY_TABLE ====
+
+const TRY_TABLE_MODULE: &str = "(module (func block try_table nop end end))";
+#[test]
+fn test_block_entry_try_table() {
+    run_module_instr_test(
+        "tests/test_inputs/instr_testing/modules/block_entry/try_table.wat",
+        |mod_it| {
+            run_block_injection(
+                mod_it,
+                &vec![(
+                    SupportedOperators::TryTable,
+                    (
+                        InstrumentationMode::BlockEntry,
+                        vec![Operator::I32Const { value: 12 }, Operator::Drop],
+                    ),
+                )],
+            );
+        },
+    );
+}
+
+fn inject_try_table_after(mod_it: &mut wirm::iterator::module_iterator::ModuleIterator<'_, '_>) {
+    run_block_injection(
+        mod_it,
+        &vec![(
+            SupportedOperators::TryTable,
+            (
+                InstrumentationMode::SemanticAfter,
+                vec![Operator::I32Const { value: 12 }, Operator::Drop],
+            ),
+        )],
+    );
+}
+
+#[test]
+fn test_try_table_after() {
+    run_module_instr_validate(TRY_TABLE_MODULE, inject_try_table_after);
+}
+
+#[test]
+fn test_semantic_after_try_table() {
+    run_module_instr_test(
+        "tests/test_inputs/instr_testing/modules/semantic_after/try_table.wat",
+        inject_try_table_after,
+    );
+}
+
+#[test]
+fn test_semantic_after_try_table_func_level() {
+    run_module_instr_test(
+        "tests/test_inputs/instr_testing/modules/semantic_after/try_table_func_level.wat",
+        inject_try_table_after,
+    );
+}
+
+#[test]
+fn test_semantic_after_try_table_with_catch() {
+    run_module_instr_test(
+        "tests/test_inputs/instr_testing/modules/semantic_after/try_table_with_catch.wat",
+        inject_try_table_after,
+    );
+}
+
+#[test]
+fn test_try_table_block_entry() {
+    run_module_instr_validate(TRY_TABLE_MODULE, |mod_it| {
+        run_block_injection(
+            mod_it,
+            &vec![(
+                SupportedOperators::TryTable,
+                (
+                    InstrumentationMode::BlockEntry,
+                    vec![Operator::I32Const { value: 12 }, Operator::Drop],
+                ),
+            )],
+        );
+    });
+}
+
+#[test]
+fn test_try_table_block_exit() {
+    run_module_instr_validate(TRY_TABLE_MODULE, |mod_it| {
+        run_block_injection(
+            mod_it,
+            &vec![(
+                SupportedOperators::TryTable,
+                (
+                    InstrumentationMode::BlockExit,
+                    vec![Operator::I32Const { value: 12 }, Operator::Drop],
+                ),
+            )],
+        );
+    });
+}
+
+#[test]
+fn test_try_table_block_alt() {
+    run_module_instr_validate(TRY_TABLE_MODULE, |mod_it| {
+        run_block_injection(
+            mod_it,
+            &vec![(
+                SupportedOperators::TryTable,
+                (InstrumentationMode::BlockAlt, vec![Operator::Nop]),
+            )],
+        );
+    });
+}
+
 // ==== BLOCK ENTRY ====
 
 #[test]
