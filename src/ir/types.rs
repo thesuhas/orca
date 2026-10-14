@@ -1490,6 +1490,7 @@ impl<'a> InstrumentationFlag<'a> {
                 | Operator::Loop { .. }
                 | Operator::If { .. }
                 | Operator::Else { .. }
+                | Operator::TryTable { .. }
         )
     }
 
