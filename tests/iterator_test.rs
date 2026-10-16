@@ -38,6 +38,25 @@ fn test_mod_iterator_count() {
     iterate_module_and_count(&mut mod_it, 1, 9);
 }
 
+#[test]
+fn test_mod_iterator_no_local_functions() {
+    for wat_src in [
+        "(module)",
+        r#"(module (import "env" "f" (func)) (memory 1))"#,
+    ] {
+        let buff = wat::parse_str(wat_src).expect("couldn't convert the input wat to Wasm");
+        let mut module = Module::parse(&buff, false, false).expect("Unable to parse");
+        {
+            let mut mod_it = ModuleIterator::new(&mut module, &vec![]);
+            assert!(mod_it.curr_op().is_none());
+            assert!(mod_it.next().is_none());
+            mod_it.reset();
+            assert!(mod_it.curr_op().is_none());
+        }
+        module.encode().expect("error encoding");
+    }
+}
+
 // example of a ModuleIterator
 #[test]
 fn test_blocks() {
