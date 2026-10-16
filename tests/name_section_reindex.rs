@@ -53,6 +53,113 @@ fn local_names_follow_function_after_import_insertion() {
     Module::parse(&out, false, false).expect("re-parse failed");
 }
 
+/// Encode an unsigned LEB128 integer.
+fn leb(mut n: u32) -> Vec<u8> {
+    let mut out = vec![];
+    loop {
+        let b = (n & 0x7f) as u8;
+        n >>= 7;
+        if n != 0 {
+            out.push(b | 0x80);
+        } else {
+            out.push(b);
+            break;
+        }
+    }
+    out
+}
+
+/// Encode a name-section string (length-prefixed bytes).
+fn name_bytes(s: &str) -> Vec<u8> {
+    let mut out = leb(s.len() as u32);
+    out.extend_from_slice(s.as_bytes());
+    out
+}
+
+/// Build a `name` custom section wrapping the given subsections (id, payload).
+fn name_custom_section(subs: &[(u8, Vec<u8>)]) -> Vec<u8> {
+    let mut payload = vec![];
+    for (id, pl) in subs {
+        payload.push(*id);
+        payload.extend(leb(pl.len() as u32));
+        payload.extend_from_slice(pl);
+    }
+    let mut body = name_bytes("name");
+    body.extend(payload);
+    let mut out = vec![0x00]; // custom section id
+    out.extend(leb(body.len() as u32));
+    out.extend(body);
+    out
+}
+
+/// Encode a function-name subsection payload from (index, name) pairs.
+fn func_names(pairs: &[(u32, &str)]) -> Vec<u8> {
+    let mut out = leb(pairs.len() as u32);
+    for (idx, nm) in pairs {
+        out.extend(leb(*idx));
+        out.extend(name_bytes(nm));
+    }
+    out
+}
+
+/// Encode a local-name subsection payload: a vec of (function index, vec of (local index, name)).
+fn local_names(entries: &[(u32, &[(u32, &str)])]) -> Vec<u8> {
+    let mut out = leb(entries.len() as u32);
+    for (func_idx, locals) in entries {
+        out.extend(leb(*func_idx));
+        out.extend(leb(locals.len() as u32));
+        for (local_idx, nm) in *locals {
+            out.extend(leb(*local_idx));
+            out.extend(name_bytes(nm));
+        }
+    }
+    out
+}
+
+#[test]
+fn malformed_func_name_index_is_ignored_not_fatal() {
+    // A valid two-function module with no name section of its own.
+    let wat = r#"
+        (module
+          (func (param i32) (result i32) local.get 0)
+          (func (export "_start") nop))
+    "#;
+    let mut buff = wat::parse_str(wat).unwrap();
+
+    // Append a name section that names function 0 (valid) and function 99
+    // (well past the two functions in the module). The bogus entry must be
+    // ignored, not crash the parser.
+    buff.extend(name_custom_section(&[(
+        1,
+        func_names(&[(0, "callee"), (99, "ghost")]),
+    )]));
+
+    let module = Module::parse(&buff, false, false).expect("parse must not panic");
+    // Re-encoding the parsed module must also succeed.
+    module.encode().expect("encode failed");
+}
+
+#[test]
+fn malformed_local_name_index_is_ignored_not_fatal() {
+    // A valid two-function module with no name section of its own.
+    let wat = r#"
+        (module
+          (func (param i32) (result i32) local.get 0)
+          (func (export "_start") nop))
+    "#;
+    let mut buff = wat::parse_str(wat).unwrap();
+
+    // A local-name subsection naming function 77 (well past the two functions
+    // in the module) must be ignored, not crash the parser.
+    buff.extend(name_custom_section(&[(
+        2,
+        local_names(&[(77, &[(0, "a")])]),
+    )]));
+
+    let module = Module::parse(&buff, false, false).expect("parse must not panic");
+    module.encode().expect("encode failed");
+}
+
 #[test]
 fn local_names_preserved_on_unmodified_roundtrip() {
     let wat = r#"
