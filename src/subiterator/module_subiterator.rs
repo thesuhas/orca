@@ -77,6 +77,12 @@ impl ModuleSubIterator {
     /// Resets the ModuleSubIterator when it is not a Child SubIterator
     pub fn reset(&mut self) {
         self.curr_idx = 0;
+        // A module with no local functions has nothing to position at: leave
+        // the iterator in its "done" state.
+        if self.metadata.is_empty() {
+            self.func_iterator.reset(0);
+            return;
+        }
         self.handle_skips();
         self.func_iterator.reset(self.get_curr_func().1);
     }
