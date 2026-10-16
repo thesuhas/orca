@@ -450,10 +450,14 @@ impl<'a> Module<'a> {
                                                     }
                                                 }
                                             } else {
-                                                let rel_idx = abs_idx - imports.num_funcs;
-                                                // assert!(0 < rel_idx && rel_idx < code_sections.len() as u32);
-                                                bodies_and_names[rel_idx as usize].1 =
-                                                    Some(naming.name.to_string());
+                                                // Skip over invalid name section entries in the input module
+                                                let rel_idx =
+                                                    (abs_idx - imports.num_funcs) as usize;
+                                                if let Some(entry) =
+                                                    bodies_and_names.get_mut(rel_idx)
+                                                {
+                                                    entry.1 = Some(naming.name.to_string());
+                                                }
                                             }
                                         }
                                     }
@@ -472,8 +476,11 @@ impl<'a> Module<'a> {
                                                 continue;
                                             }
                                             let rel_idx = (abs_idx - imports.num_funcs) as usize;
-                                            bodies_and_names[rel_idx].2 =
-                                                Some(namemap_parser2encoder(indirect.names));
+                                            // defend against invalid name section entries for locals
+                                            if let Some(entry) = bodies_and_names.get_mut(rel_idx) {
+                                                entry.2 =
+                                                    Some(namemap_parser2encoder(indirect.names));
+                                            }
                                         }
                                     }
                                     wasmparser::Name::Label(names) => {
